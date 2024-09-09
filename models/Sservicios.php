@@ -76,12 +76,11 @@ class Sservicios extends CI_Model {
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicios | getEquipSectores(".json_encode($data).")");
 		$id = $data["id_sector"];
 		$this->assetDB->select('equipos.id_equipo, equipos.codigo');
-				$this->assetDB->from('equipos');
-				$this->assetDB->where('equipos.estado', 'AC');
-				$this->assetDB->where('equipos.id_sector', $id);
-				$query = $this->assetDB->get();
-		if ($query->num_rows()!=0)
-		{
+		$this->assetDB->from('equipos');
+		$this->assetDB->where('equipos.estado', 'AC');
+		$this->assetDB->where('equipos.id_sector', $id);
+		$query = $this->assetDB->get();
+		if ($query->num_rows()!=0){
 			$i = 0;
 			foreach ($query->result() as $row)
 			{   
@@ -89,7 +88,7 @@ class Sservicios extends CI_Model {
 				$data2[$i]["id_equipo"]   = $row->id_equipo;
 				$i++;
 			}		
-					return $data2;
+			return $data2;
 		}	    
 	}	
 

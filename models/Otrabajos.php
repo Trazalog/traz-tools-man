@@ -133,51 +133,51 @@ class Otrabajos extends CI_Model {
 	
 	// Trae equipos por empresa logueada - Listo
 	function getEquiposNuevaOT(){
-		$userdata = $this->session->userdata('user_data');
-		$empId = $userdata[0]['id_empresa']; 
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | listOrden()");
+		$empId = empresa();
 			
 		$this->assetDB->select('equipos.id_equipo,equipos.codigo');
 		$this->assetDB->from('equipos');
 		$this->assetDB->where('equipos.estado!=', 'AN');
-		$this->assetDB->where('equipos.id_empresa', $empId);    	
-		$query= $this->assetDB->get();		
+		$this->assetDB->where('equipos.id_empresa', $empId);
+		$query = $this->assetDB->get();
 		
-	 	if ($query->num_rows()!=0)
-	 	{
-	 		return $query->result_array();	
-	 	}
-	 	else
-	 	{	
+	 	if ($query->num_rows()!=0){
+	 		return $query->result_array();
+	 	}else{	
 	 		return false;
 	 	}	
 	}
-	// Trae info de equipos por ID y por empresa logueada - Listo
+	/**
+    * Trae info de equipos por ID y por empresa logueada
+    * @param Integer $id_equipo id del equipo
+    * @return Array data del equipo
+    */
 	function getInfoEquiposNuevaOT($id){
-
-		$userdata = $this->session->userdata('user_data');
-    $empId = $userdata[0]['id_empresa']; 
-			
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getInfoEquipoNuevaOT($id)");
+    	$empId = empresa();
+		
 		$this->assetDB->select('equipos.*, marcasequipos.marcadescrip, admcustomers.cliRazonSocial AS nomCli');
 		$this->assetDB->join('marcasequipos', 'marcasequipos.marcaid = equipos.marca');
 		$this->assetDB->join('admcustomers', 'admcustomers.cliId = equipos.id_customer' );
-		$this->assetDB->from('equipos');    	
+		$this->assetDB->from('equipos');
 		$this->assetDB->where('equipos.id_empresa', $empId);
-		$this->assetDB->where('equipos.id_equipo', $id);	 	
-		$query= $this->assetDB->get();   
+		$this->assetDB->where('equipos.id_equipo', $id); 	
+		$query= $this->assetDB->get();
 	
-		if ($query->num_rows()!=0)
-		{
+		if ($query->num_rows()!=0){
 			return $query->result_array();
-		}
-		else
-		{
+		}else{
 			return false;
 		}
 	}
-
-
+	/**
+	 * Devuelve la descripcion para una tarea estandar.por ID
+	 * @param Integer $id_tar id de tarea
+	 * @return String descripcion de la tarea.
+	*/
 	function getDescTareaSTD($id_tar){
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getDescTareaSTD(ID tarea: $id_tar)");
 		$this->assetDB->select('tareas.descripcion');
 		$this->assetDB->from('tareas');
 		$this->assetDB->where('tareas.id_tarea', $id_tar);
@@ -186,19 +186,16 @@ class Otrabajos extends CI_Model {
 		
 		return $row->descripcion; 
 	}
-
-
-
 	/**
 	 * Guarda Orden de Trabajo
-	 *
-	 * @param   Array   $data   Arreglo con los datos de la OT.
+	 * @param Array $data array con los datos de la OT.
+	 * @return Int Id de la OT guardada.
 	 */
-	function guardar_agregar($data) // Ok
-	{
-			$this->assetDB->insert("orden_trabajo", $data);
-			$id_insert = $this->assetDB->insert_id(); 
-			return $id_insert;
+	function guardar_agregar($data){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | guardar_agregar(".json_encode($data).")");
+		$this->assetDB->insert("orden_trabajo", $data);
+		$id_insert = $this->assetDB->insert_id(); 
+		return $id_insert;
 	}
 
 	/**
@@ -228,28 +225,23 @@ class Otrabajos extends CI_Model {
 
 
 	/**
-	 * Guarda Case id en OT
-	 *
-	 * @param   
+	 * Guarda el Case id generado por bonita en la OT
+	 * @param Integer $case_id id de case; @param Integer $id id de OT
+	 * @return Bool true si se actualizo, false si no.
 	 */
-	// guarda case_id en Otrabajo
 	function setCaseidenOTNueva($case_id, $id){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | setCaseidenOTNueva(case_id: $case_id |id_ot : $id");
 		$this->assetDB->where('orden_trabajo.id_orden', $id);
 		return $this->assetDB->update('orden_trabajo', array('case_id'=>$case_id));			
 	}
-
-
-
-
-	
 	//////////////		EDICION 	//////////////////
 		/**
 		 * Devuelve valores de la OT con id_orden = $id.
-		 *
-		 * @param   Int     Id de Orden de Trabajo.
+		 * @param Integer Id de Orden de Trabajo.
+		 * @return Array datos de la OT
 		 */
-		function getpencil($id) // Ok
-		{
+		function getpencil($id) {
+			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getpencil(id OT: $id");
 			$this->assetDB->select('orden_trabajo.id_orden,
 												orden_trabajo.id_tarea,												
 												orden_trabajo.nro,
@@ -291,11 +283,14 @@ class Otrabajos extends CI_Model {
 				return 0;
 			}
 		}
-		// Trae herramientas ppor id de preventivo para Editar
+		/**
+		 * Trae herramientas por id de preventivo para Editar
+		 *  @param Integer $idp id de la orden de trabajo
+		 *  @return Array herramientas de la OT
+		*/
 		function getOTHerramientas($id){
-					
-			$userdata = $this->session->userdata('user_data');
-			$empId = $userdata[0]['id_empresa']; 
+			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTHerramientas(id OT: $id");	
+			$empId = empresa(); 
 
 			$this->assetDB->select('tbl_otherramientas.cantidad,
 													herramientas.herrcodigo,
@@ -308,42 +303,46 @@ class Otrabajos extends CI_Model {
 			$this->assetDB->where('tbl_otherramientas.id_empresa', $empId);
 			$query= $this->assetDB->get();
 
-			if( $query->num_rows() > 0)
-			{
+			if( $query->num_rows() > 0){
 				return $query->result_array();
-			}
-			else {
+			}else{
 				return 0;
 			}
 		}
-		// Trae insumos por id de preventivo para Editar
+		/**
+		 * Trae insumos por id de preventivo para Editar
+		 *  @param Integer $idp id de la orden de trabajo
+		 *  @return Array insumos de la OT
+		*/
 		function getOTInsumos($id){
+			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTHerramientas(id OT: $id");	
+			$empId = empresa(); 
 
-				$userdata = $this->session->userdata('user_data');
-				$empId = $userdata[0]['id_empresa']; 
+			$this->assetDB->select('tbl_otinsumos.id,
+													tbl_otinsumos.cantidad,
+													articles.artBarCode,
+													articles.artId,
+													articles.artDescription,
+													articles.id_empresa');                            
+			$this->assetDB->from('tbl_otinsumos');
+			$this->assetDB->join('articles', 'articles.artId = tbl_otinsumos.artId');   
+			$this->assetDB->where('tbl_otinsumos.otId', $id);        
+			$this->assetDB->where('articles.id_empresa', $empId);
+			$query= $this->assetDB->get(); 
 
-				$this->assetDB->select('tbl_otinsumos.id,
-														tbl_otinsumos.cantidad,
-														articles.artBarCode,
-														articles.artId,
-														articles.artDescription,
-														articles.id_empresa');                            
-				$this->assetDB->from('tbl_otinsumos');
-				$this->assetDB->join('articles', 'articles.artId = tbl_otinsumos.artId');   
-				$this->assetDB->where('tbl_otinsumos.otId', $id);        
-				$this->assetDB->where('articles.id_empresa', $empId);
-				$query= $this->assetDB->get(); 
-
-				if( $query->num_rows() > 0)
-				{
-					return $query->result_array();
-				}
-				else {
-					return 0;
-				}
-		}	
-		// Trae adjuntos de OT por id
+			if( $query->num_rows() > 0){
+				return $query->result_array();
+			}else {
+				return 0;
+			}
+		}
+		/**
+		 * 	Trae adjuntos de OT por id
+		 *  @param Integer $idp id de la orden de trabajo
+		 *  @return Array insumos de la OT
+		*/
 		function getOTadjuntos($id){
+			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTadjuntos(id OT: $id");	
 			$this->assetDB->select('tbl_otadjuntos.*');
 			$this->assetDB->from('tbl_otadjuntos');
 			$this->assetDB->where('tbl_otadjuntos.otId', $id);
@@ -369,8 +368,13 @@ class Otrabajos extends CI_Model {
 				$query = $this->assetDB->update("orden_trabajo",$data);
 				return $query;
 		}
-		// guarda adjunto en Edicion y en OT nueva
-		function setAdjunto($adjunto){	
+		/**
+		 * guarda adjunto en Edicion y en OT nueva
+		 * @param String $adjunto nombre codificado del adjunto.
+		 * @return Bool  true/false segun resultado de la operacion.
+		 */
+		function setAdjunto($adjunto){
+			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | setAdjunto(nombre: $adjunto");
 			$query = $this->assetDB->insert("tbl_otadjuntos", $adjunto);
 			return $query;
 		}
@@ -386,9 +390,14 @@ class Otrabajos extends CI_Model {
 			$this->assetDB->where('otId', $id);
 			$query = $this->assetDB->delete('tbl_otherramientas');
 			return $query;
-		}	
-		// Guarda el bacht de datos de herramientas 
+		}
+		/**
+		*Guarda el batch de datos de herramientas cargados en la OT
+		* @param Array $herram datos de las herramientas
+		* @return Int/Bool id de la cantidad de herramientas guardadas o false si no se guardo.
+		*/
 		function insertOTHerram($herram){
+			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | insertOTHerram(". json_encode($herram).")");
 			$query = $this->assetDB->insert_batch("tbl_otherramientas",$herram);
 			return $query;
 		}
@@ -398,8 +407,14 @@ class Otrabajos extends CI_Model {
 			$query = $this->assetDB->delete('tbl_otinsumos');
 			return $query;
 		}
+		/**
+		*Guarda el batch de datos de insumos cargados en la OT
+		* @param Array $insumo datos de los insumos
+		* @return Int/Bool id de la cantidad de insumos guardados o false si no se guardo.
+		*/
 		// Guarda el bacht de insumos 
 		function insertOTInsum($insumo){
+			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | insertOTInsum(". json_encode($insumo).")");
 			$query = $this->assetDB->insert_batch("tbl_otinsumos",$insumo);
 			return $query;
 		}
@@ -527,19 +542,6 @@ class Otrabajos extends CI_Model {
 			return false;
 		}		
 	}
-
-
-
-
-
-
-
-
-
-
-
-
-
     function traer_cli()
     {
         $userdata = $this->session->userdata('user_data');
@@ -736,18 +738,6 @@ class Otrabajos extends CI_Model {
 			
 		}
 	}
-
-	/*	  function getusuario(){
-        $query = $this->assetDB->query("SELECT * FROM sisusers");
-        $i=0;
-        foreach ($query->result() as $row)
-        {	
-        	$insumos[$i]['label'] = $row->usrName;
-            $insumos[$i]['value'] = $row->usrId;
-            $i++;
-        }
-        return $insumos;
-    }*/
 
 	function getnums($id){
 
@@ -974,21 +964,21 @@ class Otrabajos extends CI_Model {
     	}
     }
 
-
-    //devuelve valores de todos los datos de la OT para mostrar en modal.
-    function getOrigenOt($idot)
-    {
+	/**
+	 * Devuelve valores de todos los datos de la OT para mostrar en modal.
+	 * @param Integer $idot id de la orden de trabajo
+	 * @return array datos de la OT
+	*/
+    function getOrigenOt($idot){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOrigenOt($idot)");
     	$this->assetDB->select('orden_trabajo.tipo, orden_trabajo.id_solicitud');
         $this->assetDB->from('orden_trabajo');
         $this->assetDB->where('orden_trabajo.id_orden', $idot);
 
         $query = $this->assetDB->get();
-        if($query->num_rows()!=0)
-        {
+        if($query->num_rows()!=0){
             return $query->result();
-        }
-        else
-        {
+        }else{
             return false;
         }
     }
@@ -1277,23 +1267,25 @@ class Otrabajos extends CI_Model {
 						return null;
 				}
 	  }
+	/**
+	* Devuelve los datos de la OT para mostrar en modal.
+	* @param 
+	* @return array datos de la OT
+	*/
+	function getLecturasOrden($id_ot){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getLecturasOrden(id_ot : $id_ot");
+		$this->assetDB->select('orden_trabajo.fecha_inicio,
+							orden_trabajo.fecha_terminada');
+		$this->assetDB->from('orden_trabajo');
+		$this->assetDB->where('orden_trabajo.id_orden', $id_ot);
+		$query = $this->assetDB->get();
 
-	  function getLecturasOrden($id_ot) //
-	  {		
-			  $this->assetDB->select('orden_trabajo.fecha_inicio,
-								 orden_trabajo.fecha_terminada');
-			  $this->assetDB->from('orden_trabajo');
-			  $this->assetDB->where('orden_trabajo.id_orden', $id_ot);
-			  $query = $this->assetDB->get();
-			  if ($query->num_rows()!=0)
-			  {
-					  return $query->result_array();
-			  }
-			  else
-			  {   
-					  return false;
-			  }   
-	  }
+		if ($query->num_rows()!=0){
+			return $query->result_array();
+		}else{   
+			return false;
+		}   
+	}
 
 		function getViewDataComponenteEquipoBacklog($idComponenteEquipo)
 		{
@@ -1508,44 +1500,42 @@ class Otrabajos extends CI_Model {
 			$this->assetDB->set('longitud', $lon);
 			return $this->assetDB->update('orden_trabajo');
 		}
-
-		public function eliminar($id)
-		{
-			$this->assetDB->where('id_orden', $id);
-			return $this->assetDB->delete('orden_trabajo');
-		}
+	/**
+	 * Elimina una OT por su ID
+	 * @param Integer $id id de la orden de trabajo
+	 * @return Bool true/false segun resultado de la operacion
+	*/
+	public function eliminar($id){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | eliminar(ID ot: $id)");
+		$this->assetDB->where('id_orden', $id);
+		return $this->assetDB->delete('orden_trabajo');
+	}
 
 	public function filtrarListado($data, $tipo){
-		$userdata = $this->session->userdata('user_data');
-		$empId    = $userdata[0]['id_empresa'];
-		//
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | filtrarListado(Data:".json_encode($data)." Tipo: $tipo)");
+		$empId    = empresa();
 		$this->assetDB->select('orden_trabajo.*, tareas.descripcion as tareaSTD,
-												tbl_tipoordentrabajo.descripcion AS tipoDescrip,
-												user1.usrName AS nombre, user1.usrLastName,
-												sisusers.usrName, 
-												sisusers.usrLastName, equipos.codigo, 
-												0 as grpId,
-												equipos.id_equipo,
-												admcustomers.cliRazonSocial AS nomCli,
-												orden_servicio.id_orden AS ordenservicioId');
+								tbl_tipoordentrabajo.descripcion AS tipoDescrip,
+								user1.usrName AS nombre, user1.usrLastName,
+								sisusers.usrName, 
+								sisusers.usrLastName, equipos.codigo, 
+								0 as grpId,
+								equipos.id_equipo,
+								admcustomers.cliRazonSocial AS nomCli,
+								orden_servicio.id_orden AS ordenservicioId');
 		$this->assetDB->from('orden_trabajo');
 		$this->assetDB->join('tbl_tipoordentrabajo', 'tbl_tipoordentrabajo.tipo_orden = orden_trabajo.tipo');
 		$this->assetDB->join('sisusers', 'sisusers.usrId = orden_trabajo.id_usuario');
 		$this->assetDB->join('sisusers AS user1', 'orden_trabajo.id_usuario_a = user1.usrId', 'left');//usuario asignado?
 		$this->assetDB->join('equipos','equipos.id_equipo = orden_trabajo.id_equipo');
 		$this->assetDB->join('admcustomers','admcustomers.cliId = equipos.id_customer');
-
 		$this->assetDB->join('tareas', 'tareas.id_tarea = orden_trabajo.id_tarea', 'left');
-
 		//LEFT JOIN orden_servicio ON orden_trabajo.id_orden = orden_servicio.id_ot
-
 		$this->assetDB->join('orden_servicio', 'orden_trabajo.id_orden = orden_servicio.id_ot', 'left');
-	
 		$this->assetDB->where('equipos.estado !=','AN');
 
 		if($tipo == 1){
 			$this->assetDB->where('orden_trabajo.tipo', 1);
-			
 		}
 		//FILTRADO
 		//Entre Fechas
@@ -1566,15 +1556,9 @@ class Otrabajos extends CI_Model {
 		$this->assetDB->where('orden_trabajo.id_empresa', $empId);
 		$query = $this->assetDB->get();
 
-
-
-
-		if ($query->num_rows()!=0)
-		{
+		if ($query->num_rows()!=0){
 			return $query->result_array();
-		}
-		else
-		{
+		}else{
 			return false;
 		}
 	}

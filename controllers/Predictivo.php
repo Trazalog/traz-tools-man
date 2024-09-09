@@ -9,31 +9,24 @@ class Predictivo extends CI_Controller {
 		$this->load->model('Predictivos');
 		$this->load->model('Otrabajos');
 	}
-
-	public function index($permission){
-
-		$data = $this->session->userdata();
-		log_message('DEBUG','#Main/index | Predictivo >> data '.json_encode($data)." ||| ". $data['user_data'][0]['usrName'] ." ||| ".empty($data['user_data'][0]['usrName']));
-	
-		if(empty($data['user_data'][0]['usrName'])){
-			log_message('DEBUG','#Main/index | Cerrar Sesion >> '.base_url());
-			$var = array('user_data' => null,'username' => null,'email' => null, 'logged_in' => false);
-			$this->session->set_userdata($var);
-			$this->session->unset_userdata(null);
-			$this->session->sess_destroy();
-	
-			echo ("<script>location.href='login'</script>");
-	
-		}else{
-
-			$data['list'] = $this->Predictivos->predictivo_List();
-			$data['permission'] = $permission;
-			$this->load->view('predictivo/list', $data);
-		}
+	/**
+    * Carga vista principal de Predictivo
+    * @param 
+    * @return view listado Predictivo
+    */
+	public function index($permission = "Add-Edit-Del-"){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivo | index()");
+		$data['list'] = $this->Predictivos->predictivo_List();
+		$data['permission'] = $permission;
+		$this->load->view('predictivo/list', $data);
 	}
-
-	// Carga vista nuevo Predictivo
-	public function cargarpredictivo($permission){ 
+	/**
+    * Carga vista nuevo Predictivo
+    * @param 
+    * @return view agregar nuevo Predictivo
+    */
+	public function cargarpredictivo($permission){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivo | cargarpredictivo()");
         $data['permission'] = $permission;    // envia permisos       
         $this->load->view('predictivo/view_',$data);
     }
@@ -54,17 +47,19 @@ class Predictivo extends CI_Controller {
 		}
 		else echo "nada";
 	}
-
-	// Trae info de equipos por ID y por empresa logueada - Listo
+	/**
+    * Trae info de equipos por ID y por empresa logueada
+    * @param Integer $id_equipo id del equipo
+    * @return Array  data del equipo
+    */
 	public function getInfoEquipo(){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivo | getInfoEquipo()");
 		$id = $this->input->post('id_equipo');
 		$equipo = $this->Predictivos->getInfoEquipos($id);
 
-		if($equipo)
-		{	
+		if($equipo){	
 			$arre=array();
-	        foreach ($equipo as $row ) 
-	        {   
+	        foreach ($equipo as $row) {   
 	           $arre[]=$row;
 	        }
 			echo json_encode($arre);
@@ -81,11 +76,10 @@ class Predictivo extends CI_Controller {
 
 	// Trae unidades de tiempo - Listo
 	public function getUnidTiempo(){
-		
+			
 		$tarea = $this->Predictivos->getUnidTiempos();
 
-		if($tarea)
-		{	
+		if($tarea){	
 			$arre=array();
 	        foreach ($tarea as $row ) 
 	        {   
@@ -95,116 +89,119 @@ class Predictivo extends CI_Controller {
 		}
 		else echo "nada";
 	}
-
-	// Guarda predictivos nuevos - Listo
+	/**
+    * Guarda predictivos nuevos
+    * @param array $data datos cargados en formulario del predictivo nuevo
+    * @return bool true o false segun resultado de las operaciones
+    */
 	public function guardar_predictivo(){
-		
-		$userdata = $this->session->userdata('user_data');
-    $empId = $userdata[0]['id_empresa'];		
-
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivo | guardar_predictivo()");
+    	$empId = empresa();		
 		$data     = $this->input->post();
-		$eq = $this->input->post('equipo');//
-		$ta = $this->input->post('id_tarea');//
-		$fe = $this->input->post('vfecha');//
-		$per = $this->input->post('periodo');//
-		$can = $this->input->post('cantidad');//
-		$hh = floatval($this->input->post('hshombre'));//
-		$dur = $this->input->post('duracion');//
-		$uTi = $this->input->post('unidad');//
-		$op = $this->input->post('cantOper');//
+		$eq = $this->input->post('equipo');
+		$ta = $this->input->post('id_tarea');
+		$fe = $this->input->post('vfecha');
+		$per = $this->input->post('periodo');
+		$can = $this->input->post('cantidad');
+		$hh = floatval($this->input->post('hshombre'));
+		$dur = $this->input->post('duracion');
+		$uTi = $this->input->post('unidad');
+		$op = $this->input->post('cantOper');
 		
 		$uno=substr($fe, 0, 2); 
         $dos=substr($fe, 3, 2); 
         $tres=substr($fe, 6, 4); 
         $resul = ($tres."/".$dos."/".$uno); 
 		
-		$datos = array(	'id_equipo'=>$eq,
-										'tarea_descrip'=>$ta,
-										'fecha'=>$resul,
-										'periodo'=>$per,
-										'cantidad'=>$can,
-										'horash'=>$hh,
-										'estado'=>'C',
-										'pred_duracion'=>$dur,
-										'pred_canth'=>$op,
-										'id_empresa'=>$empId,
-										'id_unidad'=>$uTi
-									);
-
+		$datos = array(	
+			'id_equipo'=>$eq,
+			'tarea_descrip'=>$ta,
+			'fecha'=>$resul,
+			'periodo'=>$per,
+			'cantidad'=>$can,
+			'horash'=>$hh,
+			'estado'=>'C',
+			'pred_duracion'=>$dur,
+			'pred_canth'=>$op,
+			'id_empresa'=>$empId,
+			'id_unidad'=>$uTi
+		);
 		$response['respPredictivo'] = $this->Predictivos->insert_predictivo($datos);
 
-		if($response['respPredictivo']){
-
-			$ultimoId = $this->db->insert_id(); 	
+		if($response['respPredictivo']['status']){
+			$ultimoId = $response['respPredictivo']['id']; 	
 			////////// para guardar herramientas                 
-				if ( !empty($data['id_her']) ){
-					//saco array con herramientas y el id de empresa
-					$herr = $data["id_her"]; 
-					$i = 0;
-					foreach ($herr as $h) {
-						$herramPred[$i]['herrId']= $h;
-						$herramPred[$i]['id_empresa']= $empId;
-						$i++;                                
-					} 
-					//saco array con cant de herramientas y el id de preventivo 
-					$cantHerr = $data["cant_herr"];
-					$z = 0;
-					foreach ($cantHerr as $c) {
-						$herramPred[$z]['cantidad']= $c;
-						$herramPred[$z]['predId']= $ultimoId;
-						$z++;                                
-					}				
-					// Guarda el bacht de datos de herramientas
-					$response['respHerram'] = $this->Predictivos->insertPredHerram($herramPred);
-				}else{
-
-					$response['respHerram'] = true;	// no habia herramientas
-				}	
-
-			////////// para guardar insumos
-				if ( !empty($data['id_insumo']) ){
-					//saco array con herramientas y el id de empresa
-					$ins = $data["id_insumo"]; 
-					$j = 0;
-					foreach ($ins as $in) {
-						$insumoPred[$j]['artId'] = $in;
-						$insumoPred[$j]['id_empresa'] = $empId;
-						$j++;                                
-					} 
-					//saco array con cant de herramientas y el id de preventivo 
-					$cantInsum = $data["cant_insumo"];
-					$z = 0;
-					foreach ($cantInsum as $ci) {
-						$insumoPred[$z]['cantidad'] = $ci;
-						$insumoPred[$z]['predId'] = $ultimoId;
-						$z++;                                
-					}
-					// Guarda el bacht de datos de herramientas
-					$response['respInsumo'] = $this->Predictivos->insertPredInsum($insumoPred);
-				}else{
-
-					$response['respInsumo'] = true;	// no habia insumos
-				}	
-				
-			////////// Subir imagen o pdf 
-				$nomcodif = $this->codifNombre($ultimoId,$empId); // codificacion de nomb  		
-				$config = [
-					"upload_path" => "./assets/filespredictivos",
-					'allowed_types' => "png|jpg|pdf|xlsx",
-					'file_name'=> $nomcodif
-				];
-
-				$this->load->library("upload",$config);
-				if ($this->upload->do_upload('inputPDF')) {
-					
-					$data = array("upload_data" => $this->upload->data());
-					$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
-					$nomcodif = $nomcodif.$extens;
-					$adjunto = array('pred_adjunto' => $nomcodif);
-					$response['respNomImagen'] = $this->Predictivos->updateAdjunto($adjunto,$ultimoId);
-				}else{
-					$response['respImagen'] = false;
+			if ( !empty($data['id_her']) ){
+				//saco array con herramientas y el id de empresa
+				$herr = $data["id_her"]; 
+				$i = 0;
+				foreach ($herr as $h) {
+					$herramPred[$i]['herrId']= $h;
+					$herramPred[$i]['id_empresa']= $empId;
+					$i++;                                
+				} 
+				//saco array con cant de herramientas y el id de preventivo 
+				$cantHerr = $data["cant_herr"];
+				$z = 0;
+				foreach ($cantHerr as $c) {
+					$herramPred[$z]['cantidad']= $c;
+					$herramPred[$z]['predId']= $ultimoId;
+					$z++;                                
 				}				
+				// Guarda el bacht de datos de herramientas
+				$response['respHerram'] = $this->Predictivos->insertPredHerram($herramPred);
+			}else{
+
+				$response['respHerram'] = true;	// no habia herramientas
+			}	
+			////////// para guardar insumos
+			if ( !empty($data['id_insumo']) ){
+				//saco array con herramientas y el id de empresa
+				$ins = $data["id_insumo"]; 
+				$j = 0;
+				foreach ($ins as $in) {
+					$insumoPred[$j]['artId'] = $in;
+					$insumoPred[$j]['id_empresa'] = $empId;
+					$j++;                                
+				} 
+				//saco array con cant de herramientas y el id de preventivo 
+				$cantInsum = $data["cant_insumo"];
+				$z = 0;
+				foreach ($cantInsum as $ci) {
+					$insumoPred[$z]['cantidad'] = $ci;
+					$insumoPred[$z]['predId'] = $ultimoId;
+					$z++;                                
+				}
+				// Guarda el bacht de datos de herramientas
+				$response['respInsumo'] = $this->Predictivos->insertPredInsum($insumoPred);
+			}else{
+
+				$response['respInsumo'] = true;	// no habia insumos
+			}		
+			////////// Subir imagen o pdf 
+			$nomcodif = $this->codifNombre($ultimoId,$empId); // codificacion de nomb
+			$upload_path = "./assets/filespredictivos";
+            if (!is_dir($upload_path)) {
+                mkdir($upload_path, 0755, true);
+            }
+			
+			$config = [
+				"upload_path" => $upload_path,
+				'allowed_types' => "png|jpg|pdf|xlsx",
+				'file_name'=> $nomcodif
+			];
+
+			$this->load->library("upload",$config);
+			if ($this->upload->do_upload('inputPDF')) {
+				
+				$data = array("upload_data" => $this->upload->data());
+				$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
+				$nomcodif = $nomcodif.$extens;
+				$adjunto = array('pred_adjunto' => $nomcodif);
+				$response['respNomImagen'] = $this->Predictivos->updateAdjunto($adjunto,$ultimoId);
+			}else{
+				$response['respImagen'] = false;
+			}				
 		}		
 		
 		// si todas las inserciones se hicieron devuelve true
@@ -213,7 +210,6 @@ class Predictivo extends CI_Controller {
 		} else {
 			$result = false;
 		}
-		
 		echo json_encode($result);			
 	}
 

@@ -1,10 +1,8 @@
 <?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
 
-class Preventivos extends CI_Model
-{
-	function __construct()
-	{
+class Preventivos extends CI_Model{
+	function __construct(){
 		parent::__construct();
         $this->assetDB = $this->load->database('asset_db', TRUE);
 	}
@@ -16,9 +14,7 @@ class Preventivos extends CI_Model
 	*/
 	function preventivos_List(){	
         log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | preventivos_List()");
-		log_message('DEBUG', "HARCODE EMPR_ID 6");
-		$userdata = $this->session->userdata('user_data');
-		$empId = 6;
+		$empId = empresa();
 
 		$this->assetDB->select('preventivo.prevId, 
 											preventivo.id_equipo, 
@@ -49,14 +45,15 @@ class Preventivos extends CI_Model
 			return  $data;
 		}
 	}
+    /**
+	* Trae equipos por empresa logueada
+	* @param 
+	* @return array lista de equipos
+	*/
+	function getequipo(){
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Preventivos | getequipo()");
+        $empId = empresa(); 
 
-//// Edicion	
-
-	// Trae equipos por empresa logueada - Listo
-	function getequipo()
-    {
-		$userdata = $this->session->userdata('user_data');
-        $empId    = $userdata[0]['id_empresa']; 
         $this->assetDB->select('equipos.*');
         $this->assetDB->from('equipos');
         $this->assetDB->join('grupo', 'grupo.id_grupo=equipos.id_grupo');
@@ -74,19 +71,19 @@ class Preventivos extends CI_Model
         
         $query= $this->assetDB->get();   
 
-        if ($query->num_rows()!=0)
-        {
+        if ($query->num_rows()!=0){
             return $query->result_array();
-        }
-        else
-        {
+        }else{
             return false;
         }
 	}
-
-    // Trae unidades de tiempo  - Listo
+    /**
+	* Trae unidades de tiempo
+	* @param 
+	* @return array lista de unidades de tiempo
+	*/
     function getUnidTiempos(){
-
+        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | getUnidTiempos()");
         $this->assetDB->select('unidad_tiempo.*');
         $this->assetDB->from('unidad_tiempo');       
         $query= $this->assetDB->get();
@@ -132,11 +129,7 @@ class Preventivos extends CI_Model
 	*/
 	function gettarea(){
         log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | gettarea()");
-		log_message('DEBUG', "HARCODE EMPR_ID 6");
-
-		// $userdata = $this->session->userdata('user_data');
-        // $empresaId = $userdata[0]['id_empresa'];
-        $empId = 6;
+        $empId = empresa();
 
     	$this->assetDB->select('tareas.id_tarea AS value, tareas.descripcion AS label');
     	$this->assetDB->from('tareas');    	
@@ -152,10 +145,13 @@ class Preventivos extends CI_Model
             return false;
         }
 	}	
-
-	// Trae componente segun id de equipo - Listo
-	function getcomponente($id)
-    {
+    /**
+	*  Trae componente segun id de equipo
+	* @param integer $id id de equipo
+	* @return array lista de componenetes
+	*/
+	function getcomponente($id){
+        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | getcomponente($id)");
         $this->assetDB->distinct();
 	   	$this->assetDB->select('componentes.id_componente, componentes.descripcion');
     	$this->assetDB->from('componentes');
@@ -168,8 +164,7 @@ class Preventivos extends CI_Model
     	$query = $this->assetDB->get();
 		if($query->num_rows()>0){
             return $query->result_array();
-        }
-        else{
+        }else{
             return false;
         }
 	}
@@ -185,26 +180,30 @@ class Preventivos extends CI_Model
             return false;
         }
 	}
-
-	// Trae herramientas por empresa logueada - Listo
-	function getherramienta(){
-
-		$userdata = $this->session->userdata('user_data');
-        $empId = $userdata[0]['id_empresa']; 
+	/**
+	* Trae herramientas segun empresa logueada
+	* @param 
+	* @return array lista de herramientas
+	*/
+	public function getherramienta(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | getherramienta()");
+        $empId = empresa(); 
 
 		$query= $this->assetDB->get_where('herramientas',array('id_empresa' => $empId));
 		if($query->num_rows()>0){
             return $query->result();
-        }
-        else{
+        }else{
             return false;
         }
 	}
-
-	function getHerramientasB()
-	{
-		$userdata = $this->session->userdata('user_data');
-		$empId = $userdata[0]['id_empresa']; 
+    /**
+	* Trae herramientas por empresa logueada 
+	* @param 
+	* @return array lista de herramientas
+	*/
+	function getHerramientasB(){
+        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | getHerramientasB()");
+        $empId = empresa();
 		$this->assetDB->select('herramientas.herrId AS value, 
 				herramientas.herrcodigo AS codigo,
 				herramientas.herrmarca AS marca,
@@ -216,29 +215,30 @@ class Preventivos extends CI_Model
 		$query = $this->assetDB->get();
 
 		if($query->num_rows()>0){
-				return $query->result_array();
-		}
-		else{
-				return false;
+            return $query->result_array();
+		}else{
+            return false;
 		}
 	}
-
-	//Trae insumos (articles) por empresa logueada
+    /**
+	* Trae insumos (articles) por empresa logueada 
+	* @param 
+	* @return array lista de insumos
+	*/
 	function getinsumo(){
-		$userdata = $this->session->userdata('user_data');
-			$empId = $userdata[0]['id_empresa'];
-			$this->assetDB->select('articles.artId AS value, 
-												articles.artBarCode AS codigo,
-												articles.artDescription AS label');
-			$this->assetDB->from('articles');      
-			$this->assetDB->where('articles.id_empresa', $empId);
-			$this->assetDB->where('articles.artEstado !=', 'AN');
-			$this->assetDB->order_by('label', 'ASC');
-			$query = $this->assetDB->get();		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | getinsumo()");
+        $empId = empresa();
+        $this->assetDB->select('articles.artId AS value, 
+                                            articles.artBarCode AS codigo,
+                                            articles.artDescription AS label');
+        $this->assetDB->from('articles');      
+        $this->assetDB->where('articles.id_empresa', $empId);
+        $this->assetDB->where('articles.artEstado !=', 'AN');
+        $this->assetDB->order_by('label', 'ASC');
+        $query = $this->assetDB->get();		
 		if($query->num_rows()>0){
 			return $query->result();
-		}
-		else{
+		}else{
 			return false;
 		}
 	}
@@ -262,24 +262,40 @@ class Preventivos extends CI_Model
                 return false;
         }	
 	}
+    /**
+	* Guarda Preventivo
+	* @param array $data datos del preventivo
+	* @return array respuesta de la consulta
+	*/
+	function insert_preventivo($data){
+        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | insert_preventivo(" . json_encode($data). ")");
+        $query = $this->assetDB->insert("preventivo",$data);
+        $response['status'] = $query;
 
-	// Guarda Preventivo 
-	function insert_preventivo($data)
-    {  
-        $query = $this->assetDB->insert("preventivo",$data); 
-	    return $query;	   
+        if($response['status']){
+            $response['id'] = $this->assetDB->insert_id();
+            return $response;
+        }else{
+            return $response;
+        }
     }
-
-    // Guarda el bacht de datos de herramientas de Preventivo - Listo
+    /**
+	* Guarda el batch de datos de herramientas de Preventivo
+	* @param array $data2 datos de herramientas del preventivo
+	* @return integer cantidad de inserciones de la consulta
+	*/
 	function insertPrevHerram($data2){
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | insertPrevHerram(" . json_encode($data2). ")");
         $query = $this->assetDB->insert_batch("tbl_preventivoherramientas",$data2);
         return $query;
     }
-
-    // Guarda insumos del Preventivo - Listo 
+    /**
+	* Guarda el batch de datos de insumos de Preventivo
+	* @param array $data3 datos de insumos del preventivo
+	* @return integer cantidad de inserciones de la consulta
+	*/
     function insertPrevInsum($data3){
-
+        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | insertPrevInsum(" . json_encode($data2). ")");
         $query = $this->assetDB->insert_batch("tbl_preventivoinsumos",$data3);
         return $query;
     }
@@ -290,15 +306,17 @@ class Preventivos extends CI_Model
         $query = $this->assetDB->update("preventivo",$adjunto);
         return $adjunto;
     }
-
-    // Da de baja Preventivvo por id
+    /**
+    * Cambia el estado(eliminado logico) del preventivo por id
+    * @param integer $idprev id de preventivo
+    * @return bool true or false segun resultado de la operacion
+    */
     public function update_preventivo($data, $idprev){
+        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | update_preventivo()");
         $this->assetDB->where('prevId', $idprev);
         $query = $this->assetDB->update("preventivo",$data);
         return $query;
     }
-    
-
     //////////////////////////edicion  datos    
 
     // Trae info de Preventivo a Editar - Listo
@@ -515,12 +533,6 @@ class Preventivos extends CI_Model
         $query = $this->assetDB->insert("componentes",$data);
     	return $query;
     }
-
-    /*public function insert_preventivo($data)
-    {
-        $query = $this->assetDB->insert("preventivo",$data);
-        return $query;
-    }*/
 
 	public function insert_preventivoherramientas($data2)
     {
@@ -806,8 +818,6 @@ class Preventivos extends CI_Model
         $query = $this->assetDB->insert("orden_trabajo",$data);
         return $query;
     }
-
-
 
     /**
      * Preventivos:eliminarAdjunto

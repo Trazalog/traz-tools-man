@@ -2,16 +2,20 @@
 
 class Ordenservicios extends CI_Model {
 	
-    function __construct()
-    {
+    function __construct(){
 		parent::__construct();
         $this->assetDB = $this->load->database('asset_db', TRUE);
 	}
-	
-    function getOrdServiciosList()
-    {
-        $userdata  = $this->session->userdata('user_data');
-        $empresaId = $userdata[0]['id_empresa'];
+    /**
+    * Devuelve listado de ordenes de servicio por ID de empresa
+    * @param 
+    * @return array listado de ordenes de servicio
+    */
+    function getOrdServiciosList(){
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getOrdServiciosList()");
+        log_message('DEBUG',"#HARCODE EMPR_ID 6");
+        // $empresaId = empresa();
+        $empresaId = 6;
         $this->assetDB->select('
             orden_servicio.id_orden, 
             orden_servicio.estado,
@@ -22,37 +26,27 @@ class Ordenservicios extends CI_Model {
             equipos.codigo AS equipo,
             equipos.id_equipo
         ');
-            /*
-            equipos.id_equipo,
-            equipos.codigo,
-            solicitud_reparacion.id_solicitud,
-            solicitud_reparacion.solicitante, 
-            solicitud_reparacion.f_solicitado,                     
-            solicitud_reparacion.causa,*/
-            //TODO: ACA CAMBIE LA QUERY (se tomo id equipos de OT en vez de sol rep)
         $this->assetDB->from('orden_servicio');
         $this->assetDB->join('orden_trabajo', 'orden_servicio.id_ot = orden_trabajo.id_orden');
         $this->assetDB->join('equipos', 'orden_trabajo.id_equipo = equipos.id_equipo');
         $this->assetDB->where('orden_servicio.id_empresa', $empresaId);
-        //$this->assetDB->join('solicitud_reparacion', 'orden_servicio.id_solicitudreparacion = solicitud_reparacion.id_solicitud');
-        //$this->assetDB->join('equipos', 'solicitud_reparacion.id_equipo = equipos.id_equipo');
         $query = $this->assetDB->get();
 
-        if ($query->num_rows()!=0)
-        {
+        if ($query->num_rows()!=0){
             return $query->result_array();  
-        }
-        else
-        {   
+        }else{   
             return array();
-        }      
+        }
     }
+    /**
+    * Devuelve listado de equipos
+    * @param 
+    * @return array listado de equipos
+    */
+	function getEquipos($data){
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getEquipos(data : ".json_encode($data).")");    
 
-	function getEquipos($data) // FUNCIONA BIEN 
-    {
         $id = $data['id_equipo'];
-        log_message('DEBUG','#Main/index | OrdenServicio >getEquipo> id_equipo '.json_encode($data));
-        log_message('DEBUG','#Main/index | OrdenServicio >getEquipo> id_equipo '.$id);
         $this->assetDB->select('
             equipos.codigo AS nomb_equipo,                
             equipos.descripcion AS desc_equip,
@@ -72,23 +66,19 @@ class Ordenservicios extends CI_Model {
         $this->assetDB->where('equipos.id_equipo', $id);
         $query = $this->assetDB->get();      			
 				
-				foreach ($query->result_array() as $row){ 	
-
-					$datos['nomb_equipo']    = $row['nomb_equipo'];
-					$datos['desc_equipo']    = $row['desc_equip'];
-					$datos['fecha_ingreso']  = $row['fecha_ingreso'];
-					$datos['fecha_baja']     = $row['fecha_baja'];
-					$datos['fecha_garantia'] = $row['fecha_garantia'];
-					$datos['estado']         = $row['estado'];
-					$datos['marca']          = $row['marca'];
-					$datos['grupo_desc']     = $row['grupo_desc'];
-					$datos['sector']         = $row['sector_desc'];
-					$datos['ubicacion']      = $row['ubicacion'];
-				}
-
-                log_message('DEBUG','#Main/getEquipos |  datos: '.json_encode($datos));
-				
-				return $datos;
+        foreach ($query->result_array() as $row){
+            $datos['nomb_equipo']    = $row['nomb_equipo'];
+            $datos['desc_equipo']    = $row['desc_equip'];
+            $datos['fecha_ingreso']  = $row['fecha_ingreso'];
+            $datos['fecha_baja']     = $row['fecha_baja'];
+            $datos['fecha_garantia'] = $row['fecha_garantia'];
+            $datos['estado']         = $row['estado'];
+            $datos['marca']          = $row['marca'];
+            $datos['grupo_desc']     = $row['grupo_desc'];
+            $datos['sector']         = $row['sector_desc'];
+            $datos['ubicacion']      = $row['ubicacion'];
+        }
+        return $datos;
     }
 
     
@@ -369,29 +359,36 @@ class Ordenservicios extends CI_Model {
 			}		
 
 		}
+    /**
+    * Devuelve listado de lecturas
+    * @param integer $id_ot id orden de trabajo
+    * @return array listado de lecturas
+    */
+    function getLecturasOrden($id_ot){		
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getLecturasOrden(id_ot : $id_ot)");
 
-    function getLecturasOrden($id_ot) // Ok FUNCIONANDO BIEN!!!
-    {		
-			$this->assetDB->select('orden_servicio.horometroinicio,
-											orden_servicio.horometrofin,
-											orden_servicio.fechahorainicio,
-											orden_servicio.fechahorafin
-											');
-			$this->assetDB->from('orden_servicio');
-			$this->assetDB->where('orden_servicio.id_ot', $id_ot);
-			$query = $this->assetDB->get();
-			if ($query->num_rows()!=0)
-			{
-					return $query->result_array();
-			}
-			else
-			{   
-					return false;
-			}   
+        $this->assetDB->select('orden_servicio.horometroinicio,
+                                        orden_servicio.horometrofin,
+                                        orden_servicio.fechahorainicio,
+                                        orden_servicio.fechahorafin
+                                        ');
+        $this->assetDB->from('orden_servicio');
+        $this->assetDB->where('orden_servicio.id_ot', $id_ot);
+        $query = $this->assetDB->get();
+
+        if ($query->num_rows() != 0){
+            return $query->result_array();
+        }else{   
+            return false;
+        }
     }
-
-    function getTareasOrden($id_ot) // Ok FUNCIONANDO BIEN!!!
-    {        
+    /**
+    * Devuelve listado de tareas para el modal de informe de servicios
+    * @param integer $id_ot id orden de trabajo
+    * @return array listado de tareas
+    */
+    function getTareasOrden($id_ot){  
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getTareasOrden(id_ot : $id_ot)");      
         $this->assetDB->select('
             deta_ordenservicio.id_tarea
             ');
@@ -399,111 +396,109 @@ class Ordenservicios extends CI_Model {
         $this->assetDB->join('deta_ordenservicio', 'deta_ordenservicio.id_ordenservicio = orden_servicio.id_orden');
         $this->assetDB->where('orden_servicio.id_ot', $id_ot);
         $query = $this->assetDB->get();
-        if ($query->num_rows()!=0)
-        {
+        if ($query->num_rows()!=0){
             return $query->result_array();
-        }
-        else
-        {   
+        }else{   
             return false;
-        }   
+        }
     }
-
-    function getHerramOrdenes($id_ot) // Ok FUNCIONANDO BIEN!!!
-    {		
-			$this->assetDB->select('herramientas.herrcodigo,
-													herramientas.herrmarca,
-													herramientas.herrdescrip
-											');
-			$this->assetDB->from('orden_servicio');        
-			$this->assetDB->join('tbl_valesalida', 'orden_servicio.valesid = tbl_valesalida.valesid');        
-			$this->assetDB->join('tbl_detavalesalida', 'tbl_detavalesalida.valesid = tbl_valesalida.valesid');
-			$this->assetDB->join('herramientas', 'tbl_detavalesalida.herrId = herramientas.herrId');        
-			$this->assetDB->where('orden_servicio.id_ot', $id_ot);
-			$query = $this->assetDB->get();
-			if ($query->num_rows()!=0)
-			{
-					return $query->result_array();  
-			}
-			else
-			{   
-					return array();
-			}   
+    /**
+    * Devuelve listado de herramientas para el modal de informe de servicios
+    * @param integer $id_ot id orden de trabajo
+    * @return array listado de herramientas
+    */
+    function getHerramOrdenes($id_ot){
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getHerramOrdenes(id_ot : $id_ot)"); 
+        $this->assetDB->select('herramientas.herrcodigo,
+                                                herramientas.herrmarca,
+                                                herramientas.herrdescrip
+                                        ');
+        $this->assetDB->from('orden_servicio');        
+        $this->assetDB->join('tbl_valesalida', 'orden_servicio.valesid = tbl_valesalida.valesid');        
+        $this->assetDB->join('tbl_detavalesalida', 'tbl_detavalesalida.valesid = tbl_valesalida.valesid');
+        $this->assetDB->join('herramientas', 'tbl_detavalesalida.herrId = herramientas.herrId');        
+        $this->assetDB->where('orden_servicio.id_ot', $id_ot);
+        $query = $this->assetDB->get();
+        if ($query->num_rows()!=0){
+            return $query->result_array();
+        }else{   
+            return array();
+        }
     }
-
+    /**
+    * Devuelve listado de operarios para el modal de informe de servicios
+    * @param integer $id_orden id orden de trabajo
+    * @return array listado de operarios
+    */
     function getOperariosOrden($id_orden){
-			
-			$this->assetDB->select('sisusers.usrName,
-												sisusers.usrLastName');
-			$this->assetDB->from('asignausuario');        
-			$this->assetDB->join('sisusers', 'asignausuario.usrId = sisusers.usrId');        
-			$this->assetDB->join('orden_servicio', 'orden_servicio.id_orden = asignausuario.id_orden'); 
-			$this->assetDB->where('orden_servicio.id_ot', $id_orden);
-			$query = $this->assetDB->get();
-			if ($query->num_rows()!=0)
-			{
-					return $query->result_array();  
-			}
-			else
-			{   
-					return array();
-			}                
-    }
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getOperariosOrden(id_orden : $id_orden)");
+        $this->assetDB->select('sisusers.usrName,
+                                            sisusers.usrLastName');
+        $this->assetDB->from('asignausuario');        
+        $this->assetDB->join('sisusers', 'asignausuario.usrId = sisusers.usrId');        
+        $this->assetDB->join('orden_servicio', 'orden_servicio.id_orden = asignausuario.id_orden'); 
+        $this->assetDB->where('orden_servicio.id_ot', $id_orden);
+        $query = $this->assetDB->get();
 
-		// devuelve insumos pedidos por id de OT
+        if ($query->num_rows()!=0){
+                return $query->result_array();  
+        }else{   
+                return array();
+        }                
+    }
+    /**
+    * Devuelve listado de insumos pedidos por id de OT
+    * @param integer $id_ot id orden de trabajo
+    * @return array insumos pedidos por id de OT
+    */
     function getInsumosPorOT($id_ot){     
-        
-        $userdata      = $this->session->userdata('user_data');
-        $empresaId     = $userdata[0]['id_empresa'];
-
-        log_message('DEBUG','OrdenServicio | getInsumosPorOT | id_ot '.$id_ot);
-			$this->assetDB->select('alm_pedidos_materiales.pema_id, 
-												alm_pedidos_materiales.ortr_id , 
-												alm_articulos.barcode, alm_articulos.descripcion, 
-												alm_pedidos_materiales.fecha,
-												alm_pedidos_materiales.estado,
-												alm_deta_pedidos_materiales.cantidad');
-			$this->assetDB->from('alm_pedidos_materiales');
-			$this->assetDB->join('alm_deta_pedidos_materiales', 'alm_pedidos_materiales.pema_id = alm_deta_pedidos_materiales.pema_id');
-			$this->assetDB->join('alm_articulos', 'alm_deta_pedidos_materiales.arti_id = alm_articulos.arti_id');
-			$this->assetDB->where('alm_pedidos_materiales.ortr_id', $id_ot);
-            $this->assetDB->where('alm_pedidos_materiales.empr_id', $empresaId);
-			$query = $this->assetDB->get();
-		
-			if ($query->num_rows()!=0){
-					return $query->result_array();
-			}else{   
-					return array();
-			}  
-
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getInsumosPorOT(id_ot : $id_ot)");
+        log_message('DEBUG',"#HARCODE EMPR_ID 6");
+        // $empresaId     = empresa();
+        $empresaId = 6;
+        $this->assetDB->select('alm_pedidos_materiales.pema_id, 
+                                            alm_pedidos_materiales.ortr_id , 
+                                            alm_articulos.barcode, alm_articulos.descripcion, 
+                                            alm_pedidos_materiales.fecha,
+                                            alm_pedidos_materiales.estado,
+                                            alm_deta_pedidos_materiales.cantidad');
+        $this->assetDB->from('alm_pedidos_materiales');
+        $this->assetDB->join('alm_deta_pedidos_materiales', 'alm_pedidos_materiales.pema_id = alm_deta_pedidos_materiales.pema_id');
+        $this->assetDB->join('alm_articulos', 'alm_deta_pedidos_materiales.arti_id = alm_articulos.arti_id');
+        $this->assetDB->where('alm_pedidos_materiales.ortr_id', $id_ot);
+        $this->assetDB->where('alm_pedidos_materiales.empr_id', $empresaId);
+        $query = $this->assetDB->get();
+    
+        if ($query->num_rows()!=0){
+            return $query->result_array();
+        }else{   
+            return array();
+        }
     }
+    /**
+    * Devuelve Orden de trabajo por id
+    * @param integer $id id orden de trabajo
+    * @return array detalle de orden de trabajo
+    */
+    function getorden($id){
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | getorden($id)");  
+        $this->assetDB->select('orden_trabajo.*, 
+                                            tareas.id_tarea, 
+                                            tareas.descripcion AS tareadescrip, 
+                                            sisusers.usrId, 
+                                            CONCAT(sisusers.usrLastName,", ",sisusers.usrName) AS responsable');
+        $this->assetDB->from('orden_trabajo');
+        $this->assetDB->join('tareas','tareas.id_tarea  = orden_trabajo.id_tarea', 'left');
+        $this->assetDB->join('sisusers','sisusers.usrId  = orden_trabajo.id_usuario_a');
+        $this->assetDB->where('id_orden',$id);
+        $query= $this->assetDB->get();		
 
-
-
-
-	//Ordenn de trabajo por id
-		function getorden($id){
-
-			$this->assetDB->select('orden_trabajo.*, 
-												tareas.id_tarea, 
-												tareas.descripcion AS tareadescrip, 
-												sisusers.usrId, 
-												CONCAT(sisusers.usrLastName,", ",sisusers.usrName) AS responsable');
-			$this->assetDB->from('orden_trabajo');
-			$this->assetDB->join('tareas','tareas.id_tarea  = orden_trabajo.id_tarea', 'left');
-			$this->assetDB->join('sisusers','sisusers.usrId  = orden_trabajo.id_usuario_a');
-			$this->assetDB->where('id_orden',$id);
-			
-				$query= $this->assetDB->get();		
-
-				if( $query->num_rows() > 0)
-				{
-					return $query->result_array();	
-				} 
-				else {
-					return 0;
-				}
-		}
+        if( $query->num_rows() > 0){
+            return $query->result_array();	
+        }else{
+            return 0;
+        }
+    }
 
 
 

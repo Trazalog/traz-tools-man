@@ -7,45 +7,43 @@ class Predictivos extends CI_Model
 		parent::__construct();
         $this->assetDB = $this->load->database('asset_db', TRUE);
 	}
-
-	// Lista Predictivos con estado 'C' por Empresa Logueada
+	/**
+    * Lista Predictivos con estado 'C' por Empresa Logueada
+    * @param 
+    * @return array listado de Predictivos
+    */
 	function predictivo_List(){
-
-		$userdata = $this->session->userdata('user_data');
-        $empId = $userdata[0]['id_empresa']; 
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivos | predictivo_List()");
+        $empId = empresa(); 
         
-			$this->assetDB->select('predictivo.predId, 
-												predictivo.id_equipo,
-												predictivo.tarea_descrip, 
-												predictivo.fecha,  												 
-												predictivo.cantidad,
-												predictivo.estado, 
-												predictivo.horash,
-												predictivo.pred_adjunto, 
-												equipos.descripcion AS des, 
-												equipos.marca, 
-												equipos.codigo, 
-												equipos.ubicacion, 
-												equipos.fecha_ingreso, 
-												tareas.descripcion as de1,
-												periodo.descripcion AS periodo');
+		$this->assetDB->select('predictivo.predId, 
+								predictivo.id_equipo,
+								predictivo.tarea_descrip, 
+								predictivo.fecha,  												 
+								predictivo.cantidad,
+								predictivo.estado, 
+								predictivo.horash,
+								predictivo.pred_adjunto, 
+								equipos.descripcion AS des, 
+								equipos.marca, 
+								equipos.codigo, 
+								equipos.ubicacion, 
+								equipos.fecha_ingreso, 
+								tareas.descripcion as de1,
+								periodo.descripcion AS periodo');
     	$this->assetDB->from('predictivo');
     	$this->assetDB->join('equipos','equipos.id_equipo = predictivo.id_equipo');
-			$this->assetDB->join('tareas', 'tareas.id_tarea = predictivo.tarea_descrip');
-			$this->assetDB->join('periodo', 'periodo.idperiodo = predictivo.periodo');    	
+		$this->assetDB->join('tareas', 'tareas.id_tarea = predictivo.tarea_descrip');
+		$this->assetDB->join('periodo', 'periodo.idperiodo = predictivo.periodo');    	
     	$this->assetDB->where('predictivo.estado !=', 'AN');
     	$this->assetDB->where('predictivo.id_empresa', $empId);    	    	
     	$query= $this->assetDB->get(); 		
 	    
-	    if( $query->num_rows() > 0)
-	    {
-	      
+	    if( $query->num_rows() > 0){
 	      $data['data'] = $query->result_array();	
 	      return  $data;
-	    } 
-	    else 
-	    	$data['data'] = 0;
-	      return  $data; 
+	    } else $data['data'] = array();
+		return  $data; 
 	}
 
 	// Trae equipos por empresa logueada - Listo
@@ -68,28 +66,26 @@ class Predictivos extends CI_Model
 	 		return false;
 	 	}	
 	}
-
-	// Trae info de equipos por ID y por empresa logueada - Listo
+	/**
+    * Trae info de equipos por ID y por empresa logueada
+    * @param integer $id_equipo id del equipo
+    * @return array data del equipo
+    */
 	function getInfoEquipos($id){
-
-		$userdata = $this->session->userdata('user_data');
-        $empId = $userdata[0]['id_empresa']; 
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Preventivos | getInfoEquipos($id)");
+        $empId = empresa(); 
         
-    	$this->assetDB->select('equipos.*,marcasequipos.marcadescrip,
-												marcasequipos.marcaid');
-			$this->assetDB->from('equipos');
-			$this->assetDB->join('marcasequipos', 'equipos.marca = marcasequipos.marcaid');
+    	$this->assetDB->select('equipos.*,marcasequipos.marcadescrip,marcasequipos.marcaid');
+		$this->assetDB->from('equipos');
+		$this->assetDB->join('marcasequipos', 'equipos.marca = marcasequipos.marcaid');
     //	$this->assetDB->where('equipos.estado', 'AC');
     	$this->assetDB->where('equipos.id_empresa', $empId);
     	$this->assetDB->where('equipos.id_equipo', $id);      	
     	$query= $this->assetDB->get();   
 
-		if ($query->num_rows()!=0)
-		{
+		if ($query->num_rows()!=0){
 			return $query->result_array();
-		}
-		else
-		{
+		}else{
 			return false;
 		}
 	}
@@ -131,7 +127,9 @@ class Predictivos extends CI_Model
 
 	//Insertar  predictivo  - Listo
 	function insert_predictivo($data){
-		$query = $this->assetDB->insert("predictivo",$data);
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivos | insert_predictivo()");
+		$query['status'] = $this->assetDB->insert("predictivo",$data);
+		$query['id'] = $this->assetDB->insert_id();
 		return $query;
 	}
 
@@ -148,9 +146,13 @@ class Predictivos extends CI_Model
 		$query = $this->assetDB->insert_batch("tbl_predictivoinsumos",$insumoPred);
 		return $query;
 	}
-
-// Guarda el nombre de adjunto
+/**
+ * Guarda el nombre de adjunto
+ * @param String $adjunto nombre codificado del adjunto.
+ * @return Bool true/false segun resultado de la operacion.
+*/
 function updateAdjunto($adjunto,$ultimoId){
+	log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivos | updateAdjunto(Adjunto: $adjunto | ID: $ultimoId)");
 	$this->assetDB->where('predId', $ultimoId);
 	$query = $this->assetDB->update("predictivo",$adjunto);
 	return $adjunto;

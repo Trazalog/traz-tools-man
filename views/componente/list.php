@@ -198,7 +198,7 @@ function llenarComponentes(idEquipo, idComponente) {
 
 // Carga list componentes
 function cargarVista(){
-  $("#content").load("<?php echo base_url(); ?>index.php/Componente/asigna/<?php echo $permission; ?>");
+  $("#content").load("<?php echo MAN; ?>Componente/asigna/<?php echo $permission; ?>");
 }
 
 function cerro(){
@@ -209,16 +209,22 @@ function cerro(){
 function eliminar(){
   console.log(idequipo);
   console.log(datos);
+  wo();
   $.ajax({
     data: { idequipo: idequipo,datos: datos},
     //dataType: 'json'
     type: 'POST',
     url: '<?php echo MAN; ?>Componente/baja_comp',
-    success: function(data){  
+    success: function(data){
+      hecho(); 
       cargarVista();
     },
-    error: function(result){                
+    error: function(result){
+      error();               
       console.log(result);
+    },
+    complete: () => {
+      wc();
     }
   });
 }

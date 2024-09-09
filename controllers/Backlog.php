@@ -9,26 +9,16 @@ class Backlog extends CI_Controller {
 		$this->load->model('Backlogs');
 		$this->load->model('Tareas');
 	}
-
-	public function index($permission){
-		$data = $this->session->userdata();
-		log_message('DEBUG','#Main/index | Backlog >> data '.json_encode($data)." ||| ". $data['user_data'][0]['usrName'] ." ||| ".empty($data['user_data'][0]['usrName']));
-	
-		if(empty($data['user_data'][0]['usrName'])){
-			log_message('DEBUG','#Main/index | Cerrar Sesion >> '.base_url());
-			$var = array('user_data' => null,'username' => null,'email' => null, 'logged_in' => false);
-			$this->session->set_userdata($var);
-			$this->session->unset_userdata(null);
-			$this->session->sess_destroy();
-	
-			echo ("<script>location.href='login'</script>");
-	
-		}else{
-
-			$data['list'] = $this->Backlogs->backlog_List();		
-			$data['permission'] = $permission;
-			$this->load->view('backlog/list', $data);
-		}
+	/**
+    * Carga vista principal de Backlog
+    * @param 
+    * @return view listado Backlog
+    */
+	public function index($permission = "Add-Edit-Del-"){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlog | index()");
+		$data['list'] = $this->Backlogs->backlog_List();
+		$data['permission'] = $permission;
+		$this->load->view('backlog/list', $data);
 	}
 
 	// Trae equipos para llenar select vista - Listo
@@ -47,12 +37,15 @@ class Backlog extends CI_Controller {
 		}
 		else echo "nada";
 	}
-
-	// Trae info de equipo por id
+	/**
+    * Trae info de equipo por id
+    * @param integer $id_equipo id del equipo seleccionado
+    * @return array data del equipo
+    */
 	public function getInfoEquipo(){
-			
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlog | getInfoEquipo()");
 		$res = $this->Backlogs->getInfoEquipos($this->input->post());
-		 echo json_encode($res);
+		echo json_encode($res);
 	}
 
 	// Trae tareas por empresa logueada - Listo
@@ -324,18 +317,25 @@ class Backlog extends CI_Controller {
 		$result = $this->Backlogs->update_back($datos, $idpre);
 		echo json_encode($result);	
 	}
-
-	// Carga vista para backolg nuevo - Listo
-	public function cargarback($permission){ 
+	/**
+    * Carga vista para backlog nuevo 
+    * @param 
+    * @return view listado Backlog
+    */
+	public function cargarback($permission = "Add-Edit-Del-"){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlog | cargarback()");
 		$data['permission'] = $permission;       
 		$this->load->view('backlog/view_',$data);
 	}
-  	
-  //Inserta  Backlog nuevo - Listo
+	/**
+    * Inserta Backlog nuevo
+    * @param array $data array con datos de backlog
+    * @return array resultado de la operacion
+    */
 	public function guardar_backlog(){
-		
-		$userdata = $this->session->userdata('user_data');
-		$empId = $userdata[0]['id_empresa'];
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlog | guardar_backlog()");
+
+		$empId = empresa();
 		$data = $this->input->post();		     
 		$ideq=$data['equipo'];
 		$idce=$data['idcomponenteequipo'];
@@ -346,101 +346,97 @@ class Backlog extends CI_Controller {
 		$id_unidad = $data['unidad'];
 		$back_canth = $data['cantOper'];
 		$tarOpc = $data['tareaOpcional'];
-		// fecha convertida		
-			$uno=substr($fe, 0, 2); 
-			$dos=substr($fe, 3, 2); 
-			$tres=substr($fe, 6, 4); 
-			$resul = ($tres."/".$dos."/".$uno); 
 
-		$datos = array('id_equipo'     			=> $ideq,//
-										'id_tarea' 						=> $ta,		//				
-										'fecha'         			=> $resul, //
-										'horash'							=> $hs, //
-										'estado'        			=> 'C',//				
-										'back_duracion' 			=> $back_dur,
-										'id_unidad'						=> $id_unidad,
-										'back_canth'					=> $back_canth,
-										'id_empresa'    			=> $empId,
-										'idcomponenteequipo' 	=> $idce,//	
-										'tarea_opcional'			=> $tarOpc
-								);		
+		// fecha convertida		
+		$uno=substr($fe, 0, 2); 
+		$dos=substr($fe, 3, 2); 
+		$tres=substr($fe, 6, 4); 
+		$resul = ($tres."/".$dos."/".$uno); 
+
+		$datos = array(
+			'id_equipo'     			=> $ideq,
+			'id_tarea' 					=> $ta,			
+			'fecha'         			=> $resul,
+			'horash'					=> $hs,
+			'estado'        			=> 'C',			
+			'back_duracion' 			=> $back_dur,
+			'id_unidad'					=> $id_unidad,
+			'back_canth'				=> $back_canth,
+			'id_empresa'    			=> $empId,
+			'idcomponenteequipo' 		=> $idce,
+			'tarea_opcional'			=> $tarOpc
+		);		
 	
 		$response['respBacklog'] = $this->Backlogs->insert_backlog($datos);	
 
-		if($response['respBacklog']){
-
-			$ultimoId = $this->db->insert_id(); 
-			
+		if($response['respBacklog']['status']){
+			$ultimoId = $response['respBacklog']['id']; // id de insercion
 			////////// para guardar herramientas                 
-				if ( !empty($data['id_her']) ){
-					//saco array con herramientas y el id de empresa
-					$herr = $data["id_her"]; 
-					$i = 0;
-					foreach ($herr as $h) {
-						$herram[$i]['herrId']= $h;
-						$herram[$i]['id_empresa']= $empId;
-						$i++;                                
-					} 
-					//saco array con cant de herramientas y el id de preventivo 
-					$cantHerr = $data["cant_herr"];
-					$z = 0;
-					foreach ($cantHerr as $c) {
-						$herram[$z]['cantidad']= $c;
-						$herram[$z]['backId']= $ultimoId;
-						$z++;                                
-					}				
-					// Guarda el bacht de datos de herramientas
-					$response['respHerram'] = $this->Backlogs->insertBackHerram($herram);
-				}else{
-
-					$response['respHerram'] = true;	// no habia herramientas
-				}	
-
-
+			if ( !empty($data['id_her']) ){
+				//saco array con herramientas y el id de empresa
+				$herr = $data["id_her"]; 
+				$i = 0;
+				foreach ($herr as $h) {
+					$herram[$i]['herrId']= $h;
+					$herram[$i]['id_empresa']= $empId;
+					$i++;                                
+				} 
+				//saco array con cant de herramientas y el id de preventivo 
+				$cantHerr = $data["cant_herr"];
+				$z = 0;
+				foreach ($cantHerr as $c) {
+					$herram[$z]['cantidad']= $c;
+					$herram[$z]['backId']= $ultimoId;
+					$z++;                                
+				}				
+				// Guarda el bacht de datos de herramientas
+				$response['respHerram'] = $this->Backlogs->insertBackHerram($herram);
+			}else{
+				$response['respHerram'] = true;	// no habia herramientas
+			}	
 			////////// para guardar insumos
-				if ( !empty($data['id_insumo']) ){
-					//saco array con herramientas y el id de empresa
-					$ins = $data["id_insumo"]; 
-					$j = 0;
-					foreach ($ins as $in) {
-						$insumo[$j]['artId'] = $in;
-						$insumo[$j]['id_empresa'] = $empId;
-						$j++;                                
-					} 
-					//saco array con cant de herramientas y el id de preventivo 
-					$cantInsum = $data["cant_insumo"];
-					$z = 0;
-					foreach ($cantInsum as $ci) {
-						$insumo[$z]['cantidad'] = $ci;
-						$insumo[$z]['backId'] = $ultimoId;
-						$z++;                                
-					}
-					// Guarda el bacht de datos de herramientas
-					$response['respInsumo'] = $this->Backlogs->insertBackInsum($insumo);
-				}else{
+			if ( !empty($data['id_insumo']) ){
+				//saco array con herramientas y el id de empresa
+				$ins = $data["id_insumo"]; 
+				$j = 0;
+				foreach ($ins as $in) {
+					$insumo[$j]['artId'] = $in;
+					$insumo[$j]['id_empresa'] = $empId;
+					$j++;                                
+				} 
+				//saco array con cant de herramientas y el id de preventivo 
+				$cantInsum = $data["cant_insumo"];
+				$z = 0;
+				foreach ($cantInsum as $ci) {
+					$insumo[$z]['cantidad'] = $ci;
+					$insumo[$z]['backId'] = $ultimoId;
+					$z++;                                
+				}
+				// Guarda el bacht de datos de herramientas
+				$response['respInsumo'] = $this->Backlogs->insertBackInsum($insumo);
+			}else{
 
-					$response['respInsumo'] = true;	// no habia insumos
-				}	
+				$response['respInsumo'] = true;	// no habia insumos
+			}
+			////////// Subir imagen o pdf
+			$nomcodif = $this->codifNombre($ultimoId,$empId); // codificacion de nomb  		
+			$config = [
+				"upload_path" => "./assets/filesbacklog",
+				'allowed_types' => "png|jpg|pdf|xlsx",
+				'file_name'=> $nomcodif
+			];
 
-			////////// Subir imagen o pdf 
-				$nomcodif = $this->codifNombre($ultimoId,$empId); // codificacion de nomb  		
-				$config = [
-					"upload_path" => "./assets/filesbacklog",
-					'allowed_types' => "png|jpg|pdf|xlsx",
-					'file_name'=> $nomcodif
-				];
-
-				$this->load->library("upload",$config);
-				
-				if ($this->upload->do_upload('inputPDF')) {					
-					$data = array("upload_data" => $this->upload->data());
-					$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
-					$nomcodif = $nomcodif.$extens;
-					$adjunto = array('back_adjunto' => $nomcodif);
-					$response['respNomImagen'] = $this->Backlogs->updateAdjunto($adjunto,$ultimoId);
-				}else{
-					$response['respImagen'] = false;
-				}							
+			$this->load->library("upload",$config);
+			
+			if ($this->upload->do_upload('inputPDF')) {					
+				$data = array("upload_data" => $this->upload->data());
+				$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
+				$nomcodif = $nomcodif.$extens;
+				$adjunto = array('back_adjunto' => $nomcodif);
+				$response['respNomImagen'] = $this->Backlogs->updateAdjunto($adjunto,$ultimoId);
+			}else{
+				$response['respImagen'] = false;
+			}							
 		}		
 		
 		// si todas las inserciones se hicieron devuelve true
@@ -504,22 +500,25 @@ class Backlog extends CI_Controller {
 		$nomImagen = $ultimoId.$guion.$empId.$guion.$strigHora;		
 		return $nomImagen;
 	}
-
-	public function getComponente()
-	{
+	/**
+    * Obtiene listado de compronentes por ID de equipo 
+    * @param integer $idEquipo id del equipo
+    * @return array listado de componenetes
+    */
+	public function getComponente(){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlog | getComponente()");
 		$idEquipo = $this->input->post('idEquipo');
 		$componentes = $this->Backlogs->getComponentes($idEquipo);
-		if($componentes)
-		{	
+		if($componentes){	
 			$arre = array();$i=0;
 	        foreach ($componentes as $valor ){   
-						$valorS = (array)$valor;
-						$arre[$i]['value']   = $valorS['codigo'];
-						$arre[$i]['label']   = $valorS['codigo'];
-						$arre[$i]['descrip'] = $valorS['descripcion'];
-						$arre[$i]['sistema'] = $valorS['sistema'];
-						$arre[$i]['idce']    = $valorS['idce'];
-						$i++;
+				$valorS = (array)$valor;
+				$arre[$i]['value']   = $valorS['codigo'];
+				$arre[$i]['label']   = $valorS['codigo'];
+				$arre[$i]['descrip'] = $valorS['descripcion'];
+				$arre[$i]['sistema'] = $valorS['sistema'];
+				$arre[$i]['idce']    = $valorS['idce'];
+				$i++;
 	        }
 			echo json_encode($arre);
 		}

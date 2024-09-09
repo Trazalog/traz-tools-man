@@ -9,58 +9,47 @@ class Preventivo extends CI_Controller {
 		$this->load->model('Preventivos');
 		
 	}
-
-	public function index($permission){
-
-		$data = $this->session->userdata();
-		log_message('DEBUG','#Main/index | Preventivo >> data '.json_encode($data)." ||| ". $data['user_data'][0]['usrName'] ." ||| ".empty($data['user_data'][0]['usrName']));
-
-		if(empty($data['user_data'][0]['usrName'])){
-			log_message('DEBUG','#Main/index | Cerrar Sesion >> '.base_url());
-			$var = array('user_data' => null,'username' => null,'email' => null, 'logged_in' => false);
-			$this->session->set_userdata($var);
-			$this->session->unset_userdata(null);
-			$this->session->sess_destroy();
-
-			echo ("<script>location.href='login'</script>");
-
-		}else{
-			log_message('DEBUG','#Main/index | Sesion Activa >> '.'preventivo/list');
-			$data['list'] = $this->Preventivos->preventivos_List();
-			$data['permission'] = $permission;
-			$this->load->view('preventivo/list', $data);
-		}
-
-		
+	/**
+    * Carga vista principal de Preventivos
+    * @param 
+    * @return view listado Preventivos
+    */
+	public function index($permission = "Add-Edit-Del-"){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Preventivo | index()");
+		$data['list'] = $this->Preventivos->preventivos_List();
+		$data['permission'] = $permission;
+		$this->load->view('preventivo/list', $data);
 	}	
-
-    // Trae equipos por empresa logueada - Listo
+	/**
+	* Trae equipos por empresa logueada
+	* @param 
+	* @return array lista de equipos
+	*/
 	public function getequipo(){
-		
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Preventivo | getequipo()");
 		$equipo = $this->Preventivos->getequipo();
 
-		if($equipo)
-		{	
+		if($equipo){	
 			$arre=array();
-	        foreach ($equipo as $row ) 
-	        {   
+	        foreach ($equipo as $row ){   
 	           $arre[]=$row;
 	        }
 			echo json_encode($arre);
 		}
 		else echo "nada";
 	}
-
-	// Trae unidades de tiempo - Listo
+	/**
+	* Trae unidades de tiempo
+	* @param 
+	* @return array lista de unidades de tiempo
+	*/
 	public function getUnidTiempo(){
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | getUnidTiempo()");
 		$tarea = $this->Preventivos->getUnidTiempos();
 
-		if($tarea)
-		{	
+		if($tarea){	
 			$arre=array();
-	        foreach ($tarea as $row ) 
-	        {   
+	        foreach ($tarea as $row ){   
 	           $arre[]=$row;
 	        }
 			echo json_encode($arre);
@@ -85,7 +74,6 @@ class Preventivo extends CI_Controller {
 	*/
 	public function gettarea(){	
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | gettarea()");
-
 		$tareas = $this->Preventivos->gettarea();
 		echo json_encode($tareas);
 	}
@@ -134,18 +122,24 @@ class Preventivo extends CI_Controller {
 		}
 		else echo "nada";
 	}
-
-	// Trae componente segun id de equipo - Listo
-	public function getcomponente()
-	{
+	/**
+	* Trae componentes segun id de equipo
+	* @param 
+	* @return array lista de componentes
+	*/
+	public function getcomponente(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | getcomponente()");
 		$idEquipo   = $_POST['id_equipo']; 
 		$componente = $this->Preventivos->getcomponente($idEquipo);
 		echo json_encode($componente);
 	}
-
-	// Trae herramientas segun empresa logueada - Listo
+	/**
+	* Trae herramientas segun empresa logueada
+	* @param 
+	* @return array lista de herramientas
+	*/
 	public function getherramienta(){
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | getherramienta()");
 		$herramienta = $this->Preventivos->getherramienta();		
 		if($herramienta){	
 			$arre=array();
@@ -156,16 +150,23 @@ class Preventivo extends CI_Controller {
 		}
 		else echo "nada";
 	}
-
-	public function getHerramientasB()
-    {
+	/**
+	* Trae herramientas por empresa logueada 
+	* @param 
+	* @return array lista de herramientas
+	*/
+	public function getHerramientasB(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | getHerramientasB()");
         $herramientas = $this->Preventivos->getHerramientasB();     
         echo json_encode($herramientas);
     }
-
-	// Trae insumos segun empresa logueada
+	/**
+	* Trae insumos por empresa logueada 
+	* @param 
+	* @return array lista de insumos
+	*/
 	public function getinsumo(){
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | getinsumo()");
 		$insumo = $this->Preventivos->getinsumo();		
 		if($insumo){	
 			$arre=array();
@@ -178,11 +179,9 @@ class Preventivo extends CI_Controller {
 	}
 
 	// Guarda preventivo segun empresa logueada
-	public function guardar_preventivo()
-	{
-		$data     = $this->input->post();
-		$userdata = $this->session->userdata('user_data');
-		$empId    = $userdata[0]['id_empresa'];
+	public function guardar_preventivo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | guardar_preventivo()");
+		$empId    = empresa();
 
 		$eq         =$this->input->post('id_equipo');
 		$ta         =$this->input->post('tarea');
@@ -190,79 +189,72 @@ class Preventivo extends CI_Controller {
 		$ultimo     =$this->input->post('ultimo');
 		$pe         =$this->input->post('periodo');
 		$can        =$this->input->post('cantidad');
-		$oper       = $this->input->post('cantOper');
+		$oper       =$this->input->post('cantOper');
 		$com        =$this->input->post('id_componente');
 		$durac      =$this->input->post('duracion');
 		$unidad     =$this->input->post("unidad");
 		$canhm      =$this->input->post('hshombre');
 		$critico1   =$this->input->post('alerta');
 		$lectbase   =$this->input->post('lectura_base');	
-
+		$herr		=$this->input->post('id_her');
+		$insumos	=$this->input->post('id_insumo');
+		$cantInsum	=$this->input->post('cant_insumo');
 		$datos = array(
-				'id_equipo'     => $eq,
-				'id_tarea'      => $ta,
-				'perido'        => $pe,
-				'cantidad'      => $can,
-				'ultimo'        => $ultimo,
-				'id_componente' => $com,
-				'critico1'      => $critico1,
-				'horash'        => $canhm,
-				'estadoprev'    => 'C',
-				'prev_duracion' => $durac,
-				'id_unidad'     => $unidad,
-				'prev_canth'    => $oper,
-				'id_empresa'    => $empId,
-				'lectura_base'  => $lectbase
-			);
-
-		log_message('DEBUG', '#PREVENTIVO >> guardar_preventivo() $datos >> ' . json_encode($datos));
-
-		
-		$response['resPrenvent'] = $this->Preventivos->insert_preventivo($datos);
-
-		log_message('DEBUG', '#PREVENTIVO >> guardar_preventivo()  $response[resPrenvent]>> ' . json_encode($datos));
-		
-		if($response['resPrenvent']){
-
-			$ultimoId = $this->db->insert_id();			
-
+			'id_equipo'     => $eq,
+			'id_tarea'      => $ta,
+			'perido'        => $pe,
+			'cantidad'      => $can,
+			'ultimo'        => $ultimo,
+			'id_componente' => $com,
+			'critico1'      => $critico1,
+			'horash'        => $canhm,
+			'estadoprev'    => 'C',
+			'prev_duracion' => $durac,
+			'id_unidad'     => $unidad,
+			'prev_canth'    => $oper,
+			'id_empresa'    => $empId,
+			'lectura_base'  => $lectbase
+		);
+		$response = $this->Preventivos->insert_preventivo($datos);
+		log_message('DEBUG', '#TRAZA | TRAZ-TOOLS-MAN | Preventivo | insert_preventivo>> ' . json_encode($response));
+		if($response['status']){
+			$ultimoId = $response['id']; // id de preventivo insertado
 			////////// para guardar herramientas                 
-				if ( !empty($data['id_her']) ){
-					//saco array con herramientas y el id de empresa
-					$herr = $data["id_her"]; 
-					$i = 0;
-					foreach ($herr as $h) {
-						$herramPrev[$i]['herrId']= $h;
-						$herramPrev[$i]['id_empresa']= $empId;
-						$i++;                                
-					} 
-					//saco array con cant de herramientas y el id de preventivo 
-					$cantHerr = $data["cant_herr"];
-					$z = 0;
-					foreach ($cantHerr as $c) {
-						$herramPrev[$z]['cantidad']= $c;
-						$herramPrev[$z]['PrevId']= $ultimoId;
-						$z++;                                
-					}
-					// Guarda el bacht de datos de herramientas
-					$response['respHerram'] = $this->Preventivos->insertPrevHerram($herramPrev);
-				}else{
-
-					$response['respHerram'] = "vacio";	// no habia herramientas
+			if ( !empty($herr) ){
+				//saco array con herramientas y el id de empresa
+				// $herr = $herr;
+				$i = 0;
+				foreach ($herr as $h) {
+					$herramPrev[$i]['herrId']= $h;
+					$herramPrev[$i]['id_empresa']= $empId;
+					$i++;                                
+				} 
+				//saco array con cant de herramientas y el id de preventivo 
+				$cantHerr = $data["cant_herr"];
+				$z = 0;
+				foreach ($cantHerr as $c) {
+					$herramPrev[$z]['cantidad']= $c;
+					$herramPrev[$z]['PrevId']= $ultimoId;
+					$z++;                                
 				}
+				// Guarda el bacht de datos de herramientas
+				$response['respHerram'] = $this->Preventivos->insertPrevHerram($herramPrev);
+			}else{
 
-	  	////////// para guardar insumos
-	  		if ( !empty($data['id_insumo']) ){
+				$response['respHerram'] = "vacio";	// no habia herramientas
+			}
+	  		////////// para guardar insumos
+	  		if ( !empty($insumos) ){
 		  		//saco array con herramientas y el id de empresa
-		  		$ins = $data["id_insumo"]; 
+		  		// $ins = $data["id_insumo"];
 		  		$j = 0;
-		  		foreach ($ins as $in) {
+		  		foreach ($insumos as $in) {
 		  			$insumoPrev[$j]['artId'] = $in;
 		  			$insumoPrev[$j]['id_empresa'] = $empId;
 		  			$j++;                                
 		  		} 
 		  		//saco array con cant de herramientas y el id de preventivo 
-		  		$cantInsum = $data["cant_insumo"];
+		  		// $cantInsum = $data["cant_insumo"];
 		  		$z = 0;
 		  		foreach ($cantInsum as $ci) {
 		  			$insumoPrev[$z]['cantidad'] = $ci;
@@ -272,37 +264,33 @@ class Preventivo extends CI_Controller {
 		  		// Guarda el bacht de datos de herramientas
 		  		$response['respInsumo'] = $this->Preventivos->insertPrevInsum($insumoPrev);
 	  		}else{
-
 	  			$response['respInsumo'] = "vacio";	// no habia insumos
-	  		}	
+			}
 
 			////////// Subir imagen o pdf 
-				$nomcodif = $this->codifNombre($ultimoId,$empId); // codificacion de nomb  	
-				$nomcodif = 'preventivo'.$nomcodif;	
-				//'allowed_types' => "png|jpg|pdf|xlsx", Inicialmente guarda asi -> 26102023
-				$config = [
-					"upload_path" => "./assets/filespreventivos",
-					'allowed_types' => "png|jpg|pdf",					
-					'file_name'=> $nomcodif
-				];
+			$nomcodif = $this->codifNombre($ultimoId,$empId); // codificacion de nomb  	
+			$nomcodif = 'preventivo'.$nomcodif;	
+			//'allowed_types' => "png|jpg|pdf|xlsx", Inicialmente guarda asi -> 26102023
+			$config = [
+				"upload_path" => "./assets/filespreventivos",
+				'allowed_types' => "png|jpg|pdf",					
+				'file_name'=> $nomcodif
+			];
 
-				$this->load->library("upload",$config);
-				if ($this->upload->do_upload('inputPDF')) {
-					
-					$data = array("upload_data" => $this->upload->data());
-					$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
-					$nomcodif = $nomcodif.$extens;
-					$adjunto = array('prev_adjunto' => $nomcodif);
-					$response['respNomImagen'] = $this->Preventivos->updateAdjunto($adjunto,$ultimoId);
-				}else{
-					$response['respImagen'] = false;
-				}	
+			$this->load->library("upload",$config);
+			if ($this->upload->do_upload('inputPDF')) {
+				
+				$data = array("upload_data" => $this->upload->data());
+				$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
+				$nomcodif = $nomcodif.$extens;
+				$adjunto = array('prev_adjunto' => $nomcodif);
+				$response['respNomImagen'] = $this->Preventivos->updateAdjunto($adjunto,$ultimoId);
+			}else{
+				$response['respImagen'] = false;
+			}
 		}
-
-		
-		log_message('DEBUG', '#PREVENTIVO >> guardar_preventivo()  $response[resPrenvent]>> ' . json_encode($response));
-
-		echo json_encode($response);		
+		log_message('DEBUG', '#TRAZA | TRAZ-TOOLS-MAN | Preventivo | guardar_preventivo('. json_encode($response).')');
+		echo json_encode($response);
 	}
 
 	// Codifica nombre de imagen para no repetir en servidor
@@ -422,53 +410,28 @@ class Preventivo extends CI_Controller {
 		echo json_encode($response);
 		//echo json_encode(true);
 	}
-
-	// Da de baja Preventivo
+	/**
+    * Da de baja Preventivo
+    * @param integer $idprev id de preventivo
+    * @return bool true or false segun resultado de la operacion
+    */
 	public function baja_preventivo(){
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | baja_preventivo()");
 		$idprev = $this->input->post('idprev');		
 		$datos = array('estadoprev'=>"AN");		
 		$response = $this->Preventivos->update_preventivo($datos, $idprev);		
 		echo json_encode($response);
 	}
-
-	// Guarda edicion de Preventivo
-	// public function editar_preventivo(){
-			
-	// 	$datos=$_POST['data'];		
- //        $idp=$_POST['preglob'];
-        
-	// 	$result = $this->Preventivos->update_editar($datos,$idp);
-	// 	echo json_encode($result);
-	// 	//print_r($result);
-		
-	// }
-
-
-
-
-
-
-
-
-
-
-
-	public function cargarpreventivo($permission){ 
+	/**
+    * Carga vista para creacion de Preventivos
+    * @param 
+    * @return view agregar Preventivos
+    */
+	public function cargarpreventivo($permission){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Preventivo | cargarpreventivo()");
         $data['permission'] = $permission;    // envia permisos       
         $this->load->view('preventivo/view_',$data);
     }
-
-  //   public function volver($permission){ 
-  //   	$data['list'] = $this->Otrabajos->otrabajos_List();
-  //       $data['permission'] = $permission;    // envia permisos       
-  //       $this->load->view('otrabajos/list',$data);
-  //   }
-
-	// public function getProducto (){
-  //   	$response = $this->Preventivos->getProductos($this->input->post());
-  //   	echo json_encode($response);
-  //   }
 
 	public function volver($permission){ 
 		$data['list'] = $this->Otrabajos->otrabajos_List();

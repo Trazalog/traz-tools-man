@@ -81,22 +81,24 @@ class Componente extends CI_Controller {
 		$result  = $this->Componentes->delete_asociacion($idequip, $idcomp);
 		print_r($result);
 	}
-
-  // Devuelve descripcion de equipo segun id - Listo
-	public function getequipo()
-	{	
+	/**
+	* Devuelve descripcion de equipo segun id
+	* @param string $idequipo;
+	* @return array descripcion de equipos
+	*/
+	public function getequipo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componente | getequipo()"); 	
 		$id     = $_POST['idequipo'];
 		$equipo = $this->Componentes->getequipo($id);
-		if($equipo)
-		{
+		if($equipo){
 			$arre = array();
-	        foreach ($equipo as $row )
-	        {
+			$arre['status'] = true;
+	        foreach ($equipo as $row ){
 	            $arre['datos'] = $row;
 	        }
 			print_r(json_encode($arre)) ;
 		}
-		else echo "nada";
+		else echo json_encode(array('status' => false, 'datos' => ''));
 	}
     /**
 	* Trae marcas para modal agregar componente
@@ -167,11 +169,13 @@ class Componente extends CI_Controller {
 		$nomImagen = $ultimoId.$guion.$empId.$guion.$strigHora;		
 		return $nomImagen;
 	}
-
-
-  	// Asocia equipo/componente - Listo
-	public function guardar_componente()
-	{	
+	/**
+	* Asocia equipo/componente
+	* @param 
+	* @return array listado de marcas por empresa
+	*/
+	public function guardar_componente(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componente | guardar_componente()");
 		$idequipo = $_POST['idequipo'];
 		$compo    = $_POST['comp'];
 		$codigo   = $_POST['codigo'];
@@ -180,23 +184,16 @@ class Componente extends CI_Controller {
 		$ede      = $_POST['ge'];
 		$j        = 1;
 		
-		dump($sistema, 'sist: ');
-		
-	  for ($i=0; $i < $ba ; $i++)
-	  {     
-	 	    if($compo[$j])
-	 	    {
+	  	for ($i=0; $i < $ba ; $i++){     
+	 	    if($compo[$j]){
 	        	$datos2 = array(
-													'id_equipo'     => $idequipo, 
-													'id_componente' => $compo[$j],
-													'codigo'        => $codigo[$j],
-													'estado'        => 'AC',
-													'sistemaid'     => $sistema[$j]
-														);	
-	        	//print_r($datos2);
-						$res = $this->Componentes->insert_componente($datos2);
-						
-						
+					'id_equipo'     => $idequipo, 
+					'id_componente' => $compo[$j],
+					'codigo'        => $codigo[$j],
+					'estado'        => 'AC',
+					'sistemaid'     => $sistema[$j]
+				);
+				$res = $this->Componentes->insert_componente($datos2);	
 	        }
 	        $j++;
 	    }
@@ -274,10 +271,13 @@ class Componente extends CI_Controller {
 		$result = $this->Componentes->updateEditar($datos,$id);
 		echo json_encode($result);	
 	}
-
-	// ESTE METODO AGREGA COMPNENTE NUEVO DESDE ABM COMPONENTE
-	public function agregarComponente() // 
-	{
+	/**
+	* ESTE METODO AGREGA COMPNENTE NUEVO DESDE ABM COMPONENTE
+	* @param 
+	* @return array respuesta de la operacion
+	*/
+	public function agregarComponente(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componente | agregarComponente()");
 		$descripcion   = $this->input->post("descrip1");
 		$informacion   = $this->input->post("info");
 		$marcaid       = $this->input->post("ma");
@@ -293,41 +293,29 @@ class Componente extends CI_Controller {
 			"estado"      => "AC"
 		);
 		// inserta array
-		$response=$this->Componentes->agregar_componente($datos);	
+		$response = $this->Componentes->agregar_componente($datos);
 
 		if($response){
-
-				$ultimoId = $this->db->insert_id();
-			
-			
-				$nomcodif = $this->codifNombre($ultimoId,$empId); // codificacion de nomb  		
-			
-				$config = [
-					"upload_path" => "./assets/files/equipos",
-					'allowed_types' => "png|jpg|pdf|xlsx",
-					'file_name'=> $nomcodif
-				];
-			
-				$this->load->library("upload",$config);
-				
-				if ($this->upload->do_upload('inputPDF')) {	
-									
-					$data = array("upload_data" => $this->upload->data());
-				
-					$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
-					$nomcodif = $nomcodif.$extens;
-					$adjunto = array('pdf' => $nomcodif);
-					
-					$response = $this->Componentes->updatecomp($ultimoId,$adjunto);
-				}else{
-					$response = false;
-				}		
-
+			$ultimoId = $response['id'];
+			$nomcodif = $this->codifNombre($ultimoId,empresa()); // codificacion de nomb 
+			$config = [
+				"upload_path" => "./assets/files/equipos",
+				'allowed_types' => "png|jpg|pdf|xlsx",
+				'file_name'=> $nomcodif
+			];
+		
+			$this->load->library("upload",$config);
+			if ($this->upload->do_upload('inputPDF')) {	
+				$data = array("upload_data" => $this->upload->data());
+				$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
+				$nomcodif = $nomcodif.$extens;
+				$adjunto = array('pdf' => $nomcodif);
+				$response = $this->Componentes->updatecomp($ultimoId,$adjunto);
+			}else{
+				$response = false;
+			}
 		}
-		
 		echo json_encode($response);
-		
-		
 	}
 
 	//

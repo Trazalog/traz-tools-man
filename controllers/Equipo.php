@@ -499,8 +499,8 @@ class Equipo extends CI_Controller {
 		$exisCodEquipo = $this->Equipos->validaUnicidadCodigo($codigo);
 
 		if ($exisCodEquipo) {
-			 echo json_encode(['status'=>'error','code'=>'201','msj'=>'El código ingresado se encuentra en uso']);
-			 return;
+			echo json_encode(['status'=>'error','code'=>'201','msj'=>'El código ingresado se encuentra en uso']);
+			return;
 		}
 		$files = $_FILES['inputPDF'];
 		$names = $_FILES['inputPDF']['name'];

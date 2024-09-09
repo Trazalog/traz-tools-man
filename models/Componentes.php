@@ -36,9 +36,7 @@ class Componentes extends CI_Model{
 	*/
 	function componentes_List(){
         log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | componentes_List()");
-        log_message('DEBUG', "HARCODE EMPR_ID 6");
-		// $userdata = $this->session->userdata('user_data');
-        $empId = 6;
+        $empId = empresa();
 
 	 	$this->assetDB->select('equipos.id_equipo, 
 												equipos.codigo, 
@@ -86,10 +84,13 @@ class Componentes extends CI_Model{
 			return false;
 		}
 	}
-
-  // Devuelve descripcion de equipo segun id 
-	function getequipo($id)
-    {
+	/**
+	* Devuelve descripcion de equipo segun id
+	* @param string $idequipo;
+	* @return array descripcion de equipo
+	*/
+	function getequipo($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | getequipo()"); 
         $query= $this->assetDB->get_where('equipos',$id);
 	    foreach ($query->result() as $row){	
 	       $data['descripcion'] = $row['descripcion']; 
@@ -126,9 +127,7 @@ class Componentes extends CI_Model{
 	*/
 	function getcomponente(){
         log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | getcomponente()");
-        log_message('DEBUG', "HARCODE EMPR_ID 6");
-		// $empId    = empresa();
-		$empId    = 6;
+		$empId = empresa();
 
 		$this->assetDB->select('CONCAT(descripcion,\' - \',marcadescrip,\' - \', informacion) AS label, 
 											id_componente AS value', FALSE);    	
@@ -152,7 +151,7 @@ class Componentes extends CI_Model{
 	* @return array lista de sistemas
 	*/
 	function getsistema(){
-		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componente | getsistema()");
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | getsistema()");
 		$empId    = empresa();
 
 		$this->assetDB->select('sistema.*');     
@@ -168,23 +167,29 @@ class Componentes extends CI_Model{
 			return false;
 		}   
 	}
-	
-	// Agrega componente nuevo - Listo
+	/**
+	* Agrega componente nuevo
+	* @param array $insert data del componente nuevo
+	* @return array status true/false segun corresponda; integer $id insercion
+	*/
 	function agregar_componente($insert){
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | agregarComponente(".json_encode($insert).")");
 		$userdata             = $this->session->userdata('user_data');
-		$insert['id_empresa'] = $userdata[0]['id_empresa'];                 
-		$query = $this->assetDB->insert("componentes", $insert);
+		$insert['id_empresa'] = empresa();                 
+		$query['status'] = $this->assetDB->insert("componentes", $insert);
+		$query['id']     = $this->assetDB->insert_id();
 		return $query;    
 	}
-
-  // Asocia equipo/componente - Listo
-	function insert_componente($data2)
-	{
-			$userdata            = $this->session->userdata('user_data');
-			$data2['id_empresa'] = $userdata[0]['id_empresa'];  
-			$query = $this->assetDB->insert("componenteequipo", $data2);
-			return $query;
+	/**
+	* Asocia equipo/componente - Listo
+	* @param array $data2 data de la asociacion
+	* @return bool true/false segun corresponda
+	*/
+	function insert_componente($data2){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | insert_componente(".json_encode($data2).")");
+		$data2['id_empresa'] = empresa();  
+		$query = $this->assetDB->insert("componenteequipo", $data2);
+		return $query;
 	}
 
 	// Devuelve componentes asociados a un equipo
@@ -223,7 +228,7 @@ class Componentes extends CI_Model{
 	* @return bool true/false segun corresponda
 	*/
 	function delete_asociacion($idequip,$idcomp){
-		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | delete_asociacion(ID: $idequip | Data: ". json_encode($idcomp)."");  
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | delete_asociacion(ID: $idequip | Data: ". json_encode($idcomp)." )");  
 		$update = array('estado' => 'AN' );
 		$this->assetDB->where('id_componente', $idcomp);
 		$this->assetDB->where('id_equipo', $idequip);
@@ -238,8 +243,7 @@ class Componentes extends CI_Model{
 	*/
 	function getEditar($idCompEq){
         log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Componentes | getEditar($idCompEq)");
-        // $empId    = empresa();
-        $empId = 6;
+        $empId = empresa();
 
         $this->assetDB->select('componenteequipo.idcomponenteequipo, componenteequipo.id_equipo, componenteequipo.id_componente, componenteequipo.codigo, 
                 equipos.codigo as codigoEq, equipos.descripcion');

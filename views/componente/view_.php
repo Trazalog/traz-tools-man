@@ -229,69 +229,64 @@ function traer_equipo(){
       }
     },
     error: function(result){
-      console.error(result);
+      error('Error','Error al traer equipos');
+      console.log(result);
     },
     dataType: 'json'
   });
 }
-
 // Trae componentes segun empresa (no equipos)
-
-  function ordenaArregloDeObjetosPor(propiedad) {  
-    return function(a, b) {  
-      if (a[propiedad] > b[propiedad]) {  
-        return 1;  
-      } else if (a[propiedad] < b[propiedad]) {  
-        return -1;  
-      }  
-      return 0;  
+function ordenaArregloDeObjetosPor(propiedad) {  
+  return function(a, b) {  
+    if (a[propiedad] > b[propiedad]) {  
+      return 1;  
+    } else if (a[propiedad] < b[propiedad]) {  
+      return -1;  
     }  
-  } 
+    return 0;  
+  }  
+} 
+var dataComponentes = {};
+traerComp();
+function traerComp(){
+  dataComponentes = function() {
+    var tmp = null;
+    $.ajax({
+      'async': false,
+      'type': "POST",
+      'dataType': 'json',
+      'url': '<?php echo MAN; ?>Componente/getcomponente',
+      success: (data) => {return tmp = data;},
+      error: () => {error("Error","Error al traer componentes");}
+    });
+    return tmp;
+  }();
+}
 
-
-  var dataComponentes = {};
-  traerComp();
-  function traerComp(){
-    dataComponentes = function() {
-      $.ajax({
-        'async': false,
-        'type': "POST",
-        'dataType': 'json',
-        'url': '<?php echo MAN; ?>Componente/getcomponente',
-        success: (data) => {return data;},
-        error: () => error("Error","Error al traer componentes")
-      });
-      // return tmp;
-    }();
+// data busqueda por codigo de herramientas
+function dataCodigoCompo(request, response) {
+  function hasMatch(s) {
+    return s.toLowerCase().indexOf(request.term.toLowerCase())!==-1;
   }
+  var i, l, obj, matches = [];
 
-   
-
-  // data busqueda por codigo de herramientas
-  function dataCodigoCompo(request, response) {
-    function hasMatch(s) {
-      return s.toLowerCase().indexOf(request.term.toLowerCase())!==-1;
-    }
-    var i, l, obj, matches = [];
-
-    if (request.term==="") {
-      response([]);
-      return;
-    }
-    
-    //ordeno por codigo de herramientas
-    dataComponentes = dataComponentes.sort(ordenaArregloDeObjetosPor("label"));
-
-    for  (i = 0, l = dataComponentes.length; i<l; i++) {
-      obj = dataComponentes[i];
-      if (hasMatch(obj.codigo)) {
-        matches.push(obj);
-      }
-    }
-    response(matches);
+  if (request.term==="") {
+    response([]);
+    return;
   }
+  //ordeno por codigo de herramientas
+  dataComponentes = dataComponentes.sort(ordenaArregloDeObjetosPor("label"));
 
-  autoCompletarComponentes();
+  for  (i = 0, l = dataComponentes.length; i<l; i++) {
+    obj = dataComponentes[i];
+    if (hasMatch(obj.codigo)) {
+      matches.push(obj);
+    }
+  }
+  response(matches);
+}
+
+autoCompletarComponentes();
 function autoCompletarComponentes(){
   //busqueda por marcas de herramientas
   $("#componente").autocomplete({
@@ -300,20 +295,18 @@ function autoCompletarComponentes(){
     minLength: 1,
     focus: function(event, ui) {
       event.preventDefault();
-      $(this).val(ui.item.label);
+      $("#componente").val(ui.item.label);
       $('#id_componente').val(ui.item.value); 
     },
     select: function(event, ui) {
       event.preventDefault();
-      $(this).val(ui.item.label);
+      $("#componente").val(ui.item.label);
       $('#id_componente').val(ui.item.value);
     },
-  })
-  //muestro marca en listado de resultados
-  .data( "ui-autocomplete" )._renderItem = function( ul, item ) {
-    return $( "<li>" )
-    .append( "<a>" + item.label + "</a>" )
-    .appendTo( ul );
+  }).data("ui-autocomplete")._renderItem = function(ul, item) {
+    return $("<li>")
+    .append("<a>" + item.label + "</a>")
+    .appendTo(ul);
   };
 }
 
@@ -324,14 +317,14 @@ function autoCompletarComponentes(){
       type: 'POST',
       data: { },
       url: '<?php echo MAN; ?>Componente/getsistema',
+      dataType: 'json',
       success: function(data){
         if(data['status']){
           $('#sistema').empty();
           var opcion  = "<option value='-1'>Seleccione...</option>" ; 
           $('#sistema').append(opcion); 
-          for(var i=0; i < data.length ; i++){
-            var nombre = data[i]['descripcion'];
-            var opcion  = "<option value='"+data[i]['sistemaid']+"'>" +nombre+ "</option>" ; 
+          for(var i=0; i < data.sistemas.length ; i++){
+            var opcion  = "<option value='" + data.sistemas[i]['sistemaid'] + "'>" + data.sistemas[i]['descripcion'] + "</option>" ; 
             $('#sistema').append(opcion); 
           }
         }
@@ -340,7 +333,6 @@ function autoCompletarComponentes(){
         error();
         console.log(result);
       },
-      dataType: 'json'
     });
   }
 
@@ -362,7 +354,8 @@ function autoCompletarComponentes(){
           }
         },
       error: function(result){
-        console.error(result);
+        error("Error","Error al traer marcas");
+        console.log(result);
       },
       dataType: 'json'
     });
@@ -372,22 +365,22 @@ function autoCompletarComponentes(){
   function traer_descripcion(idequipo){
     $.ajax({
       type: 'POST',
+      dataType: 'json',
       data: { idequipo: idequipo},
-      url: 'index.php/Componente/getequipo',
+      url: '<?php echo MAN; ?>Componente/getequipo',
       success: function(data){
-              //console.log(data);
-              //console.log(data.datos);
-              if(data=='nada'){
-                var d='No hay Descripcion cargada';
-                $('#descrip').append(d);
-              }
-              $('#descrip').val(data.datos);
-          },
+        if(data.status){
+          var d='No hay descripción cargada';
+          $('#descrip').append(d);
+        }else{
+          $('#descrip').val(data.datos);
+        }
+      },
       error: function(result){
-            console.error(result);
-              },
-            dataType: 'json'
-          });   
+        error("Error","Error al traer descripción de equipo");
+        console.log(result);
+      },
+    });   
   }
 
 // Limpia modal agregar componente
@@ -401,9 +394,9 @@ function autoCompletarComponentes(){
   }
 
 // Guarda asociacion Equipo/componente 
-  function guardar(){ 
-    WaitingOpen("Guardando asociación a equipo");
-    var id_equipo = new Array();     
+  function guardar(){
+    wo();
+    var id_equipo = new Array(); 
     $("#tablaequipos tbody tr").each(function (index){
       var idequipo = $(this).attr('id');
       id_equipo.push(idequipo); 
@@ -450,7 +443,6 @@ function autoCompletarComponentes(){
             break;
         }
       });
-      //console.log(codigo);
     });
 
     var idequipo = $('#equipo').val();
@@ -460,31 +452,28 @@ function autoCompletarComponentes(){
       $.ajax({
         type: 'POST',
         data: {idequipo:idequipo, codigo:codigo, sistemaid:sistemaid, comp:comp, x:x, ge:ge},
-        url: 'index.php/Componente/guardar_componente',
+        url: '<?php echo MAN; ?>Componente/guardar_componente',
         success: function(data){
+          hecho();
           console.log("entre por el guardado del componente equipo");
-          //alert ("guardado con exito");
           cargarVista();
         },
         error: function(result){
-          console.error(result);
+          error('Error','Error al guardar asociacion de componentes');
+          console.log(result);
         }
       });
       limpiarModal();
-      WaitingClose();
-    }
-    else{
+      wc();
+    }else{
       hayError=true;
       $('#error').fadeIn('slow');
     }
     if(hayError == false){
       $('#error').fadeOut('slow');
     }
-    WaitingClose();
+    wc();
   }
-
-
-
 // Guarda un componente nuevo
   $('#guardarComponente').click(function(e) { //
     e.preventDefault();
@@ -515,6 +504,7 @@ function autoCompletarComponentes(){
       $('#errorComponentes').fadeIn('slow');
     }
     else{
+      wo();
       var formData = new FormData(document.getElementById("formComponentes"));
       $.ajax({
         cache: false,
@@ -523,7 +513,7 @@ function autoCompletarComponentes(){
         dataType: "html",
         processData: false,
         type: "POST",
-        url: "index.php/Componente/agregarComponente", 
+        url: "<?php echo MAN ?>Componente/agregarComponente", 
         success: function(data){
           traerComp();
           autoCompletarComponentes();
@@ -532,11 +522,15 @@ function autoCompletarComponentes(){
           //$("#modalAddComp2").css("display":"none");
           //$('.modal.in:visible').modal('hide');
           //$(".modal-backdrop.in").hide();
+          hecho();
         },
         error: function(result){
-            console.error("Error al crear componente");
-            console.table(result);
+            error("Error","Error al crear componente");
+            console.log(result);
         },
+        complete: () => {
+          wc();
+        }
       });
     }
   });
@@ -605,10 +599,10 @@ function autoCompletarComponentes(){
   });
 
   function cargarVista(){
-      WaitingOpen();
+      wo();
       $('#content').empty();
-      $("#content").load("<?php echo base_url(); ?>index.php/Componente/asigna/<?php echo $permission; ?>");
-      WaitingClose();
+      $("#content").load("<?php echo MAN; ?>Componente/asigna/<?php echo $permission; ?>");
+      wc();
   }
 
 // Cuando selecciona equipo carga componentes asociados al equipo
@@ -625,37 +619,36 @@ $('#equipo').change(function(){
     data: { idequipo:idequipo },
     dataType: 'json',
     type: 'POST',
-    url: 'Componente/getcompo', 
-    success: function(data){  
-              console.table(data);
-              if (data!= 0) {
-                var de = data[0]['descripcion']; 
-                var comp = data[0]['dee11'];
-                $('#descrip').val(de); 
-                for(var i=0; i < data.length ; i++){
-                  if(data[i]['marcadescrip'] != null){
-                    var  table = "<tr id='"+i+"'>"+   
-                    "<td>"+data[i]['dee11']+" - "+data[i]['marcadescrip']+" - "+data[i]['informacion']+"</td>"+
-                    "<td class='hidden' id='"+data[i]['id_componente']+"' >"+data[i]['id_componente']+"</td>"+
-                    "</tr>";
-                    $('#tablacompo').append(table); 
-                    s++;
-                  } else{
-                    $('#tablacompo').append('<tr> <td>Equipo sin componentes asociados</td></tr>')
-                  } 
-                }  
-                $('#tablacompo').val('');
-              }
-              else{
-                traer_descripcion(idequipo); 
-              } 
+    url: '<?php echo MAN; ?>Componente/getcompo',
+    success: function(data){
+      console.table(data);
+      if (data!= 0) {
+        var de = data[0]['descripcion']; 
+        var comp = data[0]['dee11'];
+        $('#descrip').val(de); 
+        for(var i=0; i < data.length ; i++){
+          if(data[i]['marcadescrip'] != null){
+            var  table = "<tr id='"+i+"'>"+   
+            "<td>"+data[i]['dee11']+" - "+data[i]['marcadescrip']+" - "+data[i]['informacion']+"</td>"+
+            "<td class='hidden' id='"+data[i]['id_componente']+"' >"+data[i]['id_componente']+"</td>"+
+            "</tr>";
+            $('#tablacompo').append(table); 
+            s++;
+          } else{
+            $('#tablacompo').append('<tr> <td>Equipo sin componentes asociados</td></tr>')
+          } 
+        }  
+        $('#tablacompo').val('');
+      }
+      else{
+        traer_descripcion(idequipo); 
+      }
     },
     error: function(result){
-          console.table(result);
-          traer_descripcion(idequipo);
+      console.table(result);
+      traer_descripcion(idequipo);
     },
   });
-
 });
 
 $('#tablaequipos').DataTable({

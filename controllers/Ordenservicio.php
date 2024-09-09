@@ -2,33 +2,22 @@
 
 class Ordenservicio extends CI_Controller {
 
-    public function __construct()
-    {
-        parent::__construct();
-        $this->load->model('Ordenservicios');
-        $this->load->model('Otrabajos');
+    public function __construct(){
+      parent::__construct();
+      $this->load->model('Ordenservicios');
+      $this->load->model('Otrabajos');
     }
-
-    public function index($permission)
-    {
-      $data = $this->session->userdata();
-      log_message('DEBUG','#Main/index | OrdenServicio >> data '.json_encode($data)." ||| ". $data['user_data'][0]['usrName'] ." ||| ".empty($data['user_data'][0]['usrName']));
-  
-      if(empty($data['user_data'][0]['usrName'])){
-        log_message('DEBUG','#Main/index | Cerrar Sesion >> '.base_url());
-        $var = array('user_data' => null,'username' => null,'email' => null, 'logged_in' => false);
-        $this->session->set_userdata($var);
-        $this->session->unset_userdata(null);
-        $this->session->sess_destroy();
-  
-        echo ("<script>location.href='login'</script>");
-  
-      }else{
+    /**
+    * Carga vista principal de informe de servicios
+    * @param 
+    * @return view listado informe de servicios
+    */
+    public function index($permission = "Add-Edit-Del-"){
+      log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | index()");
       
-        $data['permission'] = $permission;
-        $data['list']       = $this->Ordenservicios->getOrdServiciosList();
-        $this->load->view('ordenservicios/list',$data);
-      }
+      $data['permission'] = $permission;
+      $data['list']       = $this->Ordenservicios->getOrdServiciosList();
+      $this->load->view('ordenservicios/list',$data);
     }
 
    
@@ -64,13 +53,17 @@ class Ordenservicio extends CI_Controller {
      }      
     }  
 
+    /**
+    * Carga vista para llenar el modal con el detalle del informe de servicio
+    * @param 
+    * @return view detalle del informe de servicio
+    */
+    public function verInforme($id_ot = null, $id_eq = null, $id_solicitud = null, $idTarBonita = null){           
+      log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | verInforme(id_ot : $id_ot | id_eq : $id_eq | id_solicitud : $id_solicitud | idTarBonita : $idTarBonita)");    
 
-    public function verInforme($id_ot = null, $id_eq = null, $id_solicitud = null, $idTarBonita = null)   // Ok
-    {           
       $data['id_ot']      = $id_ot;            // id de OT. 
-      $data['id_eq']      = $id_eq;             // id de equipo   
-      log_message('DEBUG','#Main/index | OrdenServicio >verInforme> data '.json_encode($data)." ||| ". $data['user_data'][0]['usrName'] ." ||| ".empty($data['user_data'][0]['usrName']));
-    
+      $data['id_eq']      = $id_eq;             // id de equipo
+
       $infoOt = $this->Ordenservicios->getorden($id_ot);
       // si la tareas es opcional
       if (($infoOt[0] ["id_tarea"] < 0) || ($infoOt[0] ["id_tarea"] == NULL)) {
@@ -93,7 +86,7 @@ class Ordenservicio extends CI_Controller {
       $data['insumos'] = $this->Ordenservicios->getInsumosPorOT($id_ot);
       $data['rrhh'] = $this->Ordenservicios->getOperariosOrden($id_ot);
       $this->load->view('tareas/view_presta_presta_conf_modal',$data);
-    } 
+    }
 
     public function editarInforme($id_ot = null, $id_eq = null, $id_solicitud = null, $idTarBonita = null)   // Ok
     {           

@@ -364,11 +364,8 @@ class Calendarios extends CI_Model {
 	* @return array listado de periodos
 	*/
     function getperiodo($data = null){
-        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Calendarios | getperiodo($data)");
-        log_message('DEBUG', "HARCODE EMPR_ID 6");
-        // $userdata  = $this->session->userdata('user_data');
-        // $empresaId = $userdata[0]['id_empresa'];    
-        $empresaId = 6;    
+        log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Calendarios | getperiodo(".json_encode($data).")"); 
+        $empresaId = empresa();
 
         $this->assetDB->select('periodo.idperiodo, periodo.descripcion');
         $this->assetDB->from('periodo');

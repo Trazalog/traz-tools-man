@@ -7,13 +7,15 @@ class Backlogs extends CI_Model
 		parent::__construct();
         $this->assetDB = $this->load->database('asset_db', TRUE);
 	}
-	
-	// Trae listado de backlogs - Listo
+	/**
+    * Trae listado de backlogs
+    * @param 
+    * @return array listado de backlogs
+    */
 	function backlog_List(){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | backlog_List()");
+        $empId = empresa();
 
-		$userdata = $this->session->userdata('user_data');
-        $empId = $userdata[0]['id_empresa']; 
-          
 	    $this->assetDB->select('tbl_back.*,
 												equipos.descripcion AS des, 
 												equipos.marca, 
@@ -30,17 +32,11 @@ class Backlogs extends CI_Model
 			$this->assetDB->where('tbl_back.id_empresa', $empId);
 			$this->assetDB->where('tbl_back.estado !=', 'B');
 	    $query= $this->assetDB->get();
-			// $dato = $this->assetDB->last_query();
-			// dump($dato, 'backolog');
-	    if( $query->num_rows() > 0)
-	    {
-	      
-	      $data['data'] = $query->result_array();	
-	      return  $data;
-	    } 
-	    else 
-	    	$data['data'] = 0;
-	      return  $data; 
+	    if( $query->num_rows() > 0){
+			$data['data'] = $query->result_array();	
+			return  $data;
+	    } else $data['data'] = array();
+		return  $data;
 	}
 	// Trae equipos para llenar select vista por empresa logueada - Listo
 	function getequipo(){
@@ -63,9 +59,14 @@ class Backlogs extends CI_Model
 			return false;
 		}	
 	}	
-	function getComponentes($idEquipo){
-		$userdata  = $this->session->userdata('user_data');
-		$empresaId = $userdata[0]['id_empresa'];
+	/**
+    * Obtiene listado de compronentes por ID de equipo 
+    * @param integer $idEquipo id del equipo
+    * @return array listado de componentes
+    */
+	public function getComponentes(){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getComponentes()");
+		$empresaId = empresa();
 		$this->assetDB->select('componenteequipo.idcomponenteequipo AS idce, 
 											componenteequipo.codigo, 
 											componentes.descripcion, 
@@ -81,22 +82,21 @@ class Backlogs extends CI_Model
 		$this->assetDB->order_by('componenteequipo.codigo');
 		$query = $this->assetDB->get();
 		if($query->num_rows()>0){
-				return $query->result();
-		}
-		else
-		{
-				return false;
-		}     
-	}
-	// Trae info de equipo por id - Listo
-	function getInfoEquipos($data = null){
-
-		if($data == null)
-		{
+			return $query->result();
+		}else{
 			return false;
 		}
-		else
-		{			
+	}
+	/**
+    * Trae info de equipo por id
+    * @param integer $id_equipo id del equipo seleccionado
+    * @return array data del equipo
+    */
+	function getInfoEquipos($data = null){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getComponentes()");
+		if($data == null){
+			return false;
+		}else{			
 			$id_equipo = $data['id_equipo'];
 			//Datos del 
 			$this->assetDB->select('E.*, M.*');
@@ -106,9 +106,8 @@ class Backlogs extends CI_Model
 			$query = $this->assetDB->get();
 			if($query->num_rows()>0){
 				return $query->result()[0];
-			}
-			else{
-					return false;
+			}else{
+				return false;
 			}			
 		}
 	}
@@ -133,12 +132,15 @@ class Backlogs extends CI_Model
 		$query = $this->assetDB->update("tbl_back",$data);
 		return $query;
 	}
-
-
-
-	//Inserta  Backlog nuevo - Listo
+	/**
+    * Inserta Backlog nuevo
+    * @param array $data array con datos de backlog
+    * @return array resultado de la operacion e id de insercion
+    */
 	function insert_backlog($data){
-		$query = $this->assetDB->insert("tbl_back",$data);
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | insert_backlog()");
+		$query['status'] = $this->assetDB->insert("tbl_back",$data);
+		$query['id'] = $this->assetDB->insert_id();
 		return $query;
 	}  	
 	// Guarda el nombre de adjunto
@@ -256,9 +258,14 @@ class Backlogs extends CI_Model
 		$this->assetDB->where('backId', $id);
 		$query = $this->assetDB->delete('tbl_backlogherramientas');
 		return $query;
-	} 
-	// guarda herramientas en edicion
+	}
+	/**
+    * Guarda las herramientas
+    * @param array $herram data de herramientas cargadas en formulario
+    * @return integer/bool cantidad de inserciones del batch / false si no se inserto
+    */
 	function insertBackHerram($herram){
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | insertBackHerram(".json_encode($herram).")");
 		$query = $this->assetDB->insert_batch("tbl_backlogherramientas",$herram);
 		return $query;
 	}
@@ -267,13 +274,15 @@ class Backlogs extends CI_Model
 		$this->assetDB->where('backId', $id);
 		$query = $this->assetDB->delete('tbl_backloginsumos');
 		return $query;
-	}	
-	// Guarda insumos - Listo 
+	}
+	/**
+    * Guarda los insumos
+    * @param array $insumo data de insumos cargadas en formulario
+    * @return integer/bool cantidad de inserciones del batch / false si no se inserto
+    */
 	function insertBackInsum($insumo){
-
+		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | insert_bainsertBackInsumcklog(".json_encode($insumo).")");
 		$query = $this->assetDB->insert_batch("tbl_backloginsumos",$insumo);
 		return $query;
 	}
-
- 	
 }	

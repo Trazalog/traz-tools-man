@@ -44,24 +44,16 @@ class Sservicio extends CI_Controller{
 
 		echo json_encode($data);
 	}
-	// Trae sectores por empresa logueada - Listo
+	/**
+	* Trae sectores por empresa logueada 
+	* @param 
+	* @return array listado de sectores
+	*/
 	public function getSector(){
-		$data = $this->session->userdata();
-		log_message('DEBUG','#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getSector() |  data '.json_encode($data)." ||| ". $data['user_data'][0]['usrName'] ." ||| ".empty($data['user_data'][0]['usrName']));
+		log_message('DEBUG','#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getSector()');
 		
-		// if(empty($data['user_data'][0]['usrName'])){
-		// 	log_message('DEBUG','#Main/index | Cerrar Sesion >> '.base_url());
-		// 	$var = array('user_data' => null,'username' => null,'email' => null, 'logged_in' => false);
-		// 	$this->session->set_userdata($var);
-		// 	$this->session->unset_userdata(null);
-		// 	$this->session->sess_destroy();
-
-		// 	echo ("<script>location.href='login'</script>");
-
-		// }else{
-			$response = $this->Sservicios->getSectores($this->input->post());
-			echo json_encode($response);
-		// }
+		$response = $this->Sservicios->getSectores($this->input->post());
+		echo json_encode($response);
 	}
 	public function getEquipo(){
 		$response = $this->Sservicios->getEquipos($this->input->post());
@@ -75,8 +67,8 @@ class Sservicio extends CI_Controller{
 	}
 	/**
 	* Trae equipos segun sector de empresa logueada
-	* @param 
-	* @return array lsita equipos del sector seleccionado
+	* @param integer $id_sector id del sector seleccionado 
+	* @return array lista equipos del sector seleccionado
 	*/
 	public function getEquipSector(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getEquipSector()");
