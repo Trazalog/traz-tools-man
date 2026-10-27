@@ -5,3 +5,6 @@ controllers/Area.php
 models/Areas.php
 helpers/man_helper.php
 views/area/view_.php
+controllers/Proceso.php
+models/Procesos.php
+views/proceso/view_.php

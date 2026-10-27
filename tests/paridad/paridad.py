@@ -16,7 +16,7 @@ Variables de entorno:
   TOOLS_URL       default http://traz-comp.local/traz-v3/traz-tools/
   DNATO_URL       default http://traz-comp.local/traz-comp-dnato/
 
-Uso: python3 tests/paridad/paridad.py <pantalla> [<pantalla>...]   (hoy: area)
+Uso: python3 tests/paridad/paridad.py [<pantalla>...]   (sin argumentos: todas; ver PANTALLAS)
 """
 import html
 import http.cookiejar
@@ -108,57 +108,60 @@ def jload(texto):
         return {'_no_json': texto.strip()[:200]}
 
 
-# --------------------------------------------------------------------------------------------- área
-def paridad_area(asset, man, emp_asset):
-    pa = 'area/'
-    pm = MAN + 'Area/'
+# ------------------------------------------------------------------ ABM simple (descripción + estado)
+def paridad_abm(asset, man, emp_asset, nombre, tabla, pk):
+    """ABM con la forma de Área: index, Obtener_x, Guardar_x, Modificar_x y Eliminar_x (baja lógica AN).
+    nombre: el del controller en minúscula (area, proceso). tabla y pk: los de assetv2."""
+    Nom = nombre.capitalize()
+    pa = ASSET + nombre + '/'
+    pm = MAN + Nom + '/'
 
-    comparar('area · listado', celdas_tabla(asset.get(ASSET + pa + 'index/Add-Edit-Del')),
+    comparar(nombre + ' · listado', celdas_tabla(asset.get(pa + 'index/Add-Edit-Del')),
              celdas_tabla(man.get(pm + 'index/Add-Edit-Del')))
 
-    id_existente = sql("SELECT id_area FROM area WHERE estado='AC' AND id_empresa=%d LIMIT 1" % emp_asset)[0][0]
-    comparar('area · obtener (propia)', jload(asset.post(ASSET + pa + 'Obtener_area', {'id_area': id_existente})),
-             jload(man.post(pm + 'Obtener_area', {'id_area': id_existente})))
+    propio = sql("SELECT %s FROM %s WHERE estado='AC' AND id_empresa=%d LIMIT 1" % (pk, tabla, emp_asset))
+    if propio:
+        comparar(nombre + ' · obtener (propio)', jload(asset.post(pa + 'Obtener_' + nombre, {pk: propio[0][0]})),
+                 jload(man.post(pm + 'Obtener_' + nombre, {pk: propio[0][0]})))
 
-    # Alta: cada lado crea la suya; se compara respuesta y fila resultante (salvo id y descripción).
-    ra = jload(asset.post(ASSET + pa + 'Guardar_area', {'descripcion': PREFIJO + ' A', 'id_empresa': emp_asset}))
-    rm = jload(man.post(pm + 'Guardar_area', {'descripcion': PREFIJO + ' M', 'id_empresa': emp_asset}))
-    comparar('area · alta (respuesta)', ra, rm)
-    fa = sql("SELECT id_area, id_empresa, estado FROM area WHERE descripcion='%s A' ORDER BY id_area DESC LIMIT 1" % PREFIJO)
-    fm = sql("SELECT id_area, id_empresa, estado FROM area WHERE descripcion='%s M' ORDER BY id_area DESC LIMIT 1" % PREFIJO)
-    comparar('area · alta (fila en la base)', [r[1:] for r in fa], [r[1:] for r in fm])
+    # Alta: cada lado crea el suyo; se compara respuesta y fila resultante (salvo id y descripción).
+    ra = jload(asset.post(pa + 'Guardar_' + nombre, {'descripcion': PREFIJO + ' A', 'id_empresa': emp_asset}))
+    rm = jload(man.post(pm + 'Guardar_' + nombre, {'descripcion': PREFIJO + ' M', 'id_empresa': emp_asset}))
+    comparar(nombre + ' · alta (respuesta)', ra, rm)
+    fila = "SELECT %s, id_empresa, estado FROM %s WHERE descripcion='%%s' ORDER BY %s DESC LIMIT 1" % (pk, tabla, pk)
+    fa, fm = sql(fila % (PREFIJO + ' A')), sql(fila % (PREFIJO + ' M'))
+    comparar(nombre + ' · alta (fila en la base)', [r[1:] for r in fa], [r[1:] for r in fm])
     ida, idm = fa[0][0], fm[0][0]
 
-    ra = jload(asset.post(ASSET + pa + 'Modificar_area', {'id_area': ida, 'descripcion': PREFIJO + ' A2', 'id_empresa': emp_asset}))
-    rm = jload(man.post(pm + 'Modificar_area', {'id_area': idm, 'descripcion': PREFIJO + ' M2', 'id_empresa': emp_asset}))
-    comparar('area · modificación (respuesta)', ra, rm)
-    comparar('area · modificación (fila en la base)',
-             [r[1:] for r in sql("SELECT descripcion, id_empresa, estado FROM area WHERE id_area=%s" % ida)],
-             [r[1:] for r in sql("SELECT descripcion, id_empresa, estado FROM area WHERE id_area=%s" % idm)])
+    ra = jload(asset.post(pa + 'Modificar_' + nombre, {pk: ida, 'descripcion': PREFIJO + ' A2', 'id_empresa': emp_asset}))
+    rm = jload(man.post(pm + 'Modificar_' + nombre, {pk: idm, 'descripcion': PREFIJO + ' M2', 'id_empresa': emp_asset}))
+    comparar(nombre + ' · modificación (respuesta)', ra, rm)
+    fila = "SELECT descripcion, id_empresa, estado FROM %s WHERE %s=%%s" % (tabla, pk)
+    comparar(nombre + ' · modificación (fila en la base)', [r[1:] for r in sql(fila % ida)], [r[1:] for r in sql(fila % idm)])
 
-    ra = jload(asset.post(ASSET + pa + 'Eliminar_area', {'id_area': ida}))
-    rm = jload(man.post(pm + 'Eliminar_area', {'id_area': idm}))
-    comparar('area · baja (respuesta)', ra, rm)
-    comparar('area · baja (fila en la base)',
-             sql("SELECT id_empresa, estado FROM area WHERE id_area=%s" % ida),
-             sql("SELECT id_empresa, estado FROM area WHERE id_area=%s" % idm))
+    ra = jload(asset.post(pa + 'Eliminar_' + nombre, {pk: ida}))
+    rm = jload(man.post(pm + 'Eliminar_' + nombre, {pk: idm}))
+    comparar(nombre + ' · baja (respuesta)', ra, rm)
+    comparar(nombre + ' · baja (fila en la base)', [r[1:] for r in sql(fila % ida)], [r[1:] for r in sql(fila % idm)])
 
-    # Aislamiento: un área de otra empresa. asset la devuelve (bug T1 heredado); MAN no debe.
-    ajena = sql("SELECT id_area FROM area WHERE id_empresa<>%d LIMIT 1" % emp_asset)
-    if ajena:
-        rm = jload(man.post(pm + 'Obtener_area', {'id_area': ajena[0][0]}))
-        comparar('area · aislamiento: MAN no ve áreas de otra empresa', None, rm,
-                 'diferencia buscada con asset, que sí la devuelve')
-        antes = sql("SELECT descripcion, estado FROM area WHERE id_area=%s" % ajena[0][0])
-        man.post(pm + 'Modificar_area', {'id_area': ajena[0][0], 'descripcion': PREFIJO + ' HACK'})
-        man.post(pm + 'Eliminar_area', {'id_area': ajena[0][0]})
-        comparar('area · aislamiento: MAN no modifica ni da de baja áreas de otra empresa', antes,
-                 sql("SELECT descripcion, estado FROM area WHERE id_area=%s" % ajena[0][0]))
+    # Aislamiento: un registro de otra empresa. MAN no lo ve, no lo modifica y no lo da de baja.
+    ajeno = sql("SELECT %s FROM %s WHERE id_empresa<>%d LIMIT 1" % (pk, tabla, emp_asset))
+    if ajeno:
+        comparar(nombre + ' · aislamiento: MAN no ve registros de otra empresa', None,
+                 jload(man.post(pm + 'Obtener_' + nombre, {pk: ajeno[0][0]})))
+        antes = sql(fila % ajeno[0][0])
+        man.post(pm + 'Modificar_' + nombre, {pk: ajeno[0][0], 'descripcion': PREFIJO + ' HACK'})
+        man.post(pm + 'Eliminar_' + nombre, {pk: ajeno[0][0]})
+        comparar(nombre + ' · aislamiento: MAN no modifica ni da de baja registros de otra empresa', antes,
+                 sql(fila % ajeno[0][0]))
 
-    sql("DELETE FROM area WHERE descripcion LIKE '%s%%'" % PREFIJO)
+    sql("DELETE FROM %s WHERE descripcion LIKE '%s%%'" % (tabla, PREFIJO))
 
 
-PANTALLAS = {'area': paridad_area}
+PANTALLAS = {
+    'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
+    'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
+}
 
 if __name__ == '__main__':
     env = leer_env(os.environ['MAN_ENV_FILE'])
