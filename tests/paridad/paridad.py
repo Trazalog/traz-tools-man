@@ -158,9 +158,97 @@ def paridad_abm(asset, man, emp_asset, nombre, tabla, pk):
     sql("DELETE FROM %s WHERE descripcion LIKE '%s%%'" % (tabla, PREFIJO))
 
 
+# ------------------------------------------------------------------------------------- parámetros
+def sin_prueba(lista):
+    """Saca de una respuesta de lista las filas de prueba del otro lado, para comparar el resto.
+    false (lo que devuelven asset y MAN cuando el equipo queda sin filas) cuenta como lista vacía: el
+    orden de la prueba hace que a un lado le queden filas del otro y al otro no."""
+    if lista is False:
+        return []
+    if not isinstance(lista, list):
+        return lista
+    return sorted([f for f in lista if not str(f.get('paramdescrip', '')).startswith(PREFIJO)],
+                  key=lambda f: json.dumps(f, sort_keys=True))
+
+
+def paridad_parametro(asset, man, emp_asset):
+    pa = ASSET + 'Parametro/'
+    pm = MAN + 'Parametro/'
+
+    comparar('parametro · equipos de la empresa', jload(asset.get(pa + 'getequipo')), jload(man.get(pm + 'getequipo')))
+    comparar('parametro · catálogo de parámetros', jload(asset.get(pa + 'traerparametro')),
+             jload(man.get(pm + 'traerparametro')))
+
+    # Alta de parámetro en el catálogo: cada lado crea el suyo.
+    ra = jload(asset.post(pa + 'guardar', {'data[paramdescrip]': PREFIJO + ' A'}))
+    rm = jload(man.post(pm + 'guardar', {'data[paramdescrip]': PREFIJO + ' M'}))
+    comparar('parametro · alta en catálogo (tipo de respuesta)', type(ra).__name__, type(rm).__name__)
+    fila = "SELECT paramId, id_empresa, estado, min FROM parametros WHERE paramdescrip='%s'"
+    fa, fm = sql(fila % (PREFIJO + ' A')), sql(fila % (PREFIJO + ' M'))
+    comparar('parametro · alta en catálogo (fila en la base)', [r[1:] for r in fa], [r[1:] for r in fm])
+    comparar('parametro · alta en catálogo (devuelve el id creado)', [str(ra), str(rm)], [fa[0][0], fm[0][0]])
+    pid_a, pid_m = fa[0][0], fm[0][0]
+
+    equipo = sql("SELECT id_equipo FROM equipos WHERE estado='AC' AND id_empresa=%d ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+
+    # Asociar al equipo: cada lado asocia su parámetro. La respuesta es la lista del equipo.
+    ra = jload(asset.post(pa + 'guardar_todo', {'data[id_equipo]': equipo, 'data[id_parametro]': pid_a,
+                                               'data[maximo]': '10', 'data[minimo]': '2.5'}))
+    rm = jload(man.post(pm + 'guardar_todo', {'data[id_equipo]': equipo, 'data[id_parametro]': pid_m,
+                                             'data[maximo]': '10', 'data[minimo]': '2.5'}))
+    comparar('parametro · asociar (lista sin filas de prueba)', sin_prueba(ra), sin_prueba(rm))
+    fila = "SELECT id_equipo, CAST(maximo AS CHAR), CAST(minimo AS CHAR), id_empresa FROM setupparam WHERE id_parametro=%s"
+    comparar('parametro · asociar (fila en la base)', sql(fila % pid_a), sql(fila % pid_m))
+    propia = lambda lista, pid: [f for f in (lista if isinstance(lista, list) else []) if f.get('id_parametro') == pid]
+    comparar('parametro · asociar (la lista trae la fila nueva)',
+             [{k: v for k, v in f.items() if k != 'id_parametro' and k != 'paramdescrip'} for f in propia(ra, pid_a)],
+             [{k: v for k, v in f.items() if k != 'id_parametro' and k != 'paramdescrip'} for f in propia(rm, pid_m)])
+
+    comparar('parametro · listar parámetros del equipo', sin_prueba(jload(asset.post(pa + 'getparametros', {'id_equipo': equipo}))),
+             sin_prueba(jload(man.post(pm + 'getparametros', {'id_equipo': equipo}))))
+
+    # Traer para editar: la vista manda fila (parent) y el array de ids (comp).
+    ea = jload(asset.get(pa + 'editar?' + urllib.parse.urlencode({'e': equipo, 'parent': 0, 'comp[0]': pid_a})))
+    em = jload(man.get(pm + 'editar?' + urllib.parse.urlencode({'e': equipo, 'parent': 0, 'comp[0]': pid_m})))
+    sin_ids = lambda r: [{k: v for k, v in f.items() if k not in ('id_parametro', 'paramdescrip')} for f in r.get('datos', [])] if isinstance(r, dict) else r
+    comparar('parametro · traer para editar', sin_ids(ea), sin_ids(em))
+
+    ra = jload(asset.post(pa + 'guardarmodif', {'datos[id_equipo]': equipo, 'datos[id_parametro]': pid_a,
+                                               'datos[maximo]': '20', 'datos[minimo]': '1'}))
+    rm = jload(man.post(pm + 'guardarmodif', {'datos[id_equipo]': equipo, 'datos[id_parametro]': pid_m,
+                                             'datos[maximo]': '20', 'datos[minimo]': '1'}))
+    comparar('parametro · modificar (lista sin filas de prueba)', sin_prueba(ra), sin_prueba(rm))
+    comparar('parametro · modificar (fila en la base)', sql(fila % pid_a), sql(fila % pid_m))
+
+    ra = jload(asset.post(pa + 'eliminar', {'id_equipoElim': equipo, 'id_parametroElim': pid_a}))
+    rm = jload(man.post(pm + 'eliminar', {'id_equipoElim': equipo, 'id_parametroElim': pid_m}))
+    comparar('parametro · quitar asociación (lista sin filas de prueba)', sin_prueba(ra), sin_prueba(rm))
+    comparar('parametro · quitar asociación (fila en la base)', sql(fila % pid_a), sql(fila % pid_m))
+
+    # Aislamiento: equipo de otra empresa con parámetros asociados.
+    ajeno = sql("SELECT s.id_equipo, s.id_parametro FROM setupparam s JOIN equipos e ON e.id_equipo=s.id_equipo "
+                "WHERE e.id_empresa<>%d LIMIT 1" % emp_asset)
+    if ajeno:
+        eq, par = ajeno[0]
+        comparar('parametro · aislamiento: MAN no lista parámetros de equipos ajenos', {'_no_json': 'nada'},
+                 jload(man.post(pm + 'getparametros', {'id_equipo': eq})))
+        antes = sql("SELECT CAST(maximo AS CHAR), CAST(minimo AS CHAR) FROM setupparam WHERE id_equipo=%s AND id_parametro=%s" % (eq, par))
+        man.post(pm + 'guardarmodif', {'datos[id_equipo]': eq, 'datos[id_parametro]': par, 'datos[maximo]': '999', 'datos[minimo]': '999'})
+        man.post(pm + 'eliminar', {'id_equipoElim': eq, 'id_parametroElim': par})
+        comparar('parametro · aislamiento: MAN no modifica ni quita asociaciones ajenas', antes,
+                 sql("SELECT CAST(maximo AS CHAR), CAST(minimo AS CHAR) FROM setupparam WHERE id_equipo=%s AND id_parametro=%s" % (eq, par)))
+        man.post(pm + 'guardar_todo', {'data[id_equipo]': eq, 'data[id_parametro]': pid_m, 'data[maximo]': '1', 'data[minimo]': '0'})
+        comparar('parametro · aislamiento: MAN no asocia parámetros a equipos ajenos', [],
+                 sql("SELECT id_equipo FROM setupparam WHERE id_parametro=%s" % pid_m))
+
+    sql("DELETE FROM setupparam WHERE id_parametro IN (%s, %s)" % (pid_a, pid_m))
+    sql("DELETE FROM parametros WHERE paramdescrip LIKE '%s%%'" % PREFIJO)
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
+    'parametro': paridad_parametro,
 }
 
 if __name__ == '__main__':

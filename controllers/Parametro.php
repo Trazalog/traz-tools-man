@@ -1,246 +1,139 @@
 <?php
-
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Parametrizar predictivo: parámetros por equipo (máximo/mínimo) — MIG-ASSET-1.
+ *
+ * Portado desde asset sin las acciones que ninguna vista usa y que llamaban a métodos inexistentes
+ * del model (baja_parametro, bajaparametro, geteditar, agregar_componente, agregarcomponente).
+ */
 class Parametro extends CI_Controller {
-	
+
 	function __construct(){
 		parent::__construct();
 		$this->load->model('Parametros');
+		$this->load->helper('man');
 	}
-    /**
-    * Carga vista principal de parametrizar predictivo
-    * @param 
-    * @return view listado parametrizar predictivo
-    */
-	public function index($permission = "Add-Edit-Del-"){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Parametro | index()");
-        $data['permission'] = $permission;
-        $this->load->view('parametro/list', $data);
+
+	/**
+	* Carga vista principal de parametrizar predictivo
+	* @param string $permission acciones habilitadas ("Add-Edit-Del"); sin parámetro, solo lectura (E3)
+	*/
+	public function index($permission = ''){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | index($permission)");
+		if (man_empresa() === null) {
+			echo '<div class="alert alert-danger">La empresa no está vinculada con Mantenimiento. Contactá al administrador.</div>';
+			return;
+		}
+		$data['permission'] = $permission;
+		$this->load->view('parametro/list', $data);
 	}
-    /**
+
+	/**
 	* Trae equipos por empresa logueada
-	* @param 
-	* @return array listado de equipos
+	* @return json listado de equipos, o "nada"
 	*/
 	public function getequipo(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | getequipo()");
 		$equipo = $this->Parametros->getequipo();
-		if($equipo){	
-			$arre = array();
-	        foreach ($equipo as $row ) {   
-	           $arre[] = $row;
-            }
-			echo json_encode($arre);
+		if ($equipo) {
+			echo json_encode(array_values($equipo));
 		}
 		else echo "nada";
 	}
-    /**
+
+	/**
 	* Trae parametros asociados al id de equipo
-	* @param 
-	* @return array listado de parametros
+	* @return json listado de parametros, o "nada"
 	*/
 	public function getparametros(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | getparametros()");
-		$id         = $_POST['id_equipo'];
+		$id         = $this->input->post('id_equipo');
 		$parametros = $this->Parametros->getparametros($id);
-		if($parametros){	
-			$arre = array();
-	        foreach ($parametros as $row ) {   
-	           $arre[] = $row;
-	        }
-			echo json_encode($arre );
+		if ($parametros) {
+			echo json_encode(array_values($parametros));
 		}
 		else echo "nada";
 	}
 
-	public function baja_parametro()
-	{
-		$t  = $_POST['tr'];
-		$co = $_POST['comp'];
-		$eq = $_POST['e'];
-		//$p=$_POST['parent'];
-		//$idp=$_POST['idparam'];
-		//$i=0;
-		/*if(count($p) > 0 ){ 
-	       	if($co[$p] ){
-	       		$datos2 = $co[$p];
-				$result = $this->Parametros->delete_parametro($idq,$datos2);
-				print_r($result);
-			}
-		}*/
-		if($co[$t]){  
-       		$datos2 = $co[$t];
-       		//$i++;
-			$result = $this->Parametros->delete_parametro($eq,$datos2);
+	/**
+	* Trae la asociación a editar. La vista manda la fila (parent) y el array de ids de parámetro (comp).
+	*/
+	public function editar(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | editar()");
+		$id  = $this->input->get('e');      // id_equipo
+		$pp  = $this->input->get('parent'); // número de fila
+		$cop = $this->input->get('comp');   // ids de parámetro
+		$result = false;
+		if ($pp !== null && is_array($cop) && !empty($cop[$pp])) {
+			$result = $this->Parametros->editar($id, $cop[$pp]);
 		}
-		return $result;
-	}
-
-	public function bajaparametro()
-	{
-		$idq    = $_POST['id_equipo'];
-		$idp    = $_POST['id_parametro'];
-		if(count($idq) > 0 ){
-			if($idp){
-				$result = $this->Parametros->delete_p($idq,$idp);
-				print_r($result);
-			}
-		}
-	}
-
-	public function geteditar()
-	{
-		$id     = $_GET['equipoglob'];
-		$idp    = $_GET['id_parametro'];
-		$result = $this->Parametros->geteditar($id,$idp);
-		if($result)
-		{	
-			$arre['datos'] = $result;
-			echo json_encode($arre); //echo json_encode($arre)
-		}
-		else echo "nada";
-	}
-
-	public function editar()
-	{
-		//$pa=$_GET['idparam'];
-		//$i=0;
-		$id  = $_GET['e'];//id_equipo
-		$pp  = $_GET['parent'];//numer de fila
-		$cop = $_GET['comp']; //id de param
-		if (count($pp>0)) {
-			if ($cop[$pp]) {
-				$idp2   = $cop[$pp];
-				$result = $this->Parametros->editar($id,$idp2);
-			}
-		}
-		/*if ($pa[$i]) {
-			$idp2=$pa[$i];
-			$i++;
-			$result = $this->Parametros->editar($id,$idp2);
-		}*/
-		if($result)
-		{	
+		if ($result) {
 			$arre['datos'] = $result;
 			echo json_encode($arre);
 		}
 		else echo "nada";
 	}
 
-	public function agregar_componente()
-	{
-		//$ide=$_POST['e'];
-		$datos = $_POST['datos'];
-		if ($datos) {
-			$pa     = $datos['id_parametro'];
-			$m      = $datos['maximo'];
-			$n      = $datos['minimo'];
-			$equ    = $datos['id_equipo'];
-			//doy de baja
-			$result = $this->Parametros->update_editar($m,$n,$pa,$equ);
-			print_r(json_encode($result));
-		}
-  	}
-
-  public function agregarcomponente()
-	{
-		$ide   = $_POST['equipoglob'];
-		$datos = $_POST['datos'];
-		print_r($ide);
-		print_r($datos);
-		if ($datos) {
-			$pa     = $datos['id_parametro'];
-			$maxi   = $datos['maximo'];
-			$mini   = $datos['minimo'];
-			//doy de baja
-			$result = $this->Parametros->update_editar($maxi,$mini, $ide,$pa);
-			print_r(json_encode($result));
-		}
-  }
-	//guarda la asociacio de parametros editada
+	/**
+	* Guarda la asociación de parámetros editada y devuelve la lista actualizada del equipo
+	*/
 	public function guardarmodif(){
-		
-		$datos = $_POST['datos'];
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | guardarmodif()");
+		$datos = $this->input->post('datos');
 		if ($datos) {
-			$pa     = $datos['id_parametro'];
-			$m      = $datos['maximo'];
-			$n      = $datos['minimo'];
 			$equ    = $datos['id_equipo'];
-			//doy de baja
-			$result = $this->Parametros->update_editar($m,$n,$pa,$equ);
-			if($result){
-				$parametros = $this->Parametros->getparametros($equ);
-			}else{
-				$parametros = false;
-			}
-			
-		echo json_encode($parametros);
+			$result = $this->Parametros->update_editar($datos['maximo'], $datos['minimo'], $datos['id_parametro'], $equ);
+			$parametros = $result ? $this->Parametros->getparametros($equ) : false;
+			echo json_encode($parametros);
 		}
 	}
-	// elimina asociacion
+
+	/**
+	* Elimina la asociación y devuelve la lista actualizada del equipo
+	*/
 	public function eliminar(){
-
-		$id_equipoElim = $_POST['id_equipoElim'];
-		
-		$id_parametroElim = $_POST['id_parametroElim'];
-
-		// dump($id_equipoElim, 'id de equipo');
-		// dump($id_parametroElim,'ide parametro');
-		$response = $this->Parametros->elimina_param($id_equipoElim,$id_parametroElim);
-		if($response){
-			$parametros = $this->Parametros->getparametros($id_equipoElim);
-		}else{
-			$parametros = false;
-		}
-		
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | eliminar()");
+		$id_equipoElim    = $this->input->post('id_equipoElim');
+		$id_parametroElim = $this->input->post('id_parametroElim');
+		$response   = $this->Parametros->elimina_param($id_equipoElim, $id_parametroElim);
+		$parametros = $response ? $this->Parametros->getparametros($id_equipoElim) : false;
 		echo json_encode($parametros);
 	}
-    /**
-	* guarda asociacion nueva de parametros
-	* @param 
-	* @return array 
+
+	/**
+	* Guarda asociación nueva de parámetros y devuelve la lista actualizada del equipo
 	*/
 	public function guardar_todo(){
-        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | guardar_todo()");
-		$datos = $_POST['data'];
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | guardar_todo()");
+		$datos     = $this->input->post('data');
 		$id_equipo = $datos['id_equipo'];
-		$response = $this->Parametros->guardar_todo($datos);
-		if($response){
-			$parametros = $this->Parametros->getparametros($id_equipo);
-		}else{
-			$parametros = false;
-		}		
+		$response  = $this->Parametros->guardar_todo($datos);
+		$parametros = $response ? $this->Parametros->getparametros($id_equipo) : false;
 		echo json_encode($parametros);
 	}
-    /**
-	* guarda parametro nuevo
-	* @param string $data nombre del parametro 
-	* @return integer id insercion
+
+	/**
+	* Guarda parametro nuevo
+	* @return json id de inserción
 	*/
 	public function guardar(){
-        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | guardar()");
-		$datos  = $_POST['data'];
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | guardar()");
+		$datos = $this->input->post('data');
 		$id_insercion = $this->Parametros->guardar($datos);
-		echo json_encode($id_insercion);  
+		echo json_encode($id_insercion);
 	}
-    /**
-	* trae parametros para asociar
-	* @param 
-	* @return array listado de parametros
+
+	/**
+	* Trae parametros para asociar
+	* @return json listado de parametros, o "nada"
 	*/
 	public function traerparametro(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametro | traerparametro()");
-		$equipo = $this->Parametros->traerparametro();
-		if($equipo){	
-			$arre = array();
-	        foreach ($equipo as $row ){   
-	           $arre[] = $row;
-	        }
-			echo json_encode($arre);
+		$parametros = $this->Parametros->traerparametro();
+		if ($parametros) {
+			echo json_encode(array_values($parametros));
 		}
 		else echo "nada";
 	}
-
-}	
+}
