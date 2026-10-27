@@ -8,3 +8,6 @@ views/area/view_.php
 controllers/Proceso.php
 models/Procesos.php
 views/proceso/view_.php
+controllers/Parametro.php
+models/Parametros.php
+views/parametro/list.php

@@ -1,156 +1,128 @@
 <?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
+/**
+ * Parámetros de equipo (setupparam) y catálogo de parámetros.
+ *
+ * MIG-ASSET-1: todos los datos por MANDataService (ADR-014). Se conservan firmas y formato de salida
+ * del model de asset (objetos para result(), arrays para result_array(), false/0 sin filas). Toda
+ * operación queda limitada a equipos de la empresa de la sesión.
+ */
 class Parametros extends CI_Model{
 
 	function __construct(){
 		parent::__construct();
-        $this->assetDB = $this->load->database('asset_db', TRUE);
+		$this->load->helper('man');
 	}
-    /**
-	* Trae equipos por empresa logueada
-	* @param 
-	* @return array listado de equipos
+
+	/**
+	* Trae equipos activos de la empresa logueada
+	* @return array|false listado de equipos (objetos id_equipo, codigo)
 	*/
 	function getequipo(){
-        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | getequipo()");
-		$empresaId = empresa();
-		
-		$this->assetDB->select('equipos.id_equipo,equipos.codigo');
-		$this->assetDB->from('equipos');
-		$this->assetDB->where('equipos.estado', 'AC');
-		$this->assetDB->where('equipos.id_empresa', $empresaId);
-		$query = $this->assetDB->get();
-
-		if($query->num_rows()>0){
-			return $query->result();
-		}
-		else{
-			return false;
-		}
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | getequipo()");
+		return $this->objetos(wso2(REST_MAN . '/parametros/equipos/empresa/' . man_empresa()));
 	}
-    /**
+
+	/**
 	* Trae parametros asociados al id de equipo
-	* @param 
-	* @return array listado de parametros
+	* @param integer $id id_equipo
+	* @return array|false listado de parametros (objetos)
 	*/
 	function getparametros($id){
-        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | getparametros()");
-		$sql  = "SELECT setupparam.id_equipo,
-						setupparam.id_parametro,
-						setupparam.maximo,
-						setupparam.minimo,						
-						parametros.paramdescrip,
-						equipos.descripcion
-			FROM setupparam 
-			JOIN parametros ON parametros.paramId = setupparam.id_parametro
-			JOIN equipos ON equipos.id_equipo = setupparam.id_equipo 
-			WHERE equipos.id_equipo = $id 
-            AND equipos.estado = 'AC'
-            ";
-        $query = $this->assetDB->query($sql);
-        if($query->num_rows()>0){
-            return $query->result();
-        }else{
-            return false;
-        }
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | getparametros(" . json_encode($id) . ")");
+		return $this->objetos(wso2(REST_MAN . '/parametros/equipo/' . (int) $id . '/empresa/' . man_empresa()));
 	}
-	// trae info para editar parametros
-	function editar($id_equipo,$id_param){
-		$sql   = "SELECT setupparam.id_equipo, setupparam.id_parametro, setupparam.maximo, 						setupparam.minimo,equipos.codigo,parametros.paramdescrip
-					FROM setupparam
-					JOIN equipos ON equipos.id_equipo = setupparam.id_equipo
-					JOIN parametros ON parametros.paramId = setupparam.id_parametro
-					WHERE setupparam.id_equipo = $id_equipo 
-					AND setupparam.id_parametro = $id_param
-					";
-		$query = $this->assetDB->query($sql);
-		if( $query->num_rows() > 0)
-		{
-			return $query->result_array();	
-		} 
-		else {
-			return 0;
-		}
-	}
-	// trae info de parametro a editar
-	function geteditar($id, $idp){
-			$sql="SELECT setupparam.id_equipo, setupparam.id_parametro, setupparam.maximo, setupparam.minimo, 
-						equipos.codigo, 
-						parametros.paramdescrip
-						FROM setupparam
-						JOIN equipos ON equipos.id_equipo = setupparam.id_equipo
-						JOIN parametros ON parametros.paramId = setupparam.id_parametro
-						WHERE setupparam.id_equipo = $id 
-						AND setupparam.id_parametro = $idp
-						";
-			$query = $this->assetDB->query($sql);
-			if( $query->num_rows() > 0)
-			{
-				return $query->result_array();	
-			} 
-			else {
-				return 0;
-			}
-	}	
-	//  actualiza el parametro editado
-	function update_editar($m, $n, $pa, $equ){
-		$sql   = "UPDATE setupparam SET maximo = $m, minimo = $n
-							WHERE id_equipo = $equ 
-							AND id_parametro = $pa";
-		$query = $this->assetDB->query($sql);
-		return $query;			
-	}
-	// llimina asociacion de parametros
-	function elimina_param($ide,$idp){
 
-		$this->assetDB->where('id_equipo',$ide);
-		$this->assetDB->where('id_parametro',$idp);
-		$query =$this->assetDB->delete('setupparam');
-		return $query;
+	/**
+	* Trae info para editar la asociación de un parámetro a un equipo
+	* @return array|int filas (arrays) o 0
+	*/
+	function editar($id_equipo, $id_param){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | editar($id_equipo, $id_param)");
+		$filas = man_lista(wso2(REST_MAN . '/parametros/equipo/' . (int) $id_equipo . '/parametro/' . (int) $id_param
+			. '/empresa/' . man_empresa()));
+		return $filas ? $filas : 0;
 	}
-    /**
-	* guarda asociacion nueva de parametros
-	* @param array $data datos a guardar
-	* @return bool true/false segun resultado 
+
+	/**
+	* Actualiza máximo y mínimo de la asociación
+	* @return bool
+	*/
+	function update_editar($m, $n, $pa, $equ){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | update_editar()");
+		$rsp = man_escribir('PUT', 'parametros/equipo', array(
+			'maximo'       => (string) $m,
+			'minimo'       => (string) $n,
+			'id_equipo'    => (string) $equ,
+			'id_parametro' => (string) $pa,
+			'id_empresa'   => man_empresa(),
+		));
+		return (bool) $rsp['status'];
+	}
+
+	/**
+	* Elimina la asociación de un parámetro a un equipo
+	* @return bool
+	*/
+	function elimina_param($ide, $idp){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | elimina_param($ide, $idp)");
+		$rsp = man_escribir('PUT', 'parametros/equipo/baja', array(
+			'id_equipo'    => (string) $ide,
+			'id_parametro' => (string) $idp,
+			'id_empresa'   => man_empresa(),
+		));
+		return (bool) $rsp['status'];
+	}
+
+	/**
+	* Guarda asociación nueva de parámetro a equipo (solo equipos de la empresa)
+	* @param array $data id_equipo, id_parametro, maximo, minimo
+	* @return bool
 	*/
 	function guardar_todo($data){
-        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | guardar_todo(".json_encode($data).")");
-        $data['id_empresa'] = empresa(); 
-		$query = $this->assetDB->insert("setupparam", $data);
-		return $query;    
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | guardar_todo(" . json_encode($data) . ")");
+		$rsp = man_escribir('POST', 'parametros/equipo', array(
+			'id_parametro' => (string) $data['id_parametro'],
+			'maximo'       => (string) $data['maximo'],
+			'minimo'       => (string) $data['minimo'],
+			'id_equipo'    => (string) $data['id_equipo'],
+			'id_empresa'   => man_empresa(),
+		));
+		return (bool) $rsp['status'];
 	}
-    /**
-	* guarda parametro nuevo
-	* @param string $data nombre del parametro 
-	* @return integer id insercion
+
+	/**
+	* Guarda parámetro nuevo en el catálogo de la empresa
+	* @param array $data paramdescrip
+	* @return integer|false id de inserción
 	*/
 	function guardar($data){
-        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | guardar(".json_encode($data).")");
-		$data['id_empresa'] = empresa();
-		$data['estado'] = 'AC';
-		$query = $this->assetDB->insert("parametros", $data);
-		$id_insercion = $this->assetDB->insert_id();	// devuelve el ultimo id
-		
-		return $id_insercion;
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | guardar(" . json_encode($data) . ")");
+		$rsp = man_escribir('POST', 'parametro', array(
+			'paramdescrip' => (string) $data['paramdescrip'],
+			'id_empresa'   => man_empresa(),
+		));
+		// wso2() reduce {"parametro":{"paramId":"N"}} al valor N.
+		return ($rsp['status'] && is_scalar($rsp['data'])) ? (int) $rsp['data'] : false;
 	}
+
 	/**
-	* trae parametros para asociar
-	* @param 
-	* @return array listado de parametros
+	* Trae parámetros del catálogo de la empresa para asociar
+	* @return array|false listado de parámetros (objetos)
 	*/
 	public function traerparametro(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Parametros | traerparametro()");
-        $empresaId = empresa();
-        $this->assetDB->select('parametros.*');
-        $this->assetDB->from('parametros');
-        $this->assetDB->where('parametros.id_empresa', $empresaId);
-        $this->assetDB->where('parametros.estado !=', 'AN');
-        $query = $this->assetDB->get();
-
-        if($query->num_rows()>0){
-            return $query->result();
-        }else{
-            return false;
-        }	
+		return $this->objetos(wso2(REST_MAN . '/parametros/empresa/' . man_empresa()));
 	}
-}	
+
+	/**
+	 * Filas como objetos (lo que devolvía result()), o false si no hay.
+	 */
+	private function objetos($rsp){
+		$filas = man_lista($rsp);
+		if (!$filas) {
+			return false;
+		}
+		return json_decode(json_encode($filas));
+	}
+}

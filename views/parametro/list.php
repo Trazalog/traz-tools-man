@@ -94,7 +94,7 @@ $(document).ready(function(event) {
         $.ajax({
         type: 'POST',
         data: { id_equipo: id_equipo},
-        url: '<?php echo MAN; ?>Parametro/getparametros',
+        url: '<?php echo base_url(MAN); ?>Parametro/getparametros',
         success: function(data){
 
             tabla = $('#tablaparametros').DataTable();
@@ -205,7 +205,7 @@ $(document).on("click",".fa-pencil",function(e){
   $.ajax({
       type: 'POST',
       data: { id_equipo:id_equipo, id_param:id_parametro},
-      url: 'index.php/Parametro/editar', 
+      url: '<?php echo base_url(MAN); ?>Parametro/editar', 
       success: function(data){    
         datos={
           'id_equipo':id_equipo,
@@ -242,7 +242,7 @@ function guardarmodif(){
   console.log(datos);
   $.ajax({
     type:"POST",
-    url: "index.php/Parametro/guardarmodif",
+    url: "<?php echo base_url(MAN); ?>Parametro/guardarmodif",
     data:{datos:datos},
     success: function(data){
       console.table(data);
@@ -297,7 +297,7 @@ function eliminar(){
   $.ajax({
       type: 'POST',
       data: { id_equipoElim:id_equipoElim, id_parametroElim:id_parametroElim},
-      url: 'index.php/Parametro/eliminar', 
+      url: '<?php echo base_url(MAN); ?>Parametro/eliminar', 
       success: function(data){    
               tabla = $('#tablaparametros').DataTable();
               tabla.clear().draw();
@@ -343,7 +343,7 @@ function guardar_todo(){
     $.ajax({
         type: 'POST',
         data: {data:parametros},
-        url: '<?php echo MAN; ?>Parametro/guardar_todo',
+        url: '<?php echo base_url(MAN); ?>Parametro/guardar_todo',
         success: function(data){
             tabla = $('#tablaparametros').DataTable();
             tabla.clear().draw();
@@ -385,7 +385,7 @@ function traer_equipo(){
     $.ajax({
         type: 'POST',
         data: { },
-        url: '<?php echo MAN; ?>Parametro/getequipo',
+        url: '<?php echo base_url(MAN); ?>Parametro/getequipo',
         success: function(data){
             var opcion  = "<option value='-1'>Seleccione...</option>" ; 
             $('#equipo').append(opcion); 
@@ -410,7 +410,7 @@ function traer_parametro(){
   $.ajax({
     type: 'POST',
     data: {},
-    url: '<?php echo MAN; ?>Parametro/traerparametro',
+    url: '<?php echo base_url(MAN); ?>Parametro/traerparametro',
     success: function(data){
       console.log(data);
       //$('#parametro option').remove();
@@ -439,7 +439,7 @@ function guardar(){
   $.ajax({
     type: 'POST',
     data: {data:parametros},
-    url: '<?php echo MAN; ?>Parametro/guardar', 
+    url: '<?php echo base_url(MAN); ?>Parametro/guardar', 
     success: function(data){
       hecho();
       console.log(data);
