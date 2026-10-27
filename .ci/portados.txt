@@ -11,3 +11,8 @@ views/proceso/view_.php
 controllers/Parametro.php
 models/Parametros.php
 views/parametro/list.php
+controllers/Componente.php
+models/Componentes.php
+views/componente/list.php
+views/componente/listabm.php
+views/componente/view_.php

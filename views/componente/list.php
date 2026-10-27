@@ -52,7 +52,7 @@
                     echo '<td>'.$a['codigo'].'</td>';
                     echo '<td>'.$a['descripcion'].'</td>';
                     echo '<td>'.$a['sistema'].'</td>';
-                    $url = base_url().'assets/files/equipos/'.$a['pdf'];
+                    $url = man_asset_url().'assets/files/equipos/'.$a['pdf'];
                     echo '<td><a href="'.$url.'" target="_blank">'.basename($a['pdf']).'</td>';
                     $idc++;
                     }
@@ -76,8 +76,7 @@ var idequipo     = "";
 
   $('#btnAgre').click( function cargarVista(){
     WaitingOpen();
-    $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Componente/cargarcomp/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Componente/cargarcomp/<?php echo $permission; ?>");
     WaitingClose();
   });  
  
@@ -105,7 +104,7 @@ $('.fa-pencil').on('click', function(){
         data: { idCompEq:idCompEq },
         dataType: 'json',
         type: 'POST',
-        url:  '<?php echo MAN; ?>Componente/getEditar',
+        url:  '<?php echo base_url(MAN); ?>Componente/getEditar',
         success: function(data){
             traer_marca();
             //console.table(data);
@@ -131,7 +130,7 @@ function llenarComponentes(idEquipo, idComponente) {
     $.ajax({
         dataType: 'json',
         type: 'POST',
-        url:  '<?php echo MAN; ?>Componente/getcomponente',
+        url:  '<?php echo base_url(MAN); ?>Componente/getcomponente',
         success: function(data){
             $('#componente').empty();
             for(var i=0; i < data.length ; i++) { 
@@ -164,12 +163,11 @@ function llenarComponentes(idEquipo, idComponente) {
     $.ajax({
       type: 'POST',
       data: {data:parametros, idCompEq: idcomponenteequipo},
-      url: '<?php echo MAN; ?>Componente/editarCompEq',
+      url: '<?php echo base_url(MAN); ?>Componente/editarCompEq',
       success: function(data){
         hecho();
         $('#modalEditar').modal('hide');
-        $('#content').empty();
-        $("#content").load("<?php echo MAN; ?>Componente/asigna/<?php echo $permission; ?>");                
+        linkTo("<?php echo base_url(MAN); ?>Componente/asigna/<?php echo $permission; ?>");                
       },
       error: function(result){
         console.error("Error al editar Asociación componente equipo");
@@ -198,7 +196,7 @@ function llenarComponentes(idEquipo, idComponente) {
 
 // Carga list componentes
 function cargarVista(){
-  $("#content").load("<?php echo MAN; ?>Componente/asigna/<?php echo $permission; ?>");
+  linkTo("<?php echo base_url(MAN); ?>Componente/asigna/<?php echo $permission; ?>");
 }
 
 function cerro(){
@@ -214,7 +212,7 @@ function eliminar(){
     data: { idequipo: idequipo,datos: datos},
     //dataType: 'json'
     type: 'POST',
-    url: '<?php echo MAN; ?>Componente/baja_comp',
+    url: '<?php echo base_url(MAN); ?>Componente/baja_comp',
     success: function(data){
       hecho(); 
       cargarVista();
@@ -250,7 +248,7 @@ function guardarcompo(){
   if( id_equipo>0 && marcaid >0){                                     
     $.ajax({
       type:"POST",
-      url: "index.php/Componente/agregar_componente", 
+      url: "<?php echo base_url(MAN); ?>Componente/agregar_componente", 
       data:{parametros:parametros},
       success: function(data){
         //console.log("exito");
@@ -281,7 +279,7 @@ function traer_marca(){
   $.ajax({
     type: 'POST',
     data: { },
-    url: '<?php echo MAN; ?>Componente/getmarca',
+    url: '<?php echo base_url(MAN); ?>Componente/getmarca',
     dataType: 'json',
     success: function(data){
         var opcion  = "<option value='-1'>Seleccione...</option>" ; 
