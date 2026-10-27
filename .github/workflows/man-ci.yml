@@ -1,0 +1,70 @@
+# CI mínimo de la migración de AssetPlanner a MAN (MIG-0, punto 4).
+# Fuente: traz-tools doc/migracion/MIGRACION-ASSETPLANNER.md §3.4 (niveles 0 y 0b).
+name: man-ci
+
+on:
+  pull_request:
+    branches: [develop-v3]
+  push:
+    branches: [develop-v3]
+
+jobs:
+  lint-php56:
+    name: php -l (PHP 5.6)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '5.6'
+          tools: none
+      - name: php -l
+        run: |
+          fallas=0
+          while IFS= read -r f; do
+            php -l "$f" > /dev/null || fallas=1
+          done < <(find . -name '*.php' -not -path './.git/*')
+          exit $fallas
+
+  phpcompatibility:
+    name: phpcs PHPCompatibility 5.6
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: none
+      - name: Instalar phpcs + PHPCompatibility
+        run: |
+          composer global config allow-plugins.dealerdirect/phpcodesniffer-composer-installer true
+          composer global require --no-interaction \
+            squizlabs/php_codesniffer:^3.13 \
+            phpcompatibility/php-compatibility:^9.3 \
+            dealerdirect/phpcodesniffer-composer-installer:^1.0
+      - name: phpcs
+        run: |
+          "$(composer global config bin-dir --absolute)/phpcs" -p . \
+            --standard=PHPCompatibility --runtime-set testVersion 5.6 --extensions=php
+
+  checklist-0b:
+    name: Checklist de conversión 0b
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash .ci/checklist-0b.sh
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: gitleaks detect
+        env:
+          GITLEAKS_VERSION: 8.18.4
+        run: |
+          curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xz gitleaks
+          ./gitleaks detect --no-banner --redact -v -s .
