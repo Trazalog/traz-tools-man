@@ -1,3 +1,7 @@
 # Archivos ya portados a MAN (uno por línea, ruta relativa a la raíz del repo).
 # Se agregan acá en el mismo PR que termina de convertirlos: desde ese momento el
 # checklist 0b es bloqueante para ellos. Ver .ci/checklist-0b.sh.
+controllers/Area.php
+models/Areas.php
+helpers/man_helper.php
+views/area/view_.php
