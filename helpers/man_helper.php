@@ -83,3 +83,32 @@ if (!function_exists('man_escribir')) {
         return wso2(REST_MAN . '/' . $path, strtoupper($metodo), array($wrapper => $params));
     }
 }
+
+/*
+ * Archivos (PDF de componentes, adjuntos de equipos, imágenes de OT).
+ *
+ * Decisión MIG-ASSET E11 (2026-10-27): mientras asset siga en uso, MAN lee y escribe en la MISMA carpeta
+ * de archivos de asset, para que las dos aplicaciones vean lo mismo y el corte por empresa se pueda
+ * revertir sin perder archivos. En los servidores asset y tools comparten Apache (asset en
+ * /tools/traz-prod-assetplanner y tools en /traz-tools), así que por defecto se resuelve relativo a tools.
+ * Para otro layout (ej. local) se definen MAN_ASSET_PATH y MAN_ASSET_URL antes de cargar el módulo.
+ */
+if (!function_exists('man_asset_path')) {
+    /** Carpeta raíz de asset en disco, con barra final. */
+    function man_asset_path()
+    {
+        return defined('MAN_ASSET_PATH') ? MAN_ASSET_PATH : rtrim(dirname(rtrim(FCPATH, '/')), '/') . '/tools/traz-prod-assetplanner/';
+    }
+}
+
+if (!function_exists('man_asset_url')) {
+    /** URL raíz de asset, con barra final. */
+    function man_asset_url()
+    {
+        if (defined('MAN_ASSET_URL')) {
+            return MAN_ASSET_URL;
+        }
+        $base = rtrim(base_url(), '/');
+        return substr($base, 0, strrpos($base, '/')) . '/tools/traz-prod-assetplanner/';
+    }
+}

@@ -21,7 +21,7 @@
       </div>
   </div>
 </div>
-<section class="content">
+<div class="componente-man">
   <div class="row">
     <div class="col-xs-12">
       <div class="box">
@@ -146,7 +146,7 @@
       </div><!-- /.box -->
     </div><!-- /.col -->
   </div><!-- /.row -->
-</section><!-- /.content -->
+</div><!-- /.componente-man -->
 
 <!-- Modal Agregar componente-->
 <div class="modal" id="modalAddComp2" tabindex="-1" role="dialog" aria-labelledby="myModalLabel">
@@ -218,7 +218,7 @@ traer_equipo();
 function traer_equipo(){
   $.ajax({
     type: 'POST',
-    url: '<?php echo MAN; ?>Componente/traerequipo', 
+    url: '<?php echo base_url(MAN); ?>Componente/traerequipo', 
     success: function(data){
       var opcion  = "<option value='-1'>Seleccione...</option>" ; 
       $('#equipo').append(opcion); 
@@ -255,7 +255,7 @@ function traerComp(){
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN; ?>Componente/getcomponente',
+      'url': '<?php echo base_url(MAN); ?>Componente/getcomponente',
       success: (data) => {return tmp = data;},
       error: () => {error("Error","Error al traer componentes");}
     });
@@ -316,17 +316,16 @@ function autoCompletarComponentes(){
     $.ajax({
       type: 'POST',
       data: { },
-      url: '<?php echo MAN; ?>Componente/getsistema',
+      url: '<?php echo base_url(MAN); ?>Componente/getsistema',
       dataType: 'json',
       success: function(data){
-        if(data['status']){
-          $('#sistema').empty();
-          var opcion  = "<option value='-1'>Seleccione...</option>" ; 
+        $('#sistema').empty();
+        var opcion  = "<option value='-1'>Seleccione...</option>" ; 
+        $('#sistema').append(opcion); 
+        for(var i=0; i < data.length ; i++){  
+          var nombre = data[i]['descripcion'];
+          var opcion  = "<option value='"+data[i]['sistemaid']+"'>" +nombre+ "</option>" ; 
           $('#sistema').append(opcion); 
-          for(var i=0; i < data.sistemas.length ; i++){
-            var opcion  = "<option value='" + data.sistemas[i]['sistemaid'] + "'>" + data.sistemas[i]['descripcion'] + "</option>" ; 
-            $('#sistema').append(opcion); 
-          }
         }
       },
       error: function(result){
@@ -342,7 +341,7 @@ function autoCompletarComponentes(){
     $.ajax({
       type: 'POST',
       data: { },
-      url: '<?php echo MAN;?>Componente/getmarca', 
+      url: '<?php echo base_url(MAN); ?>Componente/getmarca', 
       success: function(data){
         $('#ma').empty();
           var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -367,7 +366,7 @@ function autoCompletarComponentes(){
       type: 'POST',
       dataType: 'json',
       data: { idequipo: idequipo},
-      url: '<?php echo MAN; ?>Componente/getequipo',
+      url: '<?php echo base_url(MAN); ?>Componente/getequipo',
       success: function(data){
         if(data.status){
           var d='No hay descripción cargada';
@@ -452,7 +451,7 @@ function autoCompletarComponentes(){
       $.ajax({
         type: 'POST',
         data: {idequipo:idequipo, codigo:codigo, sistemaid:sistemaid, comp:comp, x:x, ge:ge},
-        url: '<?php echo MAN; ?>Componente/guardar_componente',
+        url: '<?php echo base_url(MAN); ?>Componente/guardar_componente',
         success: function(data){
           hecho();
           console.log("entre por el guardado del componente equipo");
@@ -513,7 +512,7 @@ function autoCompletarComponentes(){
         dataType: "html",
         processData: false,
         type: "POST",
-        url: "<?php echo MAN ?>Componente/agregarComponente", 
+        url: "<?php echo base_url(MAN); ?>Componente/agregarComponente", 
         success: function(data){
           traerComp();
           autoCompletarComponentes();
@@ -593,15 +592,13 @@ function autoCompletarComponentes(){
   // Vuelve al listado al guardar
   $('#listado, #listado2').click( function cargarVista(){
       wo();
-      $('#content').empty();
-      $("#content").load("<?php echo MAN; ?>Componente/asigna/<?php echo $permission; ?>");
+      linkTo("<?php echo base_url(MAN); ?>Componente/asigna/<?php echo $permission; ?>");
       wc();
   });
 
   function cargarVista(){
       wo();
-      $('#content').empty();
-      $("#content").load("<?php echo MAN; ?>Componente/asigna/<?php echo $permission; ?>");
+      linkTo("<?php echo base_url(MAN); ?>Componente/asigna/<?php echo $permission; ?>");
       wc();
   }
 
@@ -619,7 +616,7 @@ $('#equipo').change(function(){
     data: { idequipo:idequipo },
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Componente/getcompo',
+    url: '<?php echo base_url(MAN); ?>Componente/getcompo',
     success: function(data){
       console.table(data);
       if (data!= 0) {

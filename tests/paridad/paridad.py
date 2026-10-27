@@ -25,6 +25,7 @@ import os
 import re
 import subprocess
 import sys
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -51,12 +52,30 @@ class Sesion:
     def __init__(self):
         self.op = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()))
 
+    def abrir(self, req, cuerpo=None):
+        """Devuelve el cuerpo de la respuesta; ante un error HTTP, '<HTTP nnn>' (para poder compararlo)."""
+        try:
+            return self.op.open(req, cuerpo, timeout=60).read().decode('utf-8', 'replace')
+        except urllib.error.HTTPError as e:
+            return '<HTTP %d>' % e.code
+
     def get(self, url):
-        return self.op.open(url, timeout=60).read().decode('utf-8', 'replace')
+        return self.abrir(url)
 
     def post(self, url, datos):
-        cuerpo = urllib.parse.urlencode(datos).encode()
-        return self.op.open(url, cuerpo, timeout=60).read().decode('utf-8', 'replace')
+        return self.abrir(url, urllib.parse.urlencode(datos).encode())
+
+    def post_archivo(self, url, datos, campo, nombre, contenido):
+        """POST multipart/form-data con un archivo (como un FormData del navegador)."""
+        limite = '----paridad' + os.urandom(8).hex()
+        partes = []
+        for k, v in datos.items():
+            partes.append(('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n' % (limite, k, v)).encode())
+        partes.append(('--%s\r\nContent-Disposition: form-data; name="%s"; filename="%s"\r\n'
+                       'Content-Type: application/pdf\r\n\r\n' % (limite, campo, nombre)).encode() + contenido + b'\r\n')
+        partes.append(('--%s--\r\n' % limite).encode())
+        req = urllib.request.Request(url, b''.join(partes), {'Content-Type': 'multipart/form-data; boundary=' + limite})
+        return self.abrir(req)
 
 
 def sesion_asset(usr, pas):
@@ -245,10 +264,117 @@ def paridad_parametro(asset, man, emp_asset):
     sql("DELETE FROM parametros WHERE paramdescrip LIKE '%s%%'" % PREFIJO)
 
 
+# ------------------------------------------------------------------------------------ componentes
+PDF_PRUEBA = b'%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n'
+
+
+def paridad_componente(asset, man, emp_asset):
+    pa = ASSET + 'Componente/'
+    pm = MAN + 'Componente/'
+    norm_pdf = lambda t: re.sub(r'\d+_\d*_[\d-]+', 'ID_EMP_FECHA', t)
+
+    comparar('componente · catálogo (pantalla)', celdas_tabla(asset.get(pa + 'index/Add-Edit-Del')),
+             celdas_tabla(man.get(pm + 'index/Add-Edit-Del')))
+    comparar('componente · asignados a equipos (pantalla)', celdas_tabla(asset.get(pa + 'asigna/Add-Edit-Del')),
+             celdas_tabla(man.get(pm + 'asigna/Add-Edit-Del')))
+    for accion in ('traerequipo', 'getmarca', 'getcomponente', 'getsistema'):
+        comparar('componente · ' + accion, jload(asset.get(pa + accion)), jload(man.get(pm + accion)))
+
+    marca = sql("SELECT marcaid FROM marcasequipos WHERE id_empresa=%d AND estado='AC' ORDER BY marcaid LIMIT 1" % emp_asset)[0][0]
+    sistema = sql("SELECT sistemaid FROM sistema WHERE id_empresa=%d AND estado='AC' ORDER BY sistemaid LIMIT 1" % emp_asset)[0][0]
+    equipo = sql("SELECT id_equipo FROM equipos WHERE estado='AC' AND id_empresa=%d ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+
+    # Alta en el catálogo con archivo (FormData). Asset deja la empresa vacía en el nombre del archivo; MAN la pone.
+    ra = jload(asset.post_archivo(pa + 'agregarComponente', {'descrip1': PREFIJO + ' A', 'info': 'info', 'ma': marca},
+                                  'inputPDF', 'prueba.pdf', PDF_PRUEBA))
+    rm = jload(man.post_archivo(pm + 'agregarComponente', {'descrip1': PREFIJO + ' M', 'info': 'info', 'ma': marca},
+                                'inputPDF', 'prueba.pdf', PDF_PRUEBA))
+    comparar('componente · alta con archivo (respuesta)', ra, rm)
+    fila = "SELECT id_componente, id_equipo, informacion, marcaid, estado, id_empresa, pdf FROM componentes WHERE descripcion='%s'"
+    fa, fm = sql(fila % (PREFIJO + ' A')), sql(fila % (PREFIJO + ' M'))
+    comparar('componente · alta con archivo (fila en la base)', [r[1:6] for r in fa], [r[1:6] for r in fm])
+    cid_a, cid_m = fa[0][0], fm[0][0]
+    comparar('componente · alta con archivo (nombre del archivo, sin id/empresa/fecha)',
+             norm_pdf(fa[0][6]), norm_pdf(fm[0][6]), 'MAN agrega la empresa al nombre')
+    carpeta = os.environ.get('ASSET_FILES_DIR', '/mnt/win/dev/git/traz-prod-assetplanner/assets/files/equipos/')
+    comparar('componente · alta con archivo (el archivo quedó en la carpeta de asset)',
+             [True, True], [os.path.exists(carpeta + fa[0][6]), os.path.exists(carpeta + fm[0][6])])
+
+    ra = jload(asset.post(pa + 'editarComponente', {'idComponenteE': cid_a, 'descripcionE': PREFIJO + ' A2', 'informacionE': 'info2', 'marcaE': marca}))
+    rm = jload(man.post(pm + 'editarComponente', {'idComponenteE': cid_m, 'descripcionE': PREFIJO + ' M2', 'informacionE': 'info2', 'marcaE': marca}))
+    comparar('componente · editar sin archivo (respuesta)', ra, rm)
+    fila_id = "SELECT informacion, marcaid, estado, id_empresa FROM componentes WHERE id_componente=%s"
+    comparar('componente · editar sin archivo (fila en la base)', sql(fila_id % cid_a), sql(fila_id % cid_m))
+
+    # Asignar al equipo (la vista manda arrays desde 1). La respuesta de asset trae un dump de depuración; MAN no.
+    asset.post(pa + 'guardar_componente', {'idequipo': equipo, 'comp[1]': cid_a, 'codigo[1]': 'MIGA', 'sistemaid[1]': sistema, 'x': 1, 'ge': ''})
+    man.post(pm + 'guardar_componente', {'idequipo': equipo, 'comp[1]': cid_m, 'codigo[1]': 'MIGM', 'sistemaid[1]': sistema, 'x': 1, 'ge': ''})
+    asoc = "SELECT idcomponenteequipo, id_equipo, estado, sistemaid, id_empresa FROM componenteequipo WHERE id_componente=%s"
+    aa, am = sql(asoc % cid_a), sql(asoc % cid_m)
+    comparar('componente · asignar a equipo (fila en la base)', [r[1:] for r in aa], [r[1:] for r in am])
+    sin_comp_prueba = lambda l: sorted([f for f in (l if isinstance(l, list) else []) if f.get('id_componente') not in (cid_a, cid_m)],
+                                       key=lambda f: json.dumps(f, sort_keys=True))
+    comparar('componente · componentes del equipo', sin_comp_prueba(jload(asset.post(pa + 'getcompo', {'idequipo': equipo}))),
+             sin_comp_prueba(jload(man.post(pm + 'getcompo', {'idequipo': equipo}))))
+    quitar = lambda d, ks: {k: v for k, v in d.items() if k not in ks} if isinstance(d, dict) else d
+    comparar('componente · traer asignación para editar',
+             quitar(jload(asset.post(pa + 'getEditar', {'idCompEq': aa[0][0]})), ('idcomponenteequipo', 'id_componente', 'codigo')),
+             quitar(jload(man.post(pm + 'getEditar', {'idCompEq': am[0][0]})), ('idcomponenteequipo', 'id_componente', 'codigo')))
+    ra = jload(asset.post(pa + 'editarCompEq', {'idCompEq': aa[0][0], 'data[id_equipo]': equipo, 'data[id_componente]': cid_a, 'data[codigo]': 'MIG2'}))
+    rm = jload(man.post(pm + 'editarCompEq', {'idCompEq': am[0][0], 'data[id_equipo]': equipo, 'data[id_componente]': cid_m, 'data[codigo]': 'MIG2'}))
+    comparar('componente · editar asignación (respuesta)', ra, rm)
+    asoc2 = "SELECT id_equipo, codigo, estado FROM componenteequipo WHERE idcomponenteequipo=%s"
+    comparar('componente · editar asignación (fila en la base)', sql(asoc2 % aa[0][0]), sql(asoc2 % am[0][0]))
+    comparar('componente · quitar asignación (respuesta)', asset.post(pa + 'baja_comp', {'idequipo': equipo, 'datos': cid_a}).strip(),
+             man.post(pm + 'baja_comp', {'idequipo': equipo, 'datos': cid_m}).strip())
+    comparar('componente · quitar asignación (fila en la base)', sql(asoc2 % aa[0][0]), sql(asoc2 % am[0][0]))
+
+    comparar('componente · baja del catálogo (respuesta)', jload(asset.post(pa + 'bajaComponente', {'idComponente': cid_a})),
+             jload(man.post(pm + 'bajaComponente', {'idComponente': cid_m})))
+    comparar('componente · baja del catálogo (fila en la base)', sql(fila_id % cid_a), sql(fila_id % cid_m))
+
+    # Alta desde la asignación, con el PDF en base64 (agregar_componente).
+    import base64
+    b64 = base64.b64encode(PDF_PRUEBA).decode()
+    ra = jload(asset.post(pa + 'agregar_componente', {'parametros[descripcion]': PREFIJO + ' B64A', 'parametros[informacion]': 'i',
+                                                     'parametros[marcaid]': marca, 'parametros[pdf]': b64}))
+    rm = jload(man.post(pm + 'agregar_componente', {'parametros[descripcion]': PREFIJO + ' B64M', 'parametros[informacion]': 'i',
+                                                   'parametros[marcaid]': marca, 'parametros[pdf]': b64}))
+    comparar('componente · alta con PDF en base64 (respuesta)', ra, rm)
+    fa, fm = sql(fila % (PREFIJO + ' B64A')), sql(fila % (PREFIJO + ' B64M'))
+    comparar('componente · alta con PDF en base64 (fila en la base)', [r[1:6] for r in fa], [r[1:6] for r in fm])
+
+    # Aislamiento con datos de otra empresa.
+    ajena = sql("SELECT ce.idcomponenteequipo, ce.id_equipo, ce.id_componente FROM componenteequipo ce "
+                "WHERE ce.id_empresa<>%d AND ce.estado='AC' LIMIT 1" % emp_asset)
+    if ajena:
+        ice, eq, comp = ajena[0]
+        comparar('componente · aislamiento: MAN no trae asignaciones ajenas', [], jload(man.post(pm + 'getEditar', {'idCompEq': ice})))
+        antes = sql(asoc2 % ice)
+        man.post(pm + 'editarCompEq', {'idCompEq': ice, 'data[id_equipo]': eq, 'data[id_componente]': comp, 'data[codigo]': 'HACK'})
+        man.post(pm + 'baja_comp', {'idequipo': eq, 'datos': comp})
+        comparar('componente · aislamiento: MAN no edita ni quita asignaciones ajenas', antes, sql(asoc2 % ice))
+        compajeno = sql("SELECT id_componente FROM componentes WHERE id_empresa<>%d AND estado='AC' LIMIT 1" % emp_asset)[0][0]
+        antes = sql(fila_id % compajeno)
+        man.post(pm + 'bajaComponente', {'idComponente': compajeno})
+        man.post(pm + 'editarComponente', {'idComponenteE': compajeno, 'descripcionE': 'HACK', 'informacionE': 'HACK', 'marcaE': marca})
+        comparar('componente · aislamiento: MAN no edita ni da de baja componentes ajenos', antes, sql(fila_id % compajeno))
+        man.post(pm + 'guardar_componente', {'idequipo': eq, 'comp[1]': cid_m, 'codigo[1]': 'HACK', 'sistemaid[1]': sistema, 'x': 1})
+        comparar('componente · aislamiento: MAN no asigna a equipos ajenos', [], sql("SELECT id_equipo FROM componenteequipo WHERE id_componente=%s AND id_equipo=%s" % (cid_m, eq)))
+
+    for f in sql("SELECT pdf FROM componentes WHERE descripcion LIKE '%s%%' AND pdf IS NOT NULL" % PREFIJO):
+        ruta = carpeta + os.path.basename(f[0])
+        if os.path.exists(ruta):
+            os.remove(ruta)
+    sql("DELETE FROM componenteequipo WHERE id_componente IN (SELECT id_componente FROM componentes WHERE descripcion LIKE '%s%%')" % PREFIJO)
+    sql("DELETE FROM componentes WHERE descripcion LIKE '%s%%'" % PREFIJO)
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
     'parametro': paridad_parametro,
+    'componente': paridad_componente,
 }
 
 if __name__ == '__main__':
