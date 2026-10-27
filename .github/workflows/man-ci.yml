@@ -4,17 +4,14 @@
 # Cuidado del consumo de GitHub Actions (cuenta free, PM 2026-10-27):
 # - Un solo job: cada job se cobra redondeado al minuto, aunque dure segundos.
 # - Solo en pull_request: el push a develop-v3 llega siempre por un PR ya verificado.
-# - Solo si cambian .php, el checklist o este workflow (un PR de docs no corre nada).
+# - Sin filtro de rutas a propósito: man-ci es check requerido de develop-v3, y un PR que no lo
+#   dispara queda trabado esperándolo. Casi todo PR de este repo toca PHP igual.
 # - Un push nuevo al mismo PR cancela la corrida anterior.
 name: man-ci
 
 on:
   pull_request:
     branches: [develop-v3]
-    paths:
-      - '**.php'
-      - '.ci/**'
-      - '.github/workflows/man-ci.yml'
 
 concurrency:
   group: man-ci-${{ github.event.pull_request.number }}
