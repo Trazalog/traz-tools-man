@@ -4,9 +4,8 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 /**
  * Solicitudes de servicio: listado, conformidad, anulación y datos para ver e imprimir — MIG-ASSET-2.
  *
- * Portado desde el asset actual (diverge del fork) solo con las acciones que usan las vistas (E9). Lanzar una
- * solicitud (crea la solicitud y el caso de Bonita) y eliminarla (borra también el caso) esperan la decisión A5:
- * responden que todavía no están disponibles, sin tocar nada.
+ * Portado desde el asset actual (diverge del fork) solo con las acciones que usan las vistas (E9). Crear una solicitud
+ * (con su caso de Bonita) y eliminarla son operaciones de toolsMANAPI, que habla con Bonita por toolsbpmAPI (A5, E22).
  */
 class Sservicio extends CI_Controller
 {
@@ -79,11 +78,36 @@ class Sservicio extends CI_Controller
 	}
 
 	/**
-	* Crea la solicitud y lanza el caso de Bonita. Espera la decisión A5 (quién lanza los casos desde MAN).
+	* Crea la solicitud con su caso de Bonita y, si viene, sube el adjunto (inputPDF) a la carpeta de asset (E11)
+	* @return json status y msj
 	*/
 	function lanzarProcesoBPM(){
-		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | lanzarProcesoBPM() >> pendiente de la decisión A5");
-		echo json_encode(['status' => false, 'msj' => 'La creación de solicitudes todavía no está disponible en este módulo']);
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | lanzarProcesoBPM()");
+		$r = $this->Sservicios->lanzarSolicitud($this->input->post());
+		if (!$r['status']) {
+			echo json_encode($r);
+			return;
+		}
+		$nomcodif = $this->codifNombre($r['id'], man_empresa());
+		$this->load->library("upload", array(
+			"upload_path"   => man_asset_path() . "assets/filesSS",
+			'allowed_types' => "png|jpg|pdf|xlsx",
+			'file_name'     => $nomcodif
+		));
+		if ($this->upload->do_upload('inputPDF')) {
+			$this->Sservicios->setAdjunto(array('sol_adjunto' => "assets/filesSS/" . $nomcodif . $this->upload->data('file_ext')), $r['id']);
+		}
+		echo json_encode(['status' => true, 'msj' => 'OK']);
+	}
+
+	/**
+	* Nombre codificado del archivo: id_empresa_fecha (año-mes-dia-hora-min-seg)
+	*/
+	private function codifNombre($ultimoId, $empId){
+		$hora = date('Y-m-d H:i:s');
+		$delimiter = array(" ", ",", ".", "'", "\"", "|", "\\", "/", ";", ":");
+		$explode = explode($delimiter[0], str_replace($delimiter, $delimiter[0], $hora));
+		return $ultimoId . '_' . $empId . '_' . $explode[0] . '-' . $explode[1] . '-' . $explode[2] . '-' . $explode[3];
 	}
 
 	/**
@@ -137,11 +161,23 @@ class Sservicio extends CI_Controller
 	}
 
 	/**
-	* Marca la solicitud y su OT como eliminadas y borra el caso de Bonita. Espera la decisión A5.
+	* Marca la solicitud y su OT como eliminadas y borra el caso de Bonita (mismos textos de respuesta que asset)
 	*/
 	public function eliminar_solicitud(){
-		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | eliminar_solicitud() >> pendiente de la decisión A5");
-		echo "La eliminación de solicitudes todavía no está disponible en este módulo.";
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | eliminar_solicitud()");
+		$id_solicitud = $this->input->post('id_solicitud');
+		$motivo = $this->input->post('motivo');
+		if (empty($id_solicitud) || empty($motivo)) {
+			echo "ID de solicitud o motivo no proporcionado.";
+			return;
+		}
+		$r = $this->Sservicios->eliminarSolicitud($id_solicitud, $motivo, $this->input->post('case_id'));
+		if ($r['status']) {
+			echo "Solicitud de servicio y orden de trabajo eliminadas exitosamente.";
+			echo json_encode($r);
+		} else {
+			echo "Error al eliminar solicitud de servicio y orden de trabajo.";
+		}
 	}
 
 	/**

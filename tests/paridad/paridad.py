@@ -875,7 +875,22 @@ def paridad_solicitud(asset, man, emp_asset):
     comparar('solicitud · reactivar (fila)', sql(fila % sa), sql(fila % sm))
     comparar('solicitud · anular (respuesta)', jload(asset.post(pa + 'elimSolicitud', {'id_solic': sa})), jload(man.post(pm + 'elimSolicitud', {'id_solic': sm})))
     comparar('solicitud · anular (fila)', sql(fila % sa), sql(fila % sm))
-    comparar('solicitud · lanzar espera A5 (MAN no crea nada)', False, jload(man.post(pm + 'lanzarProcesoBPM', {'equipo': eq, 'falla': 'x'})).get('status'))
+    if os.environ.get('MAN_PARIDAD_BONITA') == '1':
+        # Crea y elimina un caso real en la Bonita de DEV (E22): solo si se pide. Asset no se compara: lanza como el usuario y,
+        # si su contraseña de Bonita no es la común, falla y borra la solicitud.
+        r = jload(man.post(pm + 'lanzarProcesoBPM', {'equipo': eq, 'falla': PREFIJO + ' bonita'}))
+        comparar('solicitud · crear con caso de Bonita (respuesta)', {'status': True, 'msj': 'OK'}, r)
+        fb = sql("SELECT id_solicitud, case_id, estado FROM solicitud_reparacion WHERE causa='%s bonita'" % PREFIJO)
+        comparar('solicitud · crear con caso de Bonita (fila con case_id y case_empresa en assetv2)', True,
+                 bool(fb) and fb[0][1] != 'NULL' and bool(sql("SELECT 1 FROM case_empresa WHERE case_id=%s" % fb[0][1])))
+        if fb:
+            rr = man.post(pm + 'eliminar_solicitud', {'id_solicitud': fb[0][0], 'motivo': PREFIJO, 'case_id': fb[0][1]})
+            comparar('solicitud · eliminar con su caso (respuesta)', True, '"caso":"si"' in rr)
+            comparar('solicitud · eliminar con su caso (fila)', [['EL']], sql("SELECT estado FROM solicitud_reparacion WHERE id_solicitud=%s" % fb[0][0]))
+            sql("DELETE FROM case_empresa WHERE case_id=%s" % fb[0][1])
+        sql("DELETE FROM solicitud_reparacion WHERE causa='%s bonita'" % PREFIJO)
+    else:
+        print('     | solicitud · crear y eliminar con Bonita: no se corre (MAN_PARIDAD_BONITA=1 para correrlo)')
 
     ajena = sql("SELECT id_solicitud FROM solicitud_reparacion WHERE id_empresa<>%d ORDER BY id_solicitud DESC LIMIT 1" % emp_asset)[0][0]
     antes = sql(fila % ajena)

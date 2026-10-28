@@ -4,8 +4,8 @@
  * Solicitudes de servicio.
  *
  * MIG-ASSET-2: portado desde el asset actual (diverge del fork). Datos por MANDataService (ADR-014), limitado a la
- * empresa de la sesión (asset no filtraba getSSs, getEquipSectores ni get_SolicTerminadas). Lo que lanza o borra
- * casos de Bonita (setservicios + lanzarProceso, eliminar_solicitud) espera la decisión A5 y no está en este model.
+ * empresa de la sesión (asset no filtraba getSSs, getEquipSectores ni get_SolicTerminadas). Crear y eliminar solicitudes
+ * con su caso de Bonita son operaciones de toolsMANAPI, que habla con Bonita por toolsbpmAPI (A5, E22, E23).
  * Se conservan firmas y formato de salida del model de asset (E9: solo lo que usan las acciones portadas).
  */
 class Sservicios extends CI_Model
@@ -155,6 +155,71 @@ class Sservicios extends CI_Model
 		$aux = $this->rest->callAPI('GET', REST_MAN . '/solicitudServicio/adjuntos/solicitud/' . (int) $id_solicitud);
 		$resp = json_decode($aux['data']);
 		return isset($resp->adjuntos->adjunto) ? $resp->adjuntos->adjunto : null;
+	}
+
+	/**
+	 * Crea la solicitud y lanza su caso de Bonita (toolsMANAPI POST /tools/man/solicitud). Asset lo hacía en dos pasos
+	 * desde PHP (setservicios + lanzarProceso) y borraba la solicitud si Bonita fallaba; la API hace lo mismo y además
+	 * compensa si falla el registro del caso.
+	 * @param array $data post de la vista: equipo (o id_equipo) y falla
+	 * @return array status, id, caseId, msj
+	 */
+	function lanzarSolicitud($data){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicios | lanzarSolicitud(" . json_encode($data) . ")");
+		$equipo = !empty($data['equipo']) ? $data['equipo'] : (isset($data['id_equipo']) ? $data['id_equipo'] : null);
+		$usrId = man_usuario();
+		$nombre = man_lista(wso2(REST_MAN . '/usuario/' . (int) $usrId . '/nombre/empresa/' . man_empresa()));
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/solicitud', array(
+			'solicitud' => array(
+				'f_solicitado' => date('Y-m-d H:i:s'),
+				'usrId'        => $usrId,
+				'solicitante'  => $nombre ? (string) $nombre[0]['usrName'] : '',
+				'causa'        => isset($data['falla']) ? (string) $data['falla'] : null,
+				'id_equipo'    => (string) $equipo,
+				'id_empresa'   => man_empresa(),
+			),
+			'session' => $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '',
+			'emprId'  => empresa(),
+		));
+		$aux = json_decode($rsp['data'], true);
+		if (!$rsp['status'] || empty($aux['status'])) {
+			log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Sservicios | lanzarSolicitud() >> ' . $rsp['data']);
+			return array('status' => false, 'msj' => isset($aux['msj']) ? $aux['msj'] : 'ASP_101');
+		}
+		if (!empty($aux['session'])) {
+			$this->session->set_userdata('bpm_token', $aux['session']);
+		}
+		return array('status' => true, 'id' => $aux['id'], 'caseId' => $aux['caseId']);
+	}
+
+	/** Guarda la ruta del adjunto de la solicitud. @return bool */
+	function setAdjunto($adjunto, $id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicios | setAdjunto(" . json_encode($adjunto) . ", $id)");
+		$rsp = man_escribir('PUT', 'solicitud/adjunto', array(
+			'sol_adjunto'  => (string) $adjunto['sol_adjunto'],
+			'id_solicitud' => (string) $id,
+			'id_empresa'   => man_empresa(),
+		));
+		return (bool) $rsp['status'];
+	}
+
+	/**
+	 * Marca la solicitud y su OT como eliminadas y borra el caso de Bonita (toolsMANAPI POST /tools/man/solicitud/eliminar).
+	 * @return array status y caso (si | no | sin caso)
+	 */
+	function eliminarSolicitud($id, $motivo, $caseId){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicios | eliminarSolicitud($id, " . json_encode($motivo) . ", $caseId)");
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/solicitud/eliminar', array(
+			'id_solicitud' => (string) $id,
+			'id_empresa'   => man_empresa(),
+			'usrId'        => man_usuario(),
+			'fecha'        => date('Y-m-d H:i:s'),
+			'motivo'       => (string) $motivo,
+			'case_id'      => (string) $caseId,
+			'session'      => $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '',
+		));
+		$aux = json_decode($rsp['data'], true);
+		return ($rsp['status'] && !empty($aux['status'])) ? $aux : array('status' => false);
 	}
 
 	/** Cambia el estado de una solicitud de la empresa. @return bool */
