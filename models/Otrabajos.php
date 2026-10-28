@@ -260,6 +260,66 @@ class Otrabajos extends CI_Model
 		return man_lote_detalle('ot', 'herramienta', $h) !== false && man_lote_detalle('ot', 'insumo', $i) !== false;
 	}
 
+	/**
+	 * Crea la OT con su caso de Bonita, herramientas e insumos (toolsMANAPI POST /tools/man/ot). Asset lo hacía en
+	 * varios pasos desde PHP y, si Bonita fallaba, borraba la OT pero seguía; la API compensa todo lo creado.
+	 * @param array $ot id_tarea, fecha_program, fecha_entrega, descripcion, id_sucursal, id_proveedor, id_equipo
+	 * @param array $herramientas herrId, cantidad, descripcion_libre
+	 * @param array $insumos artId, cantidad
+	 * @return array status, id, caseId, msj
+	 */
+	function lanzarOT($ot, $herramientas, $insumos){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | lanzarOT(" . json_encode($ot) . ")");
+		$ot['id_usuario'] = man_usuario();
+		$ot['id_empresa'] = man_empresa();
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/ot', array(
+			'ot'           => $ot,
+			'herramientas' => $herramientas,
+			'insumos'      => $insumos,
+			'session'      => $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '',
+			'emprId'       => empresa(),
+		));
+		$aux = json_decode($rsp['data'], true);
+		if (!$rsp['status'] || empty($aux['status'])) {
+			log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | lanzarOT() >> ' . $rsp['data']);
+			return array('status' => false, 'msj' => isset($aux['msj']) ? $aux['msj'] : 'ASP_101');
+		}
+		if (!empty($aux['session'])) {
+			$this->session->set_userdata('bpm_token', $aux['session']);
+		}
+		return array('status' => true, 'id' => $aux['id'], 'caseId' => $aux['caseId']);
+	}
+
+	/**
+	 * Asigna la OT a un responsable (toolsMANAPI POST /tools/man/ot/asignar): cierra la tarea actual, le asigna
+	 * "Ejecutar OT" en Bonita al usuario con su correo y graba la OT como asignada. Asset le pasaba a Bonita el
+	 * número de usuario de asset, que no es el de Bonita (T30).
+	 * @return string "1" o el mensaje de error, como asset
+	 */
+	function asignar($idOrden, $usrId, $fechaEntrega, $caseId, $taskId){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | asignar($idOrden, $usrId, $fechaEntrega, $caseId, $taskId)");
+		$nick = $this->filas('/usuario/' . (int) $usrId . '/nick/empresa/' . man_empresa());
+		if (!$nick) {
+			return 'El responsable no es usuario de la empresa';
+		}
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/ot/asignar', array(
+			'task_id'       => (string) $taskId,
+			'case_id'       => (string) $caseId,
+			'usrNick'       => (string) $nick[0]['usrNick'],
+			'usrId'         => (string) (int) $usrId,
+			'fecha_entrega' => (string) $fechaEntrega,
+			'id_orden'      => (string) $idOrden,
+			'id_empresa'    => man_empresa(),
+			'session'       => $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '',
+		));
+		$aux = json_decode($rsp['data'], true);
+		if ($rsp['status'] && !empty($aux['status'])) {
+			return '1';
+		}
+		log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | asignar() >> ' . $rsp['data']);
+		return isset($aux['msj']) ? $aux['msj'] : 'error al insertar';
+	}
+
 	/** Registra un adjunto de la OT. @return string|false id del adjunto */
 	function setAdjunto($adjunto){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | setAdjunto(" . json_encode($adjunto) . ")");

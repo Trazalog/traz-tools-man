@@ -217,6 +217,62 @@ class Otrabajo extends CI_Controller {
 	}
 
 	/**
+	* Alta de OT desde el formulario nuevo (fechas dd/mm/aaaa, tarea estándar o texto libre, herramientas, insumos y
+	* adjunto inputPDF). La OT, el caso de Bonita y el detalle los crea la API (A5); el adjunto se sube después.
+	* Asset siempre respondía false (nunca asignaba respOT); la vista no mira la respuesta. Acá: true si se creó.
+	*/
+	public function guardar_agregar(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | guardar_agregar()");
+		$data = $this->input->post();
+		$idTarea = $this->input->post('id_tarea');
+		$herramientas = array();
+		if (!empty($data['id_her']) && is_array($data['id_her'])) {
+			foreach ($data['id_her'] as $k => $h) {
+				$herramientas[] = array(
+					'herrId'            => (string) $h,
+					'cantidad'          => isset($data['cant_herr'][$k]) ? man_numero($data['cant_herr'][$k]) : '1',
+					'descripcion_libre' => isset($data['desc_libre'][$k]) ? (string) $data['desc_libre'][$k] : '',
+				);
+			}
+		}
+		$result = $this->Otrabajos->lanzarOT(array(
+			'id_tarea'      => !empty($idTarea) ? (string) $idTarea : '0',
+			'descripcion'   => !empty($idTarea) ? '' : (string) $this->input->post('tareacustom'),
+			'fecha_program' => $this->fechaIso($this->input->post('fechaInicio')),
+			'fecha_entrega' => $this->fechaIso($this->input->post('fechaEntrega')),
+			'id_sucursal'   => man_numero((string) $this->input->post('suci')),
+			'id_proveedor'  => man_numero((string) $this->input->post('prov')),
+			'id_equipo'     => (string) $this->input->post('equipo'),
+		), $herramientas, man_detalle(isset($data['id_insumo']) ? $data['id_insumo'] : null, isset($data['cant_insumo']) ? $data['cant_insumo'] : null, 'artId'));
+		if (!$result['status']) {
+			echo json_encode($result);
+			return;
+		}
+		$nomcodif = $this->codifNombre($result['id'], man_empresa());
+		$this->load->library("upload", array(
+			"upload_path"   => man_asset_path() . "assets/filesOTrabajos",
+			'allowed_types' => "png|jpg|pdf|xlsx",
+			'file_name'     => $nomcodif
+		));
+		if ($this->upload->do_upload('inputPDF')) {
+			$this->Otrabajos->setAdjunto(array('ot_adjunto' => "assets/filesOTrabajos/" . $nomcodif . $this->upload->data('file_ext'), 'otId' => $result['id']));
+		}
+		echo json_encode(true);
+	}
+
+	/**
+	* Asigna responsable desde el modal "Asignar OT": cierra la tarea de Bonita, asigna "Ejecutar OT" y graba la OT.
+	* Responde 1 o el mensaje de error, como asset.
+	*/
+	public function guardar(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | guardar()");
+		$fee = (string) $this->input->post('fecha_entrega');
+		echo $this->Otrabajos->asignar($this->input->post('id_orden'), $this->input->post('usuario'),
+			substr($fee, 6, 4) . "-" . substr($fee, 3, 2) . "-" . substr($fee, 0, 2),
+			$this->input->post('case_id'), $this->input->post('task_id'));
+	}
+
+	/**
 	* Guarda la edición de la OT y reemplaza herramientas e insumos (asset no responde nada)
 	*/
 	public function guardar_editar(){
@@ -331,6 +387,12 @@ class Otrabajo extends CI_Controller {
 		$delimiter = array(" ", ",", ".", "'", "\"", "|", "\\", "/", ";", ":");
 		$explode = explode($delimiter[0], str_replace($delimiter, $delimiter[0], $hora));
 		return $ultimoId . '_' . $empId . '_' . $explode[0] . '-' . $explode[1] . '-' . $explode[2] . '-' . $explode[3];
+	}
+
+	/** dd/mm/aaaa → aaaa-mm-dd, como asset (vacío queda vacío) */
+	private function fechaIso($fecha){
+		$f = explode('/', (string) $fecha);
+		return count($f) == 3 ? $f[2] . '-' . $f[1] . '-' . $f[0] : '';
 	}
 
 	/** Respuesta de las vistas de OT: datos, herramientas, insumos y adjuntos (0 si no hay). */

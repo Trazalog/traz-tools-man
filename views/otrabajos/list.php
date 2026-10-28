@@ -1138,7 +1138,7 @@ function traer_usuario(id_usuario) {
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: "Otrabajo/getusuario",
+        url: "<?php echo base_url(MAN); ?>Otrabajo/getusuario",
         success: function(data) {
             $('#usuario1').text("");
             for (var i = 0; i < data.length; i++) {

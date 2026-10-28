@@ -38,3 +38,14 @@ models/Sservicios.php
 views/Sservicios/list_bpm.php
 views/Sservicios/view_.php
 views/Sservicios/list_term.php
+controllers/Otrabajo.php
+models/Otrabajos.php
+views/otrabajos/asignacion.php
+views/otrabajos/list.php
+views/otrabajos/printotback.php
+views/otrabajos/printot.php
+views/otrabajos/printotpred.php
+views/otrabajos/printotprev.php
+views/otrabajos/printotsolserv.php
+views/otrabajos/tabla_opciones.php
+views/otrabajos/view_agregarOT.php
