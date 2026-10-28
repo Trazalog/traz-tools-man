@@ -91,6 +91,11 @@ class Predictivos extends CI_Model
 		return (bool) $rsp['status'];
 	}
 
+	/** ¿El predictivo es de la empresa de la sesión? */
+	function esDeLaEmpresa($id){
+		return (bool) man_lista(wso2(REST_MAN . '/predictivos/de-empresa/' . man_empresa() . '/predictivo/' . (int) $id));
+	}
+
 	/** Predictivo a editar. @return array|false objetos */
 	function getInfopred($ide, $id){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | getInfopred(" . json_encode($ide) . ", " . json_encode($id) . ")");

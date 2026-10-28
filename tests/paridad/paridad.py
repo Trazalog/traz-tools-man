@@ -781,6 +781,11 @@ def paridad_planes(asset, man, emp_asset):
                                                                     unidad='1', operarios='1'))
         man.post(MAN + 'Predictivo/baja_predictivo', {'idpre': pr[0][0]})
     comparar('planes · aislamiento: MAN no modifica planes ajenos ni su detalle', antes_f, foto())
+    archivos = lambda: sorted(os.listdir(base + 'filespreventivos'))
+    antes_a = archivos()
+    comparar('planes · aislamiento: MAN no adjunta a preventivos ajenos', False,
+             jload(post_multi(man, MAN + 'Preventivo/agregarAdjunto', {'idAgregaAdjunto': pv}, True)))
+    comparar('planes · aislamiento: el adjunto rechazado no deja archivo', antes_a, archivos())
     n = maxid('preventivo', 'prevId')
     post_multi(man, MAN + 'Preventivo/guardar_preventivo', dict({'id_equipo': ajeno, 'tarea': tarea, 'id_componente': comp, 'ultimo': '2026-10-01',
                                                                  'periodo': '2', 'cantidad': '1', 'cantOper': '1', 'duracion': '1', 'unidad': '1',

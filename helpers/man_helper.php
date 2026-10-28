@@ -148,7 +148,7 @@ if (!function_exists('man_detalle')) {
         }
         $cantidades = is_array($cantidades) ? array_values($cantidades) : array();
         foreach (array_values($ids) as $i => $id) {
-            $out[] = array($campoId => (string) $id, 'cantidad' => isset($cantidades[$i]) ? man_numero($cantidades[$i]) : null);
+            $out[] = array($campoId => (string) $id, 'cantidad' => isset($cantidades[$i]) ? man_numero($cantidades[$i]) : '0');
         }
         return $out;
     }

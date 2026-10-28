@@ -65,7 +65,7 @@ class Predictivo extends CI_Controller {
 		$datos = array(
 			'id_equipo'     => $this->input->post('equipo'),
 			'tarea_descrip' => $this->input->post('id_tarea'),
-			'fecha'         => substr($fe, 6, 4) . "/" . substr($fe, 3, 2) . "/" . substr($fe, 0, 2),
+			'fecha'         => trim((string) $fe) === '' ? '' : substr($fe, 6, 4) . "/" . substr($fe, 3, 2) . "/" . substr($fe, 0, 2),
 			'periodo'       => $this->input->post('periodo'),
 			'cantidad'      => $this->input->post('cantidad'),
 			'horash'        => floatval($this->input->post('hshombre')),
@@ -127,6 +127,11 @@ class Predictivo extends CI_Controller {
 	public function agregarAdjunto(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | agregarAdjunto()");
 		$idPredictivo = $this->input->post('idAgregaAdjunto');
+		// Solo registros de la empresa: si no, no se sube nada (asset no lo verificaba).
+		if (!$this->Predictivos->esDeLaEmpresa($idPredictivo)) {
+			echo json_encode(false);
+			return;
+		}
 		$nomcodif = $this->codifNombre($idPredictivo, man_empresa());
 		$this->load->library("upload", array(
 			"upload_path"   => man_asset_path() . "assets/filespredictivos",

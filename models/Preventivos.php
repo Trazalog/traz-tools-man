@@ -178,6 +178,10 @@ class Preventivos extends CI_Model
 	function update_editar($data, $idp, $herramientas = array(), $insumos = array()){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivos | update_editar(" . json_encode($data) . ", $idp)");
 		$emp = man_empresa();
+		// El UPDATE se apoya en el equipo: si no es de la empresa no cambiaría la cabecera y el detalle sí.
+		if (!man_lista(wso2(REST_MAN . '/equipos/de-empresa/' . $emp . '/equipo/' . (int) $data['id_equipo']))) {
+			return array('resPrenvent' => false);
+		}
 		$clave = array('prevId' => (string) $idp, 'id_empresa' => $emp);
 		$rsp = requestBox(REST_MAN . '/', array(
 			array('_put_preventivo' => array(

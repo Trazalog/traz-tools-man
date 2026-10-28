@@ -195,6 +195,11 @@ class Preventivo extends CI_Controller {
 	public function agregarAdjunto(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Preventivo | agregarAdjunto()");
 		$idPreventivo = $this->input->post('idAgregaAdjunto');
+		// Solo registros de la empresa: si no, no se sube nada (asset no lo verificaba).
+		if (!$this->Preventivos->getInfoPreventivo($idPreventivo)) {
+			echo json_encode(false);
+			return;
+		}
 		$nomcodif = $this->codifNombre($idPreventivo, man_empresa());
 		$this->load->library("upload", array(
 			"upload_path"   => man_asset_path() . "assets/filespreventivos",

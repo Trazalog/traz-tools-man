@@ -125,7 +125,7 @@ class Backlog extends CI_Controller {
 		$datos = array(
 			'id_equipo'          => $data['equipo'],
 			'id_tarea'           => $data['id_tarea'],
-			'fecha'              => substr($fe, 6, 4) . "/" . substr($fe, 3, 2) . "/" . substr($fe, 0, 2),
+			'fecha'              => trim((string) $fe) === '' ? '' : substr($fe, 6, 4) . "/" . substr($fe, 3, 2) . "/" . substr($fe, 0, 2),
 			'horash'             => $data['hshombre'],
 			'back_duracion'      => $data['duracion'],
 			'id_unidad'          => $data['unidad'],
@@ -168,6 +168,11 @@ class Backlog extends CI_Controller {
 	public function agregarAdjunto(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlog | agregarAdjunto()");
 		$idBacklog = $this->input->post('idAgregaAdjunto');
+		// Solo registros de la empresa: si no, no se sube nada (asset no lo verificaba).
+		if (!$this->Backlogs->geteditar($idBacklog)) {
+			echo json_encode(false);
+			return;
+		}
 		$nomcodif = $this->codifNombre($idBacklog, man_empresa());
 		$this->load->library("upload", array(
 			"upload_path"   => man_asset_path() . "assets/filesbacklog",
