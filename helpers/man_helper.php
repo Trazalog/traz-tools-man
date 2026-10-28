@@ -84,6 +84,77 @@ if (!function_exists('man_escribir')) {
     }
 }
 
+if (!function_exists('man_usuario')) {
+    /**
+     * Devuelve el usrId de asset (sisusers) del usuario de la sesión de tools, como string.
+     *
+     * Decisión MIG-ASSET E15 (2026-10-28), provisoria hasta MIG-5: el vínculo es el correo (usrNick de
+     * asset = usernick de tools) dentro de la empresa. Si no hay vínculo devuelve '0' y lo deja en el log,
+     * para que el registro no se pierda; MIG-5 fija la clave definitiva y sanea los usuarios.
+     */
+    function man_usuario()
+    {
+        $ci =& get_instance();
+        $nick = userNick();
+        $emp = man_empresa();
+        if (empty($nick) || $emp === null) {
+            return '0';
+        }
+
+        $cache = $ci->session->userdata('man_usuario');
+        if (is_array($cache) && $cache['nick'] === $nick && $cache['id_empresa'] === $emp) {
+            return $cache['usrId'];
+        }
+
+        $filas = man_lista(wso2(REST_MAN . '/usuario/empresa/' . $emp . '?usrNick=' . rawurlencode($nick)));
+        $usrId = $filas ? (string) $filas[0]['usrId'] : '0';
+        if ($usrId === '0') {
+            log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | man_helper | man_usuario() >> ' . $nick
+                . ' sin usuario en asset para la empresa ' . $emp . ' (se registra con usrId 0)');
+        }
+
+        $ci->session->set_userdata('man_usuario', array('nick' => $nick, 'id_empresa' => $emp, 'usrId' => $usrId));
+        return $usrId;
+    }
+}
+
+/*
+ * Valores para columnas numéricas y de fecha de assetv2.
+ *
+ * Decisión MIG-ASSET E13: la conexión de WSO2 es estricta y rechaza lo que MariaDB convertía sola
+ * (un texto vacío en una columna numérica o de fecha). Estas funciones hacen esa conversión antes de
+ * mandar el dato, para que quede lo mismo que guardaba asset. null se respeta (campo que no llegó).
+ */
+if (!function_exists('man_numero')) {
+    /** '' → '0'; '12abc' → '12' (como MariaDB); null → null. */
+    function man_numero($valor)
+    {
+        if ($valor === null) {
+            return null;
+        }
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return '0';
+        }
+        return is_numeric($valor) ? $valor : (string) (0 + floatval($valor));
+    }
+}
+
+if (!function_exists('man_fecha')) {
+    /** '' → fecha cero de MariaDB ('0000-00-00', con hora si $conHora); null → null. */
+    function man_fecha($valor, $conHora = false)
+    {
+        if ($valor === null) {
+            return null;
+        }
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return $conHora ? '0000-00-00 00:00:00' : '0000-00-00';
+        }
+        return $valor;
+    }
+}
+
 /*
  * Archivos (PDF de componentes, adjuntos de equipos, imágenes de OT).
  *

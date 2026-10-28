@@ -65,14 +65,16 @@ class Sesion:
     def post(self, url, datos):
         return self.abrir(url, urllib.parse.urlencode(datos).encode())
 
-    def post_archivo(self, url, datos, campo, nombre, contenido):
-        """POST multipart/form-data con un archivo (como un FormData del navegador)."""
+    def post_archivo(self, url, datos, campo, nombre, contenido, otros=()):
+        """POST multipart/form-data con un archivo (como un FormData del navegador). otros: más
+        archivos, como tuplas (campo, nombre, contenido)."""
         limite = '----paridad' + os.urandom(8).hex()
         partes = []
         for k, v in datos.items():
             partes.append(('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n' % (limite, k, v)).encode())
-        partes.append(('--%s\r\nContent-Disposition: form-data; name="%s"; filename="%s"\r\n'
-                       'Content-Type: application/pdf\r\n\r\n' % (limite, campo, nombre)).encode() + contenido + b'\r\n')
+        for c, n, b in ((campo, nombre, contenido),) + tuple(otros):
+            partes.append(('--%s\r\nContent-Disposition: form-data; name="%s"; filename="%s"\r\n'
+                           'Content-Type: application/pdf\r\n\r\n' % (limite, c, n)).encode() + b + b'\r\n')
         partes.append(('--%s--\r\n' % limite).encode())
         req = urllib.request.Request(url, b''.join(partes), {'Content-Type': 'multipart/form-data; boundary=' + limite})
         return self.abrir(req)
@@ -97,7 +99,7 @@ def sesion_tools(usr, pas):
 
 def sql(consulta):
     r = subprocess.run(['mysql', '--defaults-file=' + os.environ['MAN_MYCNF'], '-N', '-B', '-e', consulta],
-                       capture_output=True, text=True, check=True)
+                       capture_output=True, text=True, errors='replace', check=True)
     return [linea.split('\t') for linea in r.stdout.strip().split('\n') if linea]
 
 
@@ -370,11 +372,232 @@ def paridad_componente(asset, man, emp_asset):
     sql("DELETE FROM componentes WHERE descripcion LIKE '%s%%'" % PREFIJO)
 
 
+def sin_claves(d, claves):
+    """Copia de una fila (o lista de filas) sin las claves que cambian de un lado al otro (ids, código)."""
+    if isinstance(d, list):
+        return sorted([sin_claves(x, claves) for x in d], key=lambda f: json.dumps(f, sort_keys=True))
+    if isinstance(d, dict):
+        return {k: v for k, v in d.items() if k not in claves}
+    return d
+
+
+def paridad_equipo(asset, man, emp_asset):
+    pa = ASSET + 'Equipo/'
+    pm = MAN + 'Equipo/'
+    carpeta = os.environ.get('ASSET_EQUIPOS_DIR', '/mnt/win/dev/git/traz-prod-assetplanner/assets/filesequipos/')
+    limpiar_equipo(carpeta)
+    ids = ('id_equipo', 'codigo', 'deeq', 'descripcion')
+    es_prueba = lambda f: any(str(v).startswith(PREFIJO) for v in f.values()) if isinstance(f, dict) else False
+    lista = lambda t: sin_claves([f for f in t if not es_prueba(f)], ()) if isinstance(t, list) else t
+
+    for accion in ('getarea', 'getproceso', 'getcriti', 'getetapa', 'getgrupo', 'getmarca', 'getcliente', 'getcontra'):
+        comparar('equipo · ' + accion, lista(jload(asset.get(pa + accion))), lista(jload(man.get(pm + accion))))
+
+    # Altas rápidas desde el formulario. La respuesta es el id nuevo.
+    altas = {}
+    for accion, campos, tabla, pk, col in (
+            ('agregar_area', {'descripcion': '%s'}, 'area', 'id_area', 'descripcion'),
+            ('agregar_proceso', {'descripcion': '%s'}, 'proceso', 'id_proceso', 'descripcion'),
+            ('agregar_criti', {'descripcion': '%s'}, 'criticidad', 'id_criti', 'descripcion'),
+            ('agregar_etapa', {'descripcion': '%s'}, 'sector', 'id_sector', 'descripcion'),
+            ('agregar_grupo', {'descripcion': '%s'}, 'grupo', 'id_grupo', 'descripcion'),
+            ('agregar_marca', {'marcadescrip': '%s', 'estado': 'AC'}, 'marcasequipos', 'marcaid', 'marcadescrip'),
+            ('agregar_cliente', {'cliName': 'N', 'cliLastName': 'L', 'cliDni': '123456789', 'cliAddress': 'D', 'cliPhone': 'T',
+                                 'cliEmail': 'e@x', 'cliRazonSocial': '%s', 'estado': 'AC'}, 'admcustomers', 'cliId', 'cliRazonSocial')):
+        par = lambda lado: {'parametros[%s]' % k: (v % (PREFIJO + ' ' + lado) if '%s' in v else v) for k, v in campos.items()}
+        ra, rm = asset.post(pa + accion, par('A')).strip(), man.post(pm + accion, par('M')).strip()
+        comparar('equipo · %s (devuelve un id)' % accion, ra.isdigit() and int(ra) > 0, rm.isdigit() and int(rm) > 0)
+        fila = "SELECT * FROM %s WHERE %s=%%s" % (tabla, pk)
+        fa, fm = sql(fila % (ra or 0)), sql(fila % (rm or 0))
+        nombre = lambda filas: [[c for c in f if not c.startswith(PREFIJO) and c not in (ra, rm)] for f in filas]
+        comparar('equipo · %s (fila en la base)' % accion, nombre(fa), nombre(fm))
+        altas[accion] = (ra, rm)
+
+    unidad = str(emp_asset)
+    contratista = sql("SELECT id_contratista FROM contratistas WHERE id_empresa=%d ORDER BY id_contratista LIMIT 1" % emp_asset)[0][0]
+
+    def form(lado, codigo):
+        i = 0 if lado == 'A' else 1
+        return {'codigo': codigo, 'descripcion': PREFIJO + ' ' + lado, 'fecha_ingreso': '2026-01-15', 'fecha_garantia': '',
+                'marca': altas['agregar_marca'][i], 'ubicacion': 'Galpón 3', 'etapa': altas['agregar_etapa'][i],
+                'grupo': altas['agregar_grupo'][i], 'cliente': altas['agregar_cliente'][i], 'criticidad': altas['agregar_criti'][i],
+                'fecha_ultima': '', 'ultima_lectura': '', 'destec': 'técnica', 'unin': unidad, 'area': altas['agregar_area'][i],
+                'proceso': altas['agregar_proceso'][i], 'numse': 'NS-1'}
+
+    # Alta de equipo con dos adjuntos. Fecha y lectura vacías prueban la conversión que hacía MariaDB (E13).
+    ra = jload(asset.post_archivo(pa + 'guardar_equipo', form('A', PREFIJO + ' A'), 'inputPDF[]', 'manual uno.pdf', PDF_PRUEBA,
+                                  [('inputPDF[]', 'manual dos.pdf', PDF_PRUEBA)]))
+    rm = jload(man.post_archivo(pm + 'guardar_equipo', form('M', PREFIJO + ' M'), 'inputPDF[]', 'manual uno.pdf', PDF_PRUEBA,
+                                [('inputPDF[]', 'manual dos.pdf', PDF_PRUEBA)]))
+    comparar('equipo · alta con adjuntos (respuesta)', ra, rm)
+    comparar('equipo · alta con código repetido (respuesta)',
+             jload(asset.post_archivo(pa + 'guardar_equipo', form('A', PREFIJO + ' A'), 'x', 'x.pdf', b'')),
+             jload(man.post_archivo(pm + 'guardar_equipo', form('M', PREFIJO + ' M'), 'x', 'x.pdf', b'')))
+    eq_a = sql("SELECT id_equipo FROM equipos WHERE codigo='%s A'" % PREFIJO)[0][0]
+    eq_m = sql("SELECT id_equipo FROM equipos WHERE codigo='%s M'" % PREFIJO)[0][0]
+    # Las columnas que apuntan a los catálogos de prueba (marca, sector, grupo, cliente, criticidad, área, proceso) difieren por id.
+    fila_eq = ("SELECT fecha_ingreso, fecha_baja, fecha_garantia, ubicacion, id_empresa, id_hubicacion, estado, fecha_ultimalectura, "
+               "ultima_lectura, tipo_horas, `id-centrodecosto`, valor_reposicion, fecha_reposicion, id_proveedor, valor, comprobante, "
+               "descrip_tecnica, id_unidad, numero_serie, adjunto, meta_disponibilidad FROM equipos WHERE id_equipo=%s")
+    comparar('equipo · alta (fila en la base)', sql(fila_eq % eq_a), sql(fila_eq % eq_m))
+    adj = "SELECT adjunto FROM equipos_archi_adjuntos WHERE id_equipo=%s AND eliminado=0 ORDER BY id_adjunto"
+    aa, am = sql(adj % eq_a), sql(adj % eq_m)
+    comparar('equipo · alta (adjuntos registrados)', len(aa), len(am))
+    comparar('equipo · alta (los adjuntos de MAN están en la carpeta de asset)', [True] * len(am),
+             [os.path.exists(carpeta + f[0]) for f in am], 'asset registra mal el nombre del segundo archivo')
+
+    norm_adj = lambda d: re.sub(r'(manual_(uno|dos))\d+(_\d+)?\.pdf', r'\1.pdf', json.dumps(d, sort_keys=True))
+    sin_ids_adj = lambda d: re.sub(r'"id_adjunto": "\d+"', '"id_adjunto": "N"', d)
+    eda, edm = jload(asset.post(pa + 'getEditar', {'idEquipo': eq_a})), jload(man.post(pm + 'getEditar', {'idEquipo': eq_m}))
+    cat = ('id_equipo', 'codigo', 'deeq', 'archivo', 'marcaid', 'marcadescrip', 'id_sector', 'desec', 'id_grupo', 'degr', 'cliId',
+           'cliRazonSocial', 'id_criti', 'decri', 'id_area', 'dear', 'id_proceso', 'depro')
+    comparar('equipo · traer para editar', sin_claves(eda, cat), sin_claves(edm, cat))
+    comparar('equipo · traer para editar (adjuntos)', len(eda[0].get('archivo') or []) if isinstance(eda, list) else eda,
+             len(edm[0].get('archivo') or []) if isinstance(edm, list) else edm)
+
+    def pagina(s, url, buscar):
+        r = jload(s.post(url + 'paginado', {'draw': 3, 'start': 0, 'length': 100, 'search[value]': buscar}))
+        if isinstance(r, dict) and isinstance(r.get('data'), list):
+            r['data'] = [f for f in r['data'] if not es_prueba(f)]
+        return r
+    comparar('equipo · listado paginado', pagina(asset, pa, ''), pagina(man, pm, ''))
+    comparar('equipo · listado paginado con búsqueda', pagina(asset, pa, 'a'), pagina(man, pm, 'a'))
+    ra = jload(asset.post(pa + 'paginado', {'draw': 1, 'start': 0, 'length': 10, 'search[value]': PREFIJO}))
+    rm = jload(man.post(pm + 'paginado', {'draw': 1, 'start': 0, 'length': 10, 'search[value]': PREFIJO}))
+    pag = lambda r: (r.get('recordsFiltered'), [sin_claves(f, cat + ('id_unidad', 'deun', 'cliId', 'clie', 'form_id')) for f in r['data']]) \
+        if isinstance(r, dict) and 'data' in r else r
+    comparar('equipo · listado paginado (equipos de prueba)', pag(ra), pag(rm))
+
+    def editar(s, url, lado, eq):
+        i = 0 if lado == 'A' else 1
+        datos = {'descripcion': PREFIJO + ' ' + lado + '2', 'fecha_ingreso': '2026-02-01', 'fecha_garantia': '', 'marca': altas['agregar_marca'][i],
+                 'codigo': PREFIJO + ' ' + lado, 'ubicacion': 'Planta 2', 'id_sector': altas['agregar_etapa'][i], 'id_grupo': altas['agregar_grupo'][i],
+                 'id_area': altas['agregar_area'][i], 'id_proceso': altas['agregar_proceso'][i], 'id_criticidad': altas['agregar_criti'][i],
+                 'id_customer': altas['agregar_cliente'][i], 'numero_serie': 'NS-2', 'estado': 'AL', 'fecha_ultimalectura': '2026-02-02',
+                 'ultima_lectura': '15', 'descrip_tecnica': 'otra'}
+        return s.post(url + 'editar_equipo', dict({'data[%s]' % k: v for k, v in datos.items()}, idEquipo=eq)).strip()
+    comparar('equipo · editar (respuesta)', editar(asset, pa, 'A', eq_a), editar(man, pm, 'M', eq_m))
+    comparar('equipo · editar (fila en la base)', sql(fila_eq % eq_a), sql(fila_eq % eq_m))
+
+    lect = ("SELECT lectura, usrId, observacion, operario_nom, turno, estado, obs, info_id FROM historial_lecturas "
+            "WHERE id_equipo=%s ORDER BY id_lectura")
+    estado = "SELECT estado FROM equipos WHERE id_equipo=%s"
+    comparar('equipo · inhabilitar (respuesta)', asset.post(pa + 'cambio_equipo', {'idequipo': eq_a}).strip(),
+             man.post(pm + 'cambio_equipo', {'idequipo': eq_m}).strip())
+    comparar('equipo · inhabilitar (estado e historial)', (sql(estado % eq_a), sql(lect % eq_a)), (sql(estado % eq_m), sql(lect % eq_m)))
+    ra, rm = jload(asset.post(pa + 'estado_alta', {'idequipo': eq_a})), jload(man.post(pm + 'estado_alta', {'idequipo': eq_m}))
+    comparar('equipo · habilitar (devuelve el id de la lectura)', isinstance(ra, int) and ra > 0, isinstance(rm, int) and rm > 0)
+    comparar('equipo · habilitar (estado e historial)', (sql(estado % eq_a), sql(lect % eq_a)), (sql(estado % eq_m), sql(lect % eq_m)))
+
+    # Lecturas. Asset además consulta y puede marcar un preventivo (T1); MAN no (E16): se compara lo que queda guardado.
+    prev = "SELECT prevId, estadoprev FROM preventivo ORDER BY prevId"
+    prev_antes = sql(prev)
+    for valor, est in (('100', 'RE'), ('250', 'AC')):
+        asset.post(pa + 'setLectura', {'id_equipo': eq_a, 'lectura': valor, 'operario': 'Op', 'turno': 'T1', 'observacion': 'obs', 'estado': est})
+        rm = jload(man.post(pm + 'setLectura', {'id_equipo': eq_m, 'lectura': valor, 'operario': 'Op', 'turno': 'T1', 'observacion': 'obs', 'estado': est}))
+        comparar('equipo · lectura %s %s (MAN la guarda)' % (valor, est), True, rm)
+        comparar('equipo · lectura %s %s (estado e historial)' % (valor, est), (sql(estado % eq_a), sql(lect % eq_a)),
+                 (sql(estado % eq_m), sql(lect % eq_m)))
+    comparar('equipo · lectura (MAN no toca preventivos)', prev_antes, sql(prev))
+    comparar('equipo · lectura con falla (MAN la rechaza sin guardar, E14)', False,
+             jload(man.post(pm + 'setLectura', {'id_equipo': eq_m, 'lectura': '300', 'estado': 'RE', 'falla': 'x'})).get('status'))
+    hist = lambda s, url, eq: sin_claves(jload(s.post(url + 'getHistoriaLect', {'idequipo': eq})), ('id_lectura', 'id_equipo', 'fecha'))
+    comparar('equipo · historial de lecturas', hist(asset, pa, eq_a), hist(man, pm, eq_m))
+    ult = lambda s, url, eq: sin_claves(jload(s.post(url + 'getEqPorId', {'idEquipo': eq})), ('id_equipo', 'codigo', 'fecha', 'id_grupo'))
+    comparar('equipo · última lectura', ult(asset, pa, eq_a), ult(man, pm, eq_m))
+    ids_lect = lambda eq: [r[0] for r in sql("SELECT id_lectura FROM historial_lecturas WHERE id_equipo=%s ORDER BY id_lectura" % eq)]
+    la, lm = ids_lect(eq_a), ids_lect(eq_m)
+    for valor, nota in (('180', 'entre la anterior y la posterior'), ('999', 'mayor que la posterior')):
+        ra = jload(asset.post(pa + 'setLecturaObservacionEdit', {'id_equipo': eq_a, 'id_lectura': la[2], 'lectura': valor, 'observacion': 'editada'}))
+        rm = jload(man.post(pm + 'setLecturaObservacionEdit', {'id_equipo': eq_m, 'id_lectura': lm[2], 'lectura': valor, 'observacion': 'editada'}))
+        comparar('equipo · editar lectura %s (respuesta)' % nota, ra, rm)
+    comparar('equipo · editar lectura (historial)', sql(lect % eq_a), sql(lect % eq_m))
+
+    # Contratistas.
+    comparar('equipo · asignar contratista (respuesta)',
+             asset.post(pa + 'guardarcontra', {'id_equipo': eq_a, 'id_contratista': contratista}).strip(),
+             man.post(pm + 'guardarcontra', {'id_equipo': eq_m, 'id_contratista': contratista}).strip())
+    contr = lambda s, url, eq: sin_claves(jload(s.post(url + 'getContratistasEquipo', {'id_equipo': eq})), ('id_equipo', 'codigo'))
+    comparar('equipo · contratistas del equipo', contr(asset, pa, eq_a), contr(man, pm, eq_m))
+    co = lambda s, url, eq: sin_claves(jload(s.post(url + 'getco', {'id_equipo': eq})), cat + ('descripcion', 'marca', 'id_customer', 'id_criticidad', 'id_area', 'id_proceso',
+                                                                                              'id_sector', 'id_grupo', 'marcaid', 'marcadescrip'))
+    comparar('equipo · equipo con su marca', co(asset, pa, eq_a), co(man, pm, eq_m))
+    comparar('equipo · quitar contratista (respuesta)',
+             asset.post(pa + 'delContratista', {'id_equipo': eq_a, 'id_contratista': contratista}).strip(),
+             man.post(pm + 'delContratista', {'id_equipo': eq_m, 'id_contratista': contratista}).strip())
+    comparar('equipo · quitar contratista (contratistas del equipo)', contr(asset, pa, eq_a), contr(man, pm, eq_m))
+
+    # Metas.
+    comparar('equipo · asignar meta (respuesta)', jload(asset.post(pa + 'asignarMeta', {'eq': eq_a, 'meta': '80'})),
+             jload(man.post(pm + 'asignarMeta', {'eq': eq_m, 'meta': '80'})))
+    comparar('equipo · traer meta', jload(asset.post(pa + 'getMeta', {'eq': eq_a})), jload(man.post(pm + 'getMeta', {'eq': eq_m})))
+
+    # Adjuntos: agregar, editar y eliminar. Los nombres llevan un número al azar.
+    ra = asset.post_archivo(pa + 'agregarAdjunto', {'idAgregaAdjunto': eq_a}, 'inputPDF[]', 'manual tres.pdf', PDF_PRUEBA)
+    rm = man.post_archivo(pm + 'agregarAdjunto', {'idAgregaAdjunto': eq_m}, 'inputPDF[]', 'manual tres.pdf', PDF_PRUEBA)
+    comparar('equipo · agregar adjunto (cantidad)', len(jload(ra)), len(jload(rm)))
+    aa, am = sql(adj.replace('adjunto FROM', 'id_adjunto FROM') % eq_a), sql(adj.replace('adjunto FROM', 'id_adjunto FROM') % eq_m)
+    ra = asset.post_archivo(pa + 'EditarAdjunto', {'idEquipo': eq_a, 'id_adjunto': aa[0][0]}, 'inputEditarPDF', 'nuevo.pdf', PDF_PRUEBA)
+    rm = man.post_archivo(pm + 'EditarAdjunto', {'idEquipo': eq_m, 'id_adjunto': am[0][0]}, 'inputEditarPDF', 'nuevo.pdf', PDF_PRUEBA)
+    comparar('equipo · editar adjunto (cantidad)', len(jload(ra)), len(jload(rm)))
+    comparar('equipo · editar adjunto (el archivo nuevo está en la carpeta de asset)', True,
+             os.path.exists(carpeta + sql("SELECT adjunto FROM equipos_archi_adjuntos WHERE id_adjunto=%s" % am[0][0])[0][0]))
+    ra = jload(asset.post(pa + 'eliminaAdjunto', {'idEquipo': eq_a, 'idAdjunto': aa[0][0]}))
+    rm = jload(man.post(pm + 'eliminaAdjunto', {'idEquipo': eq_m, 'idAdjunto': am[0][0]}))
+    comparar('equipo · eliminar adjunto (cantidad)', len(ra), len(rm))
+
+    comparar('equipo · baja (respuesta)', asset.post(pa + 'baja_equipo', {'idEquipo': eq_a}).strip(),
+             man.post(pm + 'baja_equipo', {'idEquipo': eq_m}).strip())
+    comparar('equipo · baja (estado)', sql(estado % eq_a), sql(estado % eq_m))
+    comparar('equipo · equipo dado de baja no se trae para editar', asset.post(pa + 'getEditar', {'idEquipo': eq_a}).strip(),
+             man.post(pm + 'getEditar', {'idEquipo': eq_m}).strip())
+
+    # Aislamiento con un equipo de otra empresa.
+    ajeno = sql("SELECT id_equipo FROM equipos WHERE id_empresa<>%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)
+    if ajeno:
+        eq = ajeno[0][0]
+        foto = lambda: (sql("SELECT * FROM equipos WHERE id_equipo=%s" % eq), sql(lect % eq),
+                        sql("SELECT * FROM equipos_archi_adjuntos WHERE id_equipo=%s" % eq),
+                        sql("SELECT * FROM contratistaquipo WHERE id_equipo=%s" % eq))
+        antes = foto()
+        comparar('equipo · aislamiento: MAN no trae equipos ajenos', 'nada', man.post(pm + 'getEditar', {'idEquipo': eq}).strip())
+        comparar('equipo · aislamiento: MAN no trae lecturas ajenas', [], jload(man.post(pm + 'getHistoriaLect', {'idequipo': eq})))
+        comparar('equipo · aislamiento: MAN no trae la marca de equipos ajenos', 'nada', man.post(pm + 'getco', {'id_equipo': eq}).strip())
+        man.post(pm + 'editar_equipo', {'idEquipo': eq, 'data[descripcion]': 'HACK', 'data[estado]': 'IN'})
+        man.post(pm + 'cambio_equipo', {'idequipo': eq})
+        man.post(pm + 'estado_alta', {'idequipo': eq})
+        man.post(pm + 'setLectura', {'id_equipo': eq, 'lectura': '1', 'operario': 'H', 'turno': 'H', 'observacion': 'H', 'estado': 'RE'})
+        man.post(pm + 'asignarMeta', {'eq': eq, 'meta': '1'})
+        man.post(pm + 'guardarcontra', {'id_equipo': eq, 'id_contratista': contratista})
+        man.post_archivo(pm + 'agregarAdjunto', {'idAgregaAdjunto': eq}, 'inputPDF[]', 'hack.pdf', PDF_PRUEBA)
+        man.post(pm + 'baja_equipo', {'idEquipo': eq})
+        comparar('equipo · aislamiento: MAN no modifica equipos ajenos ni sus lecturas, adjuntos o contratistas', antes, foto())
+
+    limpiar_equipo(carpeta)
+
+def limpiar_equipo(carpeta):
+    """Borra los equipos de prueba, sus lecturas, adjuntos (y archivos), contratistas y catálogos."""
+    for f in sql("SELECT a.adjunto FROM equipos_archi_adjuntos a JOIN equipos e ON e.id_equipo=a.id_equipo WHERE e.codigo LIKE '%s%%'" % PREFIJO):
+        ruta = carpeta + os.path.basename(f[0])
+        if os.path.exists(ruta):
+            os.remove(ruta)
+    for f in os.listdir(carpeta):
+        if re.match(r'(manual_(uno|dos|tres)|nuevo|hack)\d+(_\d+)?\.pdf$', f):
+            os.remove(carpeta + f)
+    for t in ('historial_lecturas', 'equipos_archi_adjuntos', 'contratistaquipo'):
+        sql("DELETE FROM %s WHERE id_equipo IN (SELECT id_equipo FROM equipos WHERE codigo LIKE '%s%%')" % (t, PREFIJO))
+    sql("DELETE FROM equipos WHERE codigo LIKE '%s%%'" % PREFIJO)
+    for tabla, col in (('area', 'descripcion'), ('proceso', 'descripcion'), ('criticidad', 'descripcion'), ('sector', 'descripcion'),
+                       ('grupo', 'descripcion'), ('marcasequipos', 'marcadescrip'), ('admcustomers', 'cliRazonSocial')):
+        sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (tabla, col, PREFIJO))
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
     'parametro': paridad_parametro,
     'componente': paridad_componente,
+    'equipo': paridad_equipo,
 }
 
 if __name__ == '__main__':

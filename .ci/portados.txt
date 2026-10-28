@@ -16,3 +16,7 @@ models/Componentes.php
 views/componente/list.php
 views/componente/listabm.php
 views/componente/view_.php
+controllers/Equipo.php
+models/Equipos.php
+views/Equipo/list.php
+views/Equipo/view_.php
