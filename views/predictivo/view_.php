@@ -7,11 +7,10 @@
     </div>
   </div>
 </div>
-<section class="content">
   <div class="row">
     <div class="col-xs-12">
       <div class="box">
-        <form id="formPredictivo" role="form" action="<?php echo MAN; ?>Predictivo/guardar_predictivo" method="POST" >
+        <form id="formPredictivo" role="form" action="<?php echo base_url(MAN); ?>Predictivo/guardar_predictivo" method="POST" >
           <div class="box-header">
           <h3 class="box-title">Programación Predictivo</h3>
           <?php
@@ -236,7 +235,6 @@
       </div>
     </div>
   </div>
-</section>
 
 <script> 
 
@@ -248,7 +246,7 @@ function traer_equipo(){
     $.ajax({
       type: 'POST',
       data: { },
-      url: 'index.php/Backlog/getequipo', //index.php/
+      url: '<?php echo base_url(MAN); ?>Backlog/getequipo',
       success: function(data){
              
                var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -287,7 +285,7 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getSector",
+      'url': "<?php echo base_url(MAN); ?>Sservicio/getSector",
       success: function (data) {
         tmp = data;
       }
@@ -358,7 +356,7 @@ function getEquiSector(idSect){
         'type': "POST",
         'global': false,
         'dataType': 'json',
-        'url': "<?php echo MAN; ?>Sservicio/getEquipSector",
+        'url': "<?php echo base_url(MAN); ?>Sservicio/getEquipSector",
         success: function (data) {
             if(data !== null){
                 // Asigna opciones al select Equipo en modal
@@ -431,7 +429,7 @@ $("#formPredictivo").submit(function (event){
 $('#listado').click( function cargarVista(){
     wo();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Predictivo/index/<?php echo $permission; ?>", function() {
+    linkTo("<?php echo base_url(MAN); ?>Predictivo/index/<?php echo $permission; ?>", function() {
       wc();
     });
 });
@@ -448,7 +446,7 @@ $('#equipo').change(function(){
     $.ajax({
         type: 'POST',
         data: { id_equipo: id_equipo},
-        url: '<?php echo MAN; ?>Predictivo/getInfoEquipo',
+        url: '<?php echo base_url(MAN); ?>Predictivo/getInfoEquipo',
         dataType: 'json',
         success: function(data){    
             console.log(data);                     
@@ -479,7 +477,7 @@ var dataTarea = function() {
     'async': false,
     'type': "POST",
     'dataType': 'json',
-    'url': '<?php echo MAN; ?>Preventivo/gettarea',
+    'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
     success: function(data){
       tmp = data;
     },
@@ -514,7 +512,7 @@ $(function(){
     $.ajax({
         type: 'POST',
         data: { },
-        url: '<?php echo MAN; ?>Preventivo/getUnidTiempo',
+        url: '<?php echo base_url(MAN); ?>Preventivo/getUnidTiempo',
         dataType: 'json',
         success: function(data){
             var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -542,7 +540,7 @@ function traer_periodo(periodoId){
     data: {periodoId:periodoId },
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Calendario/getperiodo',
+    url: '<?php echo base_url(MAN); ?>Calendario/getperiodo',
     success: function(data){
       var opcion = "<option value='-1'>Seleccione...</option>" ; 
       $('#periodo').append(opcion); 
@@ -600,7 +598,7 @@ $('#duracion, #unidad, #cantOper').change(function(){
 function cargarVista(){
   wo();
   $('#content').empty();
-  $("#content").load("<?php echo MAN; ?>Predictivo/index/<?php echo $permission; ?>", () => wc());
+  linkTo("<?php echo base_url(MAN); ?>Predictivo/index/<?php echo $permission; ?>", () => wc());
 }
 
 function ordenaArregloDeObjetosPor(propiedad) {  
@@ -622,7 +620,7 @@ $.ajax({
     'async': false,
     'type': "POST",
     'dataType': 'json',
-    'url': '<?php echo MAN; ?>Preventivo/getHerramientasB',
+    'url': '<?php echo base_url(MAN); ?>Preventivo/getHerramientasB',
     success: function(data){
     tmp = data;
     },
@@ -806,7 +804,7 @@ return tmp;
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN; ?>Preventivo/getinsumo',
+      'url': '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
       success: function(data){
         tmp = data;
       },

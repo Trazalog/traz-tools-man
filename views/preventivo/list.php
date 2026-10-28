@@ -44,7 +44,7 @@
             }   
             
             if ($a['prev_adjunto']) {
-                echo '<a href="./assets/filespreventivos/'.$a['prev_adjunto'].'" target="_blank"><i class="fa fa-file-pdf-o text-light-blue" style="cursor: pointer; margin-left: 15px;" title="Ver Archivo"></i></a>';                    
+                echo '<a href="'.man_asset_url().'assets/filespreventivos/'.$a['prev_adjunto'].'" target="_blank"><i class="fa fa-file-pdf-o text-light-blue" style="cursor: pointer; margin-left: 15px;" title="Ver Archivo"></i></a>';                    
             } 
 
             }
@@ -78,7 +78,7 @@
   $('#btnAgre').click( function cargarVista(){
     wo();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Preventivo/cargarpreventivo/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Preventivo/cargarpreventivo/<?php echo $permission; ?>");
     wc();
   });
   //Eliminar
@@ -95,7 +95,7 @@
                     'async': false,
                     'type': "POST",
                     'dataType': 'json',
-                    'url': '<?php echo MAN; ?>Preventivo/gettarea',
+                    'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
                     success: (data) => {return tmp = data;},
                     error: () => {error("Error","Error al traer tareas");}
                   })
@@ -123,7 +123,7 @@
     $.ajax({
       type: 'POST',
       data: { },
-      url: '<?php echo MAN; ?>Preventivo/getUnidTiempo', 
+      url: '<?php echo base_url(MAN); ?>Preventivo/getUnidTiempo', 
       success: function(data){
         var opcion  = "<option value='-1'>Seleccione...</option>" ; 
         $('#unidad').append(opcion); 
@@ -162,7 +162,7 @@
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN; ?>Preventivo/getHerramientasB',
+      'url': '<?php echo base_url(MAN); ?>Preventivo/getHerramientasB',
       success: (data) => {return tmp = data;},
       error: () => {error("Error","Error al traer herramientas");}
     })
@@ -342,7 +342,7 @@
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN; ?>Preventivo/getinsumo',
+      'url': '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
       success: (data) => {return tmp = data;},
       error: () => {error("Error","Error al traer componentes");}
     });
@@ -474,7 +474,7 @@
       type: 'POST',
       data: { idprev:idprev },
       dataType: 'json',
-      url: 'index.php/Preventivo/geteditar',
+      url: '<?php echo base_url(MAN); ?>Preventivo/geteditar',
       success: function(data){                         
         datos = {
           'idprev'       :data['datos'][0]['idprev'],
@@ -598,7 +598,7 @@
                       'async': false,
                       'type': "POST",
                       'dataType': 'json',
-                      'url': '<?php echo MAN; ?>Preventivo/gettarea',
+                      'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
                       success: (data) => {return tmp = data;},
                       error: () => {error("Error","Error al traer tareas");}
                     });
@@ -626,7 +626,7 @@
     $.ajax({
       type: 'POST',
       data: { },
-      url: '<?php echo MAN; ?>Preventivo/getUnidTiempo', 
+      url: '<?php echo base_url(MAN); ?>Preventivo/getUnidTiempo', 
       success: function(data){
         var opcion  = "<option value='-1'>Seleccione...</option>" ; 
         $('#unidad').append(opcion); 
@@ -653,7 +653,7 @@
       data: {periodoE:periodoE },
       dataType: 'json',
       type: 'POST',
-      url: 'index.php/Calendario/getperiodo',
+      url: '<?php echo base_url(MAN); ?>Calendario/getperiodo',
       success: function(data){
         var opcion = "<option value='-1'>Seleccione...</option>" ; 
         $('#periodo').append(opcion); 
@@ -679,7 +679,7 @@
       data: {id_equipo:id_equipo },
       dataType: 'json',
       type: 'POST',
-      url: 'index.php/Preventivo/getcomponente',
+      url: '<?php echo base_url(MAN); ?>Preventivo/getcomponente',
       async:false,
       success: function(data){
         $('#componente option').remove();
@@ -753,7 +753,7 @@
         idsinsumo: idsinsumo, 
         cantInsum: cantInsum
       },
-      url: 'index.php/Preventivo/editar_preventivo',  
+      url: '<?php echo base_url(MAN); ?>Preventivo/editar_preventivo',  
       success: function(data){                 
         $('#modalSale').modal('hide');                    
         console.log("resp preventivo: ");
@@ -787,7 +787,7 @@ function eliminaPrevent(){
   $.ajax({
     type: 'POST',
     data: { idprev: idP},
-    url: '<?php echo MAN; ?>Preventivo/baja_preventivo',
+    url: '<?php echo base_url(MAN); ?>Preventivo/baja_preventivo',
     success: function(data){     
       hecho('Hecho','Preventivo eliminado correctamente');
       cargarVista();
@@ -803,7 +803,7 @@ function eliminaPrevent(){
 function cargarVista(){
   wo();
   $('#content').empty();  
-  $("#content").load("<?php echo MAN; ?>Preventivo/index/<?php echo $permission; ?>", function() {
+  linkTo("<?php echo base_url(MAN); ?>Preventivo/index/<?php echo $permission; ?>", function() {
     wc();
   });
 }
@@ -820,7 +820,32 @@ $('#tabprev').DataTable({
     "targets": [ 0 ], 
     "orderable": false
   } ],
-  "order": [[1, "asc"]],
+  "order": [[1, "desc"]],
+  "ordering": true,
+  "language": {
+    "decimal": "",
+    "emptyTable": "No hay datos disponibles",
+    "info": "Mostrando _START_ a _END_ de _TOTAL_ registros",
+    "infoEmpty": "Mostrando 0 a 0 de 0 registros",
+    "infoFiltered": "(filtrado de _MAX_ registros totales)",
+    "infoPostFix": "",
+    "thousands": ",",
+    "lengthMenu": "Mostrar _MENU_ registros",
+    "loadingRecords": "Cargando...",
+    "processing": "Procesando...",
+    "search": "Buscar:",
+    "zeroRecords": "No se encontraron registros coincidentes",
+    "paginate": {
+      "first": "Primero",
+      "last": "Último",
+      "next": "Siguiente",
+      "previous": "Anterior"
+    },
+    "aria": {
+      "sortAscending": ": activar para ordenar columna ascendente",
+      "sortDescending": ": activar para ordenar columna descendente"
+    }
+  }
 });
 
 </script>

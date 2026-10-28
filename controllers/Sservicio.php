@@ -1,254 +1,190 @@
-<?php defined('BASEPATH') or exit('No direct script access allowed');
+<?php
+defined('BASEPATH') OR exit('No direct script access allowed');
 
-class Sservicio extends CI_Controller{
-    public function __construct(){
-        parent::__construct();
-		$this->load->model('Sservicios');
-		$this->load->model('Areas');
-		$this->load->model('Procesos');
-    }
-    /**
-	* Vista principal para la gestion de solicitudes de servicios
-	* @param 
-	* @return view
-	*/
-    public function index($permission = "Add-Edit-Del-"){
-		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | index()");
-
-		$data['list'] = $this->Sservicios->getServiciosList('false');
-		$data['permission'] = $permission;
-
-        $this->load->view('Sservicios/list_bpm', $data);
-    }
-	/**
-	* Levanta vista para la creacion de una solicitud de servicios
-	* @param 
-	* @return view
-	*/
-	public function nuevaSS($permission){
-		// $data['list']       = $this->Otrabajos->otrabajos_List();
-		$data['permission'] = $permission;
-		$this->load->view('Sservicios/view_', $data);
+/**
+ * Solicitudes de servicio: listado, conformidad, anulación y datos para ver e imprimir — MIG-ASSET-2.
+ *
+ * Portado desde el asset actual (diverge del fork) solo con las acciones que usan las vistas (E9). Crear una solicitud
+ * (con su caso de Bonita) y eliminarla son operaciones de toolsMANAPI, que habla con Bonita por toolsbpmAPI (A5, E22).
+ */
+class Sservicio extends CI_Controller
+{
+	function __construct()
+	{
+		parent::__construct();
+		$this->load->model(array('Sservicios', 'Areas', 'Procesos'));
+		$this->load->helper('man');
 	}
+
+	/**
+	* Listado de solicitudes
+	* @param string $permission acciones habilitadas; sin parámetro, solo lectura (E3)
+	*/
+	public function index($permission = '')
+	{
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | index($permission)");
+		if (man_empresa() === null) {
+			echo '<div class="alert alert-danger">La empresa no está vinculada con Mantenimiento. Contactá al administrador.</div>';
+			return;
+		}
+		$data['permission'] = $permission;
+		$this->load->view('Sservicios/list_bpm', $data);
+	}
+
+	/**
+	* Solicitud con equipo, sector, área, proceso y adjuntos
+	*/
 	public function getSS(){
-
-		$data["SS"] = $this->Sservicios->getSSs($_POST['idSS']);
-		$id_equipo = $data["SS"][0]->id_equipo;
-		$data["EQ_SEC"] = $this->Sservicios->getEquipoSector($id_equipo);
-		$id_area = $data["EQ_SEC"][0]->area;
-		$id_proceso = $data["EQ_SEC"][0]->proceso;
-		$area = $this->areas->Obtener_areas($id_area);
-		$data["AR"] = $area[0]["descripcion"];
-		$proceso = $this->procesos->Obtener_procesos($id_proceso);
-		$data["PR"] = $proceso[0]["descripcion"];
-
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getSS()");
+		$idSS = $this->input->post('idSS');
+		$data["SS"] = $this->Sservicios->getSSs($idSS);
+		if (empty($data["SS"])) {
+			echo json_encode($data);
+			return;
+		}
+		$data["EQ_SEC"] = $this->Sservicios->getEquipoSector($data["SS"][0]->id_equipo);
+		$area = isset($data["EQ_SEC"][0]) ? $this->Areas->Obtener_areas($data["EQ_SEC"][0]->area) : null;
+		$data["AR"] = $area ? $area[0]["descripcion"] : null;
+		$proceso = isset($data["EQ_SEC"][0]) ? $this->Procesos->Obtener_procesos($data["EQ_SEC"][0]->proceso) : null;
+		$data["PR"] = $proceso ? $proceso[0]["descripcion"] : null;
+		$data['adjuntos'] = $this->Sservicios->getAdjuntosSolServicio($idSS);
 		echo json_encode($data);
 	}
-	/**
-	* Trae sectores por empresa logueada 
-	* @param 
-	* @return array listado de sectores
-	*/
+
 	public function getSector(){
-		log_message('DEBUG','#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getSector()');
-		
-		$response = $this->Sservicios->getSectores($this->input->post());
-		echo json_encode($response);
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getSector()");
+		echo json_encode($this->Sservicios->getSectores());
 	}
-	public function getEquipo(){
-		$response = $this->Sservicios->getEquipos($this->input->post());
-		echo json_encode($response);
-	}
-	// Elimina solicitud - Listo 
+
+	/** Anula la solicitud (AN) */
 	public function elimSolicitud(){
-		$id = $this->input->post('id_solic');
-		$response = $this->Sservicios->elimSolicitudes($id);
-		echo json_encode($response);
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | elimSolicitud()");
+		echo json_encode($this->Sservicios->elimSolicitudes($this->input->post('id_solic')));
 	}
-	/**
-	* Trae equipos segun sector de empresa logueada
-	* @param integer $id_sector id del sector seleccionado 
-	* @return array lista equipos del sector seleccionado
-	*/
+
 	public function getEquipSector(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getEquipSector()");
-		
-		$response = $this->Sservicios->getEquipSectores($this->input->post());
-		echo json_encode($response);
+		echo json_encode($this->Sservicios->getEquipSectores($this->input->post()));
 	}
-	//Trae datos para impresion de solicitud - Listo
+
+	/** Datos para imprimir */
 	public function getsolImp(){
-		$id = $_POST['idservicio'];
-
-		$result = $this->Sservicios->getsolImps($id);
-
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getsolImp()");
+		$result = $this->Sservicios->getsolImps($this->input->post('idservicio'));
 		if ($result) {
-
-			$arre['datos'] = $result;
-			print_r(json_encode($arre));
-		} else echo "nada";
+			echo json_encode(array('datos' => $result));
+		}
+		else echo "nada";
 	}
-	// Trae usuarios registrados (para solicitantes de la SServicio) OK
-	public function getOperario(){
-		$response = $this->Sservicios->getOperarios($this->input->post());
-		echo json_encode($response);
-	}
-	/* FUNCIONES ORIGINALES DE ASSET	*/
 
-	// Codifica nombre de imagen para no repetir en servidor
-	// formato "12_6_2018-05-21-15-26-24" idpreventivo_idempresa_fecha(a�o-mes-dia-hora-min-seg)
-	function codifNombre($ultimoId,$empId){
-
-		$guion = '_';
-		$guion_medio = '-';
-		$hora = date('Y-m-d H:i:s');// hora actual del sistema	
-		$delimiter = array(" ",",",".","'","\"","|","\\","/",";",":");
-		$replace = str_replace($delimiter, $delimiter[0], $hora);
-		$explode = explode($delimiter[0], $replace);
-		
-		$strigHora = $explode[0].$guion_medio.$explode[1].$guion_medio.$explode[2].$guion_medio.$explode[3];
-		
-		$nomImagen = $ultimoId.$guion.$empId.$guion.$strigHora;
-		
-		return $nomImagen;
-  	}
-	/* INTEGRACION CON BPM */
-	// trae tareas estandar para select de nueva solicitud
-	public function getTareasStandar(){
-		$result = $this->Sservicios->getTareasStandar();
-		echo json_encode($result);
-	}
 	/**
-	* GUARDA SSERVICIOS y lanza proceso en BPM (inspección)
-	* @param 
-	* @return array json con respuesta de la transaccion
+	* Crea la solicitud con su caso de Bonita y, si viene, sube el adjunto (inputPDF) a la carpeta de asset (E11)
+	* @return json status y msj
 	*/
 	function lanzarProcesoBPM(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | lanzarProcesoBPM()");
-		$userdata = $this->session->userdata('user_data');
-		$empId = empresa();
-		// inserta registro en  tabla solicitud de reparacion
-		$id_solServicio  = $this->Sservicios->setservicios($this->input->post());
-
-		if ($id_solServicio) {
-			//Contrato para lanzar Solcitud de Servicio
-			$contract = array(
-				"idSolicitudServicio"	=>	$id_solServicio,
-				"idOT"  => 	0
-			);			
-
-			//Lanzar Proceso
-			$responce  = $this->bpm->lanzarProceso(BPM_PROCESS_ID_MANTENIMIENTO, $contract);
-			
-			if(!$responce['status']){
-				$this->Sservicios->eliminar($id_solServicio);
-				echo json_encode($responce); 
-				return;
-			}
-
-			//Validar Resultado
-		
-			if ($responce['data']['caseId']) {
-				////////// Subir imagen o pdf 
-				$nomcodif = $this->codifNombre($id_solServicio, $empId); // codificacion de nomb  		
-				$config = [
-					"upload_path" => "./assets/filesSS",
-					'allowed_types' => "png|jpg|pdf|xlsx",
-					'file_name'=> $nomcodif
-				];
-				$this->load->library("upload",$config);
-				if ($this->upload->do_upload('inputPDF')) {
-					$urlfile = "assets/filesSS/";
-					$data = array("upload_data" => $this->upload->data());
-					$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
-					$nomcodif = $urlfile.$nomcodif.$extens;
-					$adjunto = array('sol_adjunto' => $nomcodif);
-					$result['respNomImagen'] = $this->Sservicios->setAdjunto($adjunto,$id_solServicio);
-				}else{
-					$result['respImagen'] = false;
-				}	
-				//update de solic de servicio concaseid
-				if($this->Sservicios->setCaseId($responce['data']['caseId'],$id_solServicio)){
-
-					echo json_encode(['status'=> true, 'msj'=>'OK']);return;
-
-				}else{
-
-					echo json_encode(['status'=> false, 'msj'=>ASP_0200]);return;
-
-				}				
-
-			} else{ 
-
-				//Falla Lanzar el Procesoy elimina la solicitud
-				$result = $this->Sservicios->elimSolicitudes($id_solServicio);
-				echo json_encode(['status'=> false, 'msj'=>ASP_0100]);
-				return;
-			}
-	
-		}else{ 
-
-			//Falla Lanzar el Procesoy elimina la solicitud
-			$result = $this->Sservicios->elimSolicitudes($id_solServicio);
-			echo json_encode(['status'=> false, 'msj'=>ASP_0100]);
+		$r = $this->Sservicios->lanzarSolicitud($this->input->post());
+		if (!$r['status']) {
+			echo json_encode($r);
 			return;
 		}
-	}
-	/*	./INTEGRACION CON BPM */
-
-	public function getInfoEquipo(){
-		$data = $this->Sservicios->getInfoEquipos($this->input->post());
-		if ($data  == false) {
-			echo json_encode(false);
-		} else {
-			echo json_encode($data);
+		$nomcodif = $this->codifNombre($r['id'], man_empresa());
+		$this->load->library("upload", array(
+			"upload_path"   => man_asset_path() . "assets/filesSS",
+			'allowed_types' => "png|jpg|pdf|xlsx",
+			'file_name'     => $nomcodif
+		));
+		if ($this->upload->do_upload('inputPDF')) {
+			$this->Sservicios->setAdjunto(array('sol_adjunto' => "assets/filesSS/" . $nomcodif . $this->upload->data('file_ext')), $r['id']);
 		}
+		echo json_encode(['status' => true, 'msj' => 'OK']);
 	}
-	// Guarda solicitud de Servicio - Listo
-	public function setservicios(){
 
-		$data = $this->Sservicios->setservicios($this->input->post());
-		if($data  == false)
-		{
-			echo json_encode(false);
-		}
-		else
-		{
-			echo json_encode(true);	
-		}
+	/**
+	* Nombre codificado del archivo: id_empresa_fecha (año-mes-dia-hora-min-seg)
+	*/
+	private function codifNombre($ultimoId, $empId){
+		$hora = date('Y-m-d H:i:s');
+		$delimiter = array(" ", ",", ".", "'", "\"", "|", "\\", "/", ";", ":");
+		$explode = explode($delimiter[0], str_replace($delimiter, $delimiter[0], $hora));
+		return $ultimoId . '_' . $empId . '_' . $explode[0] . '-' . $explode[1] . '-' . $explode[2] . '-' . $explode[3];
 	}
-	//////// no vistas
-	public function get_SolicTerminada(){
 
+	/**
+	* Formulario de nueva solicitud
+	*/
+	public function nuevaSS($permission = ''){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | nuevaSS($permission)");
+		$data['permission'] = $permission;
+		$this->load->view('Sservicios/view_', $data);
+	}
+
+	/**
+	* Solicitudes terminadas (para reactivarlas)
+	*/
+	public function get_SolicTerminada($permission = ''){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | get_SolicTerminada($permission)");
 		$data['list'] = $this->Sservicios->get_SolicTerminadas();
 		$data['permission'] = $permission;
 		$this->load->view('Sservicios/list_term', $data);
 	}
-	public function confSolicitud()
-	{
-		$data = $this->Sservicios->confSolicitudes($this->input->post());
-		if ($data  == false) {
-			echo json_encode(false);
+
+	/** Registra la conformidad */
+	public function confSolicitud(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | confSolicitud()");
+		echo json_encode((bool) $this->Sservicios->confSolicitudes($this->input->post()));
+	}
+
+	/**
+	* Vuelve una solicitud terminada a Solicitada. Asset respondía la vista vieja Sservicios/list cuando la que llama
+	* espera JSON, así que siempre mostraba "Error en cambio de estado"; acá responde el resultado (E12).
+	*/
+	public function activSolicitud(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | activSolicitud()");
+		echo json_encode($this->Sservicios->activSolicitudes($this->input->post()));
+	}
+
+	/**
+	* Página de la tabla (DataTables del lado del servidor)
+	*/
+	public function paginado(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | paginado()");
+		$search = $this->input->post('search');
+		$r = $this->Sservicios->solicitudespaginadas($this->input->post('start'), $this->input->post('length'),
+			isset($search['value']) ? $search['value'] : '', $this->input->post('order'), $this->input->post('showConformes'));
+		echo json_encode(array(
+			"draw"            => intval($this->input->post('draw')),
+			"recordsTotal"    => intval($r['numDataTotal']),
+			"recordsFiltered" => intval($r['numDataTotal']),
+			"data"            => $r['datos']
+		));
+	}
+
+	/**
+	* Marca la solicitud y su OT como eliminadas y borra el caso de Bonita (mismos textos de respuesta que asset)
+	*/
+	public function eliminar_solicitud(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | eliminar_solicitud()");
+		$id_solicitud = $this->input->post('id_solicitud');
+		$motivo = $this->input->post('motivo');
+		if (empty($id_solicitud) || empty($motivo)) {
+			echo "ID de solicitud o motivo no proporcionado.";
+			return;
+		}
+		$r = $this->Sservicios->eliminarSolicitud($id_solicitud, $motivo, $this->input->post('case_id'));
+		if ($r['status']) {
+			echo "Solicitud de servicio y orden de trabajo eliminadas exitosamente.";
+			echo json_encode($r);
 		} else {
-			echo json_encode(true);
+			echo "Error al eliminar solicitud de servicio y orden de trabajo.";
 		}
 	}
-	public function activSolicitud()
-	{
-		$data = $this->input->post();
-		$response = $this->Sservicios->activSolicitudes($data);
-		$this->load->view('Sservicios/list', $data);
-	}
-	/**
-	* Devuelve el listado de solicitudes de servicio con aquellas en estado Conforme
-	* @param string $showConforme
-	* @return array json con listado
-	*/
-	public function getServiciosConformes(){
-		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | getServiciosConformes()");
 
-		$showConformes = $_GET['showConformes'];
-		$data['list'] = $this->Sservicios->getServiciosList($showConformes);
-		echo json_encode($data['list']);
+	/**
+	* ¿El usuario está en alguno de los grupos de asset indicados? (provisorio hasta MIG-5)
+	*/
+	public function validaUsuario(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Sservicio | validaUsuario()");
+		echo json_encode($this->Sservicios->validaUsuario(man_usuario(), man_empresa(), $this->input->post('filtro1'), $this->input->post('filtro2')));
 	}
 }

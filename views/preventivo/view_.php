@@ -7,7 +7,6 @@
       </div>
   </div>
 </div>
-<section class="content">
   <div class="row">
     <div class="col-xs-12">
       <div class="box">
@@ -21,7 +20,7 @@
         </div><!-- /.box-header -->
 
         <div class="box-body">
-          <form id="formPreventivo" role="form" action="<?php echo MAN; ?>Preventivo/guardar_preventivo" method="POST" >
+          <form id="formPreventivo" role="form" action="<?php echo base_url(MAN); ?>Preventivo/guardar_preventivo" method="POST" >
             <div class="panel panel-default">
               <div class="panel-heading">
                 <h3 class="panel-title"><div class="fa fa-cogs"></div> Datos del Equipo</h3>
@@ -230,7 +229,6 @@
       </div> <!-- box -->    
     </div> <!-- col-xs-12 -->  
   </div>  <!-- row -->        
-</section>
 
 <script>
 
@@ -242,7 +240,7 @@ function traer_equipo(){
     $.ajax({
         type: 'POST',
         data: { },
-        url: 'index.php/Backlog/getequipo',
+        url: '<?php echo base_url(MAN); ?>Backlog/getequipo',
         dataType: 'json',
         success: function(data){
             var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -268,7 +266,7 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getSector",
+      'url': "<?php echo base_url(MAN); ?>Sservicio/getSector",
       'success': function (data) {
         tmp = data;
         var $select = $("#sector");
@@ -308,7 +306,7 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getEquipSector",
+      'url': "<?php echo base_url(MAN); ?>Sservicio/getEquipSector",
       'success': function (data) {
         console.table(data)
         $('#equipo').attr('disabled', false);
@@ -337,7 +335,7 @@ var dataF = function () {
 $('#listado').click( function cargarVista(){
     wo();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Preventivo/index/<?php echo $permission; ?>", () => wc());
+    linkTo("<?php echo base_url(MAN); ?>Preventivo/index/<?php echo $permission; ?>", () => wc());
 });
 
 $('#ultimo').datetimepicker({
@@ -354,7 +352,7 @@ $('#equipo').change(function(){
     type: 'POST',
     data: { id_equipo: id_equipo},
     dataType: 'json',
-    url: '<?php echo MAN; ?>Preventivo/getEquipoNuevoPrevent', 
+    url: '<?php echo base_url(MAN); ?>Preventivo/getEquipoNuevoPrevent', 
   })
   .done( (data) => {
     var fecha_ingreso = data['fecha_ingreso']; 
@@ -380,7 +378,7 @@ function traer_componente(id_equipo){
     type: 'POST',
     data: {id_equipo:id_equipo },
     dataType: 'json',
-    url: '<?php echo MAN; ?>Preventivo/getcomponente',
+    url: '<?php echo base_url(MAN); ?>Preventivo/getcomponente',
     success: function(data){
       //console.log(data);
       $('#componente option').remove();
@@ -411,7 +409,7 @@ var dataTarea = function() {
     'async': false,
     'type': "POST",
     'dataType': 'json',
-    'url': '<?php echo MAN; ?>Preventivo/gettarea',
+    'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
     success: (data) => { tmp = data;
     var $select = $("#tarea");
         for (var i = 0; i < data.length; i++) {
@@ -433,7 +431,7 @@ function traer_periodo(periodoId){
     data: {periodoId:periodoId },
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Calendario/getperiodo',
+    url: '<?php echo base_url(MAN); ?>Calendario/getperiodo',
     success: function(data){
       var opcion = "<option value='-1'>Seleccione...</option>" ; 
       $('#periodo').append(opcion); 
@@ -471,7 +469,7 @@ $('#unidad').html("");
 $.ajax({
     type: 'POST',
     data: { },
-    url: '<?php echo MAN; ?>Predictivo/getUnidTiempo',
+    url: '<?php echo base_url(MAN); ?>Predictivo/getUnidTiempo',
     dataType: 'json',
     success: function(data){
         var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -525,7 +523,7 @@ $('#duracion, #unidad, #cantOper').change(function(){
 function cargarVista(){
     wo();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Preventivo/index/<?php echo $permission; ?>", () => wc());
+    linkTo("<?php echo base_url(MAN); ?>Preventivo/index/<?php echo $permission; ?>", () => wc());
 }
 
 // Guarda Preventivo  
@@ -613,7 +611,7 @@ function ordenaArregloDeObjetosPor(propiedad) {
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN; ?>Preventivo/getHerramientasB',
+      'url': '<?php echo base_url(MAN); ?>Preventivo/getHerramientasB',
       success: (data) => { tmp = data },
       error: () => error('Error',"Error al traer Herramientas")
     })
@@ -786,7 +784,7 @@ function ordenaArregloDeObjetosPor(propiedad) {
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN;?>Preventivo/getinsumo',
+      'url': '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
       success: (data) => { tmp = data },
       error: (result) => error('Error',"Error al traer Insumos")
     })

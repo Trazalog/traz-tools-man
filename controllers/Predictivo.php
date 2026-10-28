@@ -1,418 +1,207 @@
 <?php
 defined('BASEPATH') OR exit('No direct script access allowed');
 
+/**
+ * Predictivos: listado, alta, edición y baja de planes predictivos — MIG-ASSET-2.
+ *
+ * Portado desde el asset actual (diverge del fork) solo con las acciones que usan las vistas (E9). Las vistas usan
+ * además acciones de Preventivo (herramientas, insumos, tareas, adjuntos). El alta con herramientas e insumos es una
+ * operación de toolsMANAPI (ADR-014, regla 3); los adjuntos van a la carpeta de asset (E11).
+ */
 class Predictivo extends CI_Controller {
 
 	function __construct(){
-		
 		parent::__construct();
 		$this->load->model('Predictivos');
-		$this->load->model('Otrabajos');
+		$this->load->helper('man');
 	}
+
 	/**
-    * Carga vista principal de Predictivo
-    * @param 
-    * @return view listado Predictivo
-    */
-	public function index($permission = "Add-Edit-Del-"){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivo | index()");
-		$data['list'] = $this->Predictivos->predictivo_List();
+	* Listado de predictivos
+	* @param string $permission acciones habilitadas; sin parámetro, solo lectura (E3)
+	*/
+	public function index($permission = ''){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | index($permission)");
+		if (!$this->empresaVinculada()) {
+			return;
+		}
+		$data['list']       = $this->Predictivos->predictivo_List();
 		$data['permission'] = $permission;
 		$this->load->view('predictivo/list', $data);
 	}
-	/**
-    * Carga vista nuevo Predictivo
-    * @param 
-    * @return view agregar nuevo Predictivo
-    */
-	public function cargarpredictivo($permission){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivo | cargarpredictivo()");
-        $data['permission'] = $permission;    // envia permisos       
-        $this->load->view('predictivo/view_',$data);
-    }
 
-	// Trae equipos por empresa logueada - Listo
+	/**
+	* Formulario de alta
+	*/
+	public function cargarpredictivo($permission = ''){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | cargarpredictivo($permission)");
+		$data['permission'] = $permission;
+		$this->load->view('predictivo/view_', $data);
+	}
+
 	public function getEquipo(){
-		
-		$equipo = $this->Predictivos->getEquipos();
-
-		if($equipo)
-		{	
-			$arre=array();
-	        foreach ($equipo as $row ) 
-	        {   
-	           $arre[]=$row;
-	        }
-			echo json_encode($arre);
-		}
-		else echo "nada";
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | getEquipo()");
+		$this->lista($this->Predictivos->getEquipos());
 	}
-	/**
-    * Trae info de equipos por ID y por empresa logueada
-    * @param Integer $id_equipo id del equipo
-    * @return Array  data del equipo
-    */
+
 	public function getInfoEquipo(){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivo | getInfoEquipo()");
-		$id = $this->input->post('id_equipo');
-		$equipo = $this->Predictivos->getInfoEquipos($id);
-
-		if($equipo){	
-			$arre=array();
-	        foreach ($equipo as $row) {   
-	           $arre[]=$row;
-	        }
-			echo json_encode($arre);
-		}
-		else echo "nada";
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | getInfoEquipo()");
+		$this->lista($this->Predictivos->getInfoEquipos($this->input->post('id_equipo')));
 	}
 
-	// Trae tareas por empresa logueada - Listo
-	public function gettarea()
-	{	
-		$tareas = $this->Preventivos->gettarea();
-		echo json_encode($tareas);
-	}
-
-	// Trae unidades de tiempo - Listo
 	public function getUnidTiempo(){
-			
-		$tarea = $this->Predictivos->getUnidTiempos();
-
-		if($tarea){	
-			$arre=array();
-	        foreach ($tarea as $row ) 
-	        {   
-	           $arre[]=$row;
-	        }
-			echo json_encode($arre);
-		}
-		else echo "nada";
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | getUnidTiempo()");
+		$this->lista($this->Predictivos->getUnidTiempos());
 	}
+
 	/**
-    * Guarda predictivos nuevos
-    * @param array $data datos cargados en formulario del predictivo nuevo
-    * @return bool true o false segun resultado de las operaciones
-    */
+	* Alta de predictivo con herramientas, insumos y adjunto (inputPDF). La fecha llega como dd-mm-aaaa.
+	* @return json true si se guardó todo
+	*/
 	public function guardar_predictivo(){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivo | guardar_predictivo()");
-    	$empId = empresa();		
-		$data     = $this->input->post();
-		$eq = $this->input->post('equipo');
-		$ta = $this->input->post('id_tarea');
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | guardar_predictivo()");
+		$data = $this->input->post();
 		$fe = $this->input->post('vfecha');
-		$per = $this->input->post('periodo');
-		$can = $this->input->post('cantidad');
-		$hh = floatval($this->input->post('hshombre'));
-		$dur = $this->input->post('duracion');
-		$uTi = $this->input->post('unidad');
-		$op = $this->input->post('cantOper');
-		
-		$uno=substr($fe, 0, 2); 
-        $dos=substr($fe, 3, 2); 
-        $tres=substr($fe, 6, 4); 
-        $resul = ($tres."/".$dos."/".$uno); 
-		
-		$datos = array(	
-			'id_equipo'=>$eq,
-			'tarea_descrip'=>$ta,
-			'fecha'=>$resul,
-			'periodo'=>$per,
-			'cantidad'=>$can,
-			'horash'=>$hh,
-			'estado'=>'C',
-			'pred_duracion'=>$dur,
-			'pred_canth'=>$op,
-			'id_empresa'=>$empId,
-			'id_unidad'=>$uTi
+		$datos = array(
+			'id_equipo'     => $this->input->post('equipo'),
+			'tarea_descrip' => $this->input->post('id_tarea'),
+			'fecha'         => trim((string) $fe) === '' ? '' : substr($fe, 6, 4) . "/" . substr($fe, 3, 2) . "/" . substr($fe, 0, 2),
+			'periodo'       => $this->input->post('periodo'),
+			'cantidad'      => $this->input->post('cantidad'),
+			'horash'        => floatval($this->input->post('hshombre')),
+			'pred_duracion' => $this->input->post('duracion'),
+			'pred_canth'    => $this->input->post('cantOper'),
+			'id_unidad'     => $this->input->post('unidad')
 		);
-		$response['respPredictivo'] = $this->Predictivos->insert_predictivo($datos);
+		$herramientas = man_detalle(isset($data['id_her']) ? $data['id_her'] : null, isset($data['cant_herr']) ? $data['cant_herr'] : null, 'herrId');
+		$insumos      = man_detalle(isset($data['id_insumo']) ? $data['id_insumo'] : null, isset($data['cant_insumo']) ? $data['cant_insumo'] : null, 'artId');
 
-		if($response['respPredictivo']['status']){
-			$ultimoId = $response['respPredictivo']['id']; 	
-			////////// para guardar herramientas                 
-			if ( !empty($data['id_her']) ){
-				//saco array con herramientas y el id de empresa
-				$herr = $data["id_her"]; 
-				$i = 0;
-				foreach ($herr as $h) {
-					$herramPred[$i]['herrId']= $h;
-					$herramPred[$i]['id_empresa']= $empId;
-					$i++;                                
-				} 
-				//saco array con cant de herramientas y el id de preventivo 
-				$cantHerr = $data["cant_herr"];
-				$z = 0;
-				foreach ($cantHerr as $c) {
-					$herramPred[$z]['cantidad']= $c;
-					$herramPred[$z]['predId']= $ultimoId;
-					$z++;                                
-				}				
-				// Guarda el bacht de datos de herramientas
-				$response['respHerram'] = $this->Predictivos->insertPredHerram($herramPred);
-			}else{
-
-				$response['respHerram'] = true;	// no habia herramientas
-			}	
-			////////// para guardar insumos
-			if ( !empty($data['id_insumo']) ){
-				//saco array con herramientas y el id de empresa
-				$ins = $data["id_insumo"]; 
-				$j = 0;
-				foreach ($ins as $in) {
-					$insumoPred[$j]['artId'] = $in;
-					$insumoPred[$j]['id_empresa'] = $empId;
-					$j++;                                
-				} 
-				//saco array con cant de herramientas y el id de preventivo 
-				$cantInsum = $data["cant_insumo"];
-				$z = 0;
-				foreach ($cantInsum as $ci) {
-					$insumoPred[$z]['cantidad'] = $ci;
-					$insumoPred[$z]['predId'] = $ultimoId;
-					$z++;                                
-				}
-				// Guarda el bacht de datos de herramientas
-				$response['respInsumo'] = $this->Predictivos->insertPredInsum($insumoPred);
-			}else{
-
-				$response['respInsumo'] = true;	// no habia insumos
-			}		
-			////////// Subir imagen o pdf 
-			$nomcodif = $this->codifNombre($ultimoId,$empId); // codificacion de nomb
-			$upload_path = "./assets/filespredictivos";
-            if (!is_dir($upload_path)) {
-                mkdir($upload_path, 0755, true);
-            }
-			
-			$config = [
-				"upload_path" => $upload_path,
+		$result = $this->Predictivos->insert_predictivo($datos, $herramientas, $insumos);
+		if ($result) {
+			$ultimoId = $this->Predictivos->ultimo_id;
+			$nomcodif = $this->codifNombre($ultimoId, man_empresa());
+			$this->load->library("upload", array(
+				"upload_path"   => man_asset_path() . "assets/filespredictivos",
 				'allowed_types' => "png|jpg|pdf|xlsx",
-				'file_name'=> $nomcodif
-			];
-
-			$this->load->library("upload",$config);
+				'file_name'     => $nomcodif
+			));
 			if ($this->upload->do_upload('inputPDF')) {
-				
-				$data = array("upload_data" => $this->upload->data());
-				$extens = $data['upload_data']['file_ext'];//guardo extesnsion de archivo
-				$nomcodif = $nomcodif.$extens;
-				$adjunto = array('pred_adjunto' => $nomcodif);
-				$response['respNomImagen'] = $this->Predictivos->updateAdjunto($adjunto,$ultimoId);
-			}else{
-				$response['respImagen'] = false;
-			}				
-		}		
-		
-		// si todas las inserciones se hicieron devuelve true
-		if ($response['respPredictivo'] && $response['respHerram'] && $response['respInsumo']) {
-			$result = true;
-		} else {
-			$result = false;
-		}
-		echo json_encode($result);			
-	}
-
-	// Codifica nombre de imagen para no repetir en servidor
-	// formato "12_6_2018-05-21-15-26-24" idpreventivo_idempresa_fecha(año-mes-dia-hora-min-seg)
-	function codifNombre($ultimoId,$empId){
-
-		$guion = '_';
-		$guion_medio = '-';
-		$hora = date('Y-m-d H:i:s');// hora actual del sistema	
-		$delimiter = array(" ",",",".","'","\"","|","\\","/",";",":");
-		$replace = str_replace($delimiter, $delimiter[0], $hora);
-		$explode = explode($delimiter[0], $replace);
-		
-		$strigHora = $explode[0].$guion_medio.$explode[1].$guion_medio.$explode[2].$guion_medio.$explode[3];
-		
-		$nomImagen = $ultimoId.$guion.$empId.$guion.$strigHora;
-		
-		return $nomImagen;
-	}
-
-
-	// Trae info de Predictivo para editar - Listo 
-	public function getEditar(){
-
-		$id = $this->input->post('idpred');
-		$ide = $this->input->post('datos');
-		$result2 = $this->Predictivos->getInfopred($ide,$id);
-	
-		if($result2){
-
-			$arre['datos'] = $result2;
-			// trae herramientas 
-			$herramientas = $this->Predictivos->getPredictivoHerramientas($id);
-			if($herramientas){
-				$arre['herramientas']=$herramientas;
+				$this->Predictivos->updateAdjunto(array('pred_adjunto' => $nomcodif . $this->upload->data('file_ext')), $ultimoId);
 			}
-			else{ 
-				$arre['herramientas']=0;
-			}
-			// trae insumos
-			$insumos = $this->Predictivos->getPredictivoInsumos($id);
-			if($insumos){
-					$arre['insumos']=$insumos;
-			}
-			else{ $arre['insumos']=0;}
-
-			echo json_encode($arre);
 		}
-		else {
-			$arre['datos'] = 0;
-			echo json_encode($arre);
-		}	
-	}	
-
-	// Agrega adjunto desde modal edicion
-	public function agregarAdjunto(){
-		$userdata     = $this->session->userdata('user_data');
-		$empId        = $userdata[0]['id_empresa'];
-
-		$idPredictivo = $this->input->post('idAgregaAdjunto');
-
-		$nomcodif = $this->codifNombre($idPredictivo, $empId); // codificacion de nomb  		
-		$config   = [
-			"upload_path"   => "./assets/filespredictivos",
-			'allowed_types' => "png|jpg|pdf|xlsx",
-			'file_name'     => $nomcodif
-		];
-
-		$this->load->library("upload",$config);
-		if ($this->upload->do_upload('inputPDF'))
-		{
-			$data     = array("upload_data" => $this->upload->data());
-			$extens   = $data['upload_data']['file_ext'];//guardo extension de archivo
-			$nomcodif = $nomcodif.$extens;
-			$adjunto  = array('pred_adjunto' => $nomcodif);
-			$response = $this->Predictivos->updateAdjunto($adjunto, $idPredictivo);
-		}
-		else
-		{
-			$response = false;
-		}
-
-		echo json_encode($response);
-	}
-
-	// Guarda Predictivo editado -
-	public function updatePredictivo(){
-
-		$userdata = $this->session->userdata('user_data');
-		$empId = $userdata[0]['id_empresa'];
-		// datos
-			$id = $this->input->post('id_Predictivo');
-			$ta = $this->input->post('tarea');
-			$fe = $this->input->post('fecha');
-			$per = $this->input->post('periodo');
-			$can = $this->input->post('cantidad');
-			$hh = $this->input->post('horash');
-			$dur = $this->input->post('duracion');
-			$uTi = $this->input->post('unidad');
-			$op = $this->input->post('operarios');	
-		
-		$datos = array(	'tarea_descrip'=>$ta,
-						'fecha'=>$fe,
-						'periodo'=>$per,
-						'cantidad'=>$can,
-						'horash'=>$hh,
-						'estado'=>'C',
-						'pred_duracion'=>$dur,
-						'id_unidad'=>$uTi,
-						'pred_canth'=>$op						
-					);
-
-		$response['updatedatos'] = $this->Predictivos->updatePredictivos($datos,$id);
-		
-		if ($response['updatedatos']) {
-			// caso 1: hay herram/insumos cargadas y agrego mas
-			// caso 2: hay herram/insumos cargadas borra alguna
-			// caso 3: hay herram/insumos cargadas borra todas
-		
-			/// HERRAMIENTAS	
-				//saco array con herramientas y el id de empresa
-				$herr = $this->input->post('idsherramienta');
-				//saco array con cant de herramientas y el id de preventivo 
-				$cantHerr = $this->input->post('cantHerram');		
-				
-				if ( !empty($herr) ) {				
-					
-						$respdelHerr = $this->Predictivos->deleteHerramPred($id);// borr herram ant	  		
-						if ($respdelHerr) {
-							$i = 0;		  			
-							foreach ($herr as $h) {
-								$herramPrev[$i]['herrId']= $h;
-								$herramPrev[$i]['id_empresa']= $empId;
-								$i++;                                
-							} 
-							$z = 0;
-							foreach ($cantHerr as $c) {
-								$herramPrev[$z]['cantidad']= $c;
-								$herramPrev[$z]['predId']= $id;
-								$z++;                                
-							}
-						// Guarda el bacht de datos de herramientas
-						$response['respHerram'] = $this->Predictivos->insertPredHerram($herramPrev);
-						}
-				}else{
-					// se borran la herram
-					$respdelHerr = $this->Predictivos->deleteHerramPred($id);
-					$response['respHerram'] = $respdelHerr;	// no habia herramientas
-				}
-
-
-			/// INSUMOS	
-				//saco array con herramientas y el id de empresa
-				$ins = $this->input->post('idsinsumo');
-				//saco array con cant de herramientas y el id de preventivo			
-				$cantInsum = $this->input->post('cantInsum');
-				if ( !empty($ins) ){
-					// se borran la insum anteriores
-					$respdelInsum = $this->Predictivos->deleteInsumPred($id); 
-					$j = 0;
-					foreach ($ins as $in) {
-						$insumoPrev[$j]['artId'] = $in;
-						$insumoPrev[$j]['id_empresa'] = $empId;
-						$j++;                                
-					}
-					$z = 0;
-					foreach ($cantInsum as $ci) {
-						$insumoPrev[$z]['cantidad'] = $ci;
-						$insumoPrev[$z]['predId'] = $id;
-						$z++;                                
-					}
-					// Guarda el bacht de datos de herramientas
-					$response['respInsumo'] = $this->Predictivos->insertPredInsum($insumoPrev);
-				}else{
-					$respdelInsum = $this->Predictivos->deleteInsumPred($id); 
-					$response['respInsumo'] = $respdelInsum ;	// no habia insumos	  			
-				}	
-
-		}	
-
-		if ($response['updatedatos'] &&	$response['respHerram'] && $response['respInsumo']) {
-			$result = true;
-		} else {
-			$result = fase;
-		}		
-
 		echo json_encode($result);
 	}
 
-	//Cambia de estado a "AN"
-	public function baja_predictivo(){
-		
-		$idpre= $this->input->post('idpre');		
-		$datos = array('estado'=>"AN");
-
-		$result = $this->Predictivos->updatePredictivos($datos,$idpre);
-		if ($result) {
-			echo json_encode(true);
+	/**
+	* Predictivo a editar, con herramientas e insumos
+	*/
+	public function getEditar(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | getEditar()");
+		$id = $this->input->post('idpred');
+		$result2 = $this->Predictivos->getInfopred($this->input->post('datos'), $id);
+		if ($result2) {
+			$arre['datos'] = $result2;
+			$herramientas = $this->Predictivos->getPredictivoHerramientas($id);
+			$arre['herramientas'] = $herramientas ? $herramientas : 0;
+			$insumos = $this->Predictivos->getPredictivoInsumos($id);
+			$arre['insumos'] = $insumos ? $insumos : 0;
+		} else {
+			$arre['datos'] = 0;
 		}
-		else {
-			echo json_encode(false);
-		}
+		echo json_encode($arre);
 	}
 
+	/**
+	* Borra el nombre del adjunto del predictivo. En asset la vista llamaba a Preventivo/eliminarAdjunto con el id del
+	* predictivo, que borraba el adjunto del preventivo con ese número (T20); acá se borra el del predictivo (E12).
+	*/
+	public function eliminarAdjunto(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | eliminarAdjunto()");
+		echo json_encode($this->Predictivos->eliminarAdjunto($this->input->post('idprev')));
+	}
+
+	/**
+	* Agrega o reemplaza el adjunto (inputPDF)
+	* @return json array('pred_adjunto' => nombre) o false
+	*/
+	public function agregarAdjunto(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | agregarAdjunto()");
+		$idPredictivo = $this->input->post('idAgregaAdjunto');
+		// Solo registros de la empresa: si no, no se sube nada (asset no lo verificaba).
+		if (!$this->Predictivos->esDeLaEmpresa($idPredictivo)) {
+			echo json_encode(false);
+			return;
+		}
+		$nomcodif = $this->codifNombre($idPredictivo, man_empresa());
+		$this->load->library("upload", array(
+			"upload_path"   => man_asset_path() . "assets/filespredictivos",
+			'allowed_types' => "png|jpg|pdf|xlsx",
+			'file_name'     => $nomcodif
+		));
+		if ($this->upload->do_upload('inputPDF')) {
+			$response = $this->Predictivos->updateAdjunto(array('pred_adjunto' => $nomcodif . $this->upload->data('file_ext')), $idPredictivo);
+		} else {
+			$response = false;
+		}
+		echo json_encode($response);
+	}
+
+	/**
+	* Edita el predictivo y reemplaza herramientas e insumos
+	* @return json true si se guardó todo (asset devolvía la constante inexistente "fase" si fallaba, T10)
+	*/
+	public function updatePredictivo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | updatePredictivo()");
+		$datos = array(
+			'tarea_descrip' => $this->input->post('tarea'),
+			'fecha'         => $this->input->post('fecha'),
+			'periodo'       => $this->input->post('periodo'),
+			'cantidad'      => $this->input->post('cantidad'),
+			'horash'        => $this->input->post('horash'),
+			'pred_duracion' => $this->input->post('duracion'),
+			'id_unidad'     => $this->input->post('unidad'),
+			'pred_canth'    => $this->input->post('operarios')
+		);
+		$herramientas = man_detalle($this->input->post('idsherramienta'), $this->input->post('cantHerram'), 'herrId');
+		$insumos      = man_detalle($this->input->post('idsinsumo'), $this->input->post('cantInsum'), 'artId');
+		$r = $this->Predictivos->updatePredictivos($datos, $this->input->post('id_Predictivo'), $herramientas, $insumos);
+		echo json_encode($r['updatedatos'] && $r['respHerram'] && $r['respInsumo']);
+	}
+
+	/**
+	* Baja lógica (AN)
+	*/
+	public function baja_predictivo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivo | baja_predictivo()");
+		echo json_encode($this->Predictivos->baja_predictivos(array('estado' => "AN"), $this->input->post('idpre')));
+	}
+
+	/**
+	* Nombre codificado del archivo: id_empresa_fecha (año-mes-dia-hora-min-seg)
+	*/
+	private function codifNombre($ultimoId, $empId){
+		$hora = date('Y-m-d H:i:s');
+		$delimiter = array(" ", ",", ".", "'", "\"", "|", "\\", "/", ";", ":");
+		$explode = explode($delimiter[0], str_replace($delimiter, $delimiter[0], $hora));
+		return $ultimoId . '_' . $empId . '_' . $explode[0] . '-' . $explode[1] . '-' . $explode[2] . '-' . $explode[3];
+	}
+
+	/** Lista como json (array de filas), o "nada" si no hay. */
+	private function lista($filas){
+		if ($filas) {
+			echo json_encode(array_values($filas));
+		}
+		else echo "nada";
+	}
+
+	/**
+	 * Si la empresa no está vinculada con asset, muestra el aviso y devuelve false.
+	 */
+	private function empresaVinculada(){
+		if (man_empresa() === null) {
+			echo '<div class="alert alert-danger">La empresa no está vinculada con Mantenimiento. Contactá al administrador.</div>';
+			return false;
+		}
+		return true;
+	}
 }

@@ -43,7 +43,7 @@
                             echo '<i class="fa fa-fw fa-pencil text-light-blue" style="cursor: pointer; margin-left: 15px;" title="Editar" ></i>';
                             }   
                             if ($a['back_adjunto']) {
-                            echo '<a href="'.base_url().'assets/filesbacklog/'.$a['back_adjunto'].'" target="_blank"><i class="fa fa-file-pdf-o text-light-blue" style="cursor: pointer; margin-left: 15px;" title="Ver Archivo"></i></a>';
+                            echo '<a href="'.man_asset_url().'assets/filesbacklog/'.$a['back_adjunto'].'" target="_blank"><i class="fa fa-file-pdf-o text-light-blue" style="cursor: pointer; margin-left: 15px;" title="Ver Archivo"></i></a>';
                             }                          
                         }                     
                         echo '</td>';
@@ -120,8 +120,8 @@ $(document).ready(function(event) {
     $('#btnAgre').click(function cargarVista() {
         wo();
         $('#content').empty();
-        $("#content").load(
-            "<?php echo MAN; ?>Backlog/cargarback/<?php echo $permission; ?>", function() {
+        linkTo(
+            "<?php echo base_url(MAN); ?>Backlog/cargarback/<?php echo $permission; ?>", function() {
                 wc();
             });
     });
@@ -151,7 +151,7 @@ $(document).ready(function(event) {
                 idpred: idpred,
                 datos: datos
             },
-            url: 'index.php/Backlog/geteditar',
+            url: '<?php echo base_url(MAN); ?>Backlog/geteditar',
             success: function(data) {
                 console.table(data);
                 datos = {
@@ -222,7 +222,7 @@ function eliminarpred() {
         data: {
             gloid: gloid
         },
-        url: 'index.php/Backlog/baja_backlog_estado_Borrado',
+        url: '<?php echo base_url(MAN); ?>Backlog/baja_backlog_estado_Borrado',
         success: function(data) {
 
             Refrescar1();
@@ -368,7 +368,7 @@ function guardar() {
                 tareaOpcional: tareaOpcional,
                 tipo: 'edit'
             },
-            url: 'index.php/Backlog/editar_backlog',
+            url: '<?php echo base_url(MAN); ?>Backlog/editar_backlog',
             success: function(data) {
                 WaitingClose();
                 $('#modalSale').modal('hide');
@@ -400,7 +400,7 @@ function traer_equipo() {
     $.ajax({
         type: 'POST',
         data: {},
-        url: '<?php echo MAN; ?>Backlog/getequipo',
+        url: '<?php echo base_url(MAN); ?>Backlog/getequipo',
         success: function(data) {
             for (var i = 0; i < data.length; i++) {
                 var nombre = data[i]['codigo'];
@@ -433,7 +433,7 @@ var dataTarea = function() {
             'async': false,
             'type': "POST",
             'dataType': 'json',
-            'url': '<?php echo MAN;?>Preventivo/gettarea',
+            'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
             success: function(data) {
                 tmp = data;
             },
@@ -464,7 +464,7 @@ $(function() {
     $.ajax({
         type: 'POST',
         data: {},
-        url: '<?php echo MAN; ?>Preventivo/getUnidTiempo',
+        url: '<?php echo base_url(MAN); ?>Preventivo/getUnidTiempo',
         success: function(data) {
             var opcion = "<option value='-1'>Seleccione...</option>";
             $('#unidad').append(opcion);
@@ -521,7 +521,7 @@ $(function() {
     $.ajax({
         type: 'POST',
         data: {},
-        url: '<?php echo MAN; ?>Preventivo/getherramienta',
+        url: '<?php echo base_url(MAN); ?>Preventivo/getherramienta',
         success: function(data) {
             var opcion = "<option value='-1'>Seleccione...</option>";
             $('#herramienta').append(opcion);
@@ -547,7 +547,7 @@ $("#herramienta").change(function() {
         data: {
             id_herramienta: id_herramienta
         },
-        url: 'index.php/Preventivo/getdatos', //index.php/
+        url: '<?php echo base_url(MAN); ?>Preventivo/getdatos',
         success: function(data) {
 
             console.log(data);
@@ -606,7 +606,7 @@ $(function() {
     $.ajax({
         type: 'POST',
         data: {},
-        url: '<?php echo MAN; ?>Preventivo/getinsumo',
+        url: '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
         success: function(data) {
             var opcion = "<option value='-1'>Seleccione...</option>";
             $('#insumo').append(opcion);
@@ -635,7 +635,7 @@ $("#insumo").change(function() {
         data: {
             id_insumo: id_insumo
         },
-        url: 'index.php/Preventivo/getinsumo', //index.php/
+        url: '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
         success: function(data) {
             console.log(data);
             var d = data[0]['label'];
@@ -677,7 +677,7 @@ function Refrescar() {
 
     $('#content').empty();
     $('#modalSale').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Backlog/index/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Backlog/index/<?php echo $permission; ?>");
     WaitingClose();
     WaitingClose();
 }
@@ -686,7 +686,7 @@ function Refrescar1() {
 
     $('#content').empty();
     // $('#modalSale').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Backlog/index/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Backlog/index/<?php echo $permission; ?>");
     // WaitingClose();
     WaitingClose();
 }
@@ -719,14 +719,14 @@ function eliminarAdjunto() {
             },
             dataType: 'json',
             type: 'POST',
-            url: 'index.php/Preventivo/eliminarAdjunto',
+            url: '<?php echo base_url(MAN); ?>Backlog/eliminarAdjunto',
         })
         .done(function(data) {
             //console.table(data); 
             let prevAdjunto = '';
             recargaTablaAdjunto(prevAdjunto);
         })
-        .error(function(result) {
+        .fail(function(result) {
             console.error(result);
         });
 }
@@ -769,13 +769,13 @@ $("#formAgregarAdjunto").submit(function(event) {
                 dataType: 'json',
                 processData: false,
                 type: 'POST',
-                url: 'index.php/Backlog/agregarAdjunto',
+                url: '<?php echo base_url(MAN); ?>Backlog/agregarAdjunto',
             })
             .done(function(data) {
                 console.info("adjunto completo : " + data);
                 recargaTablaAdjunto(data['back_adjunto']);
             })
-            .error(function(result) {
+            .fail(function(result) {
                 console.error(result);
             });
     }
@@ -784,7 +784,7 @@ $("#formAgregarAdjunto").submit(function(event) {
 function recargaTablaAdjunto(backAdjunto) {
     console.info("adjunto: " + backAdjunto);
     $('#adjunto').text(backAdjunto);
-    $('#adjunto').attr('href', 'assets/filesbacklog/' + backAdjunto);
+    $('#adjunto').attr('href', '<?php echo man_asset_url(); ?>assets/filesbacklog/' + backAdjunto);
     if (backAdjunto == null || backAdjunto == '') {
         var accion =
             '<i class="fa fa-plus-square agregaAdjunto text-light-blue" style="color:#f39c12; cursor:pointer; margin-right:10px" title="Agregar Adjunto"></i>';

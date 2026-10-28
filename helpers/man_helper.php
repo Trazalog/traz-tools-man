@@ -85,6 +85,147 @@ if (!function_exists('man_escribir')) {
 }
 
 /*
+ * Cabecera con detalle de herramientas e insumos (Preventivo, Predictivo, Backlog).
+ *
+ * El alta es una operación encadenada (el detalle necesita el id de la cabecera), así que va por toolsMANAPI
+ * (ADR-014, regla 3), que compensa si falla. En la edición el detalle se borra y se vuelve a grabar; cada lista
+ * va en un pedido por lotes del DataService (una transacción): request_box no admite repetir una operación.
+ */
+if (!function_exists('man_alta_con_detalle')) {
+    /**
+     * @param string $entidad      preventivo | predictivo | backlog
+     * @param array  $cabecera     parámetros de POST /<entidad> de MANDataService (con id_empresa de asset)
+     * @param array  $herramientas lista de array(herrId, cantidad)
+     * @param array  $insumos      lista de array(artId, cantidad)
+     * @return string|false id de la cabecera creada
+     */
+    function man_alta_con_detalle($entidad, $cabecera, $herramientas, $insumos)
+    {
+        $ci =& get_instance();
+        $rsp = $ci->rest->callAPI('POST', HOST . '/tools/man/' . $entidad, array(
+            'cabecera'     => $cabecera,
+            'herramientas' => array_values($herramientas),
+            'insumos'      => array_values($insumos),
+        ));
+        $aux = $rsp['status'] ? json_decode($rsp['data'], true) : null;
+        if (empty($aux['status']) || empty($aux['id'])) {
+            log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | man_helper | man_alta_con_detalle(' . $entidad . ') >> ' . json_encode($rsp['data']));
+            return false;
+        }
+        return (string) $aux['id'];
+    }
+}
+
+if (!function_exists('man_lote_detalle')) {
+    /**
+     * Graba una lista de detalle en un solo pedido por lotes. Una lista vacía no hace nada y devuelve true.
+     * @param string $entidad preventivo | predictivo | backlog
+     * @param string $tipo    herramienta | insumo
+     * @param array  $filas   filas con los parámetros de POST /<entidad>/<tipo>
+     * @return int|bool cantidad de filas (lo que devolvía insert_batch() en asset), true si la lista está vacía, false si falla
+     */
+    function man_lote_detalle($entidad, $tipo, $filas)
+    {
+        if (empty($filas)) {
+            return true;
+        }
+        $op = '_post_' . $entidad . '_' . $tipo;
+        $rsp = wso2(REST_MAN . '/' . $entidad . '/' . $tipo . '_batch_req', 'POST', array($op . '_batch_req' => array($op => array_values($filas))));
+        return $rsp['status'] ? count($filas) : false;
+    }
+}
+
+if (!function_exists('man_detalle')) {
+    /**
+     * Arma la lista de detalle con los arrays paralelos que mandan las vistas de asset (ids y cantidades).
+     * @return array lista de array($campoId => id, 'cantidad' => cantidad)
+     */
+    function man_detalle($ids, $cantidades, $campoId)
+    {
+        $out = array();
+        if (empty($ids) || !is_array($ids)) {
+            return $out;
+        }
+        $cantidades = is_array($cantidades) ? array_values($cantidades) : array();
+        foreach (array_values($ids) as $i => $id) {
+            $out[] = array($campoId => (string) $id, 'cantidad' => isset($cantidades[$i]) ? man_numero($cantidades[$i]) : '0');
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('man_usuario')) {
+    /**
+     * Devuelve el usrId de asset (sisusers) del usuario de la sesión de tools, como string.
+     *
+     * Decisión MIG-ASSET E15 (2026-10-28), provisoria hasta MIG-5: el vínculo es el correo (usrNick de
+     * asset = usernick de tools) dentro de la empresa. Si no hay vínculo devuelve '0' y lo deja en el log,
+     * para que el registro no se pierda; MIG-5 fija la clave definitiva y sanea los usuarios.
+     */
+    function man_usuario()
+    {
+        $ci =& get_instance();
+        $nick = userNick();
+        $emp = man_empresa();
+        if (empty($nick) || $emp === null) {
+            return '0';
+        }
+
+        $cache = $ci->session->userdata('man_usuario');
+        if (is_array($cache) && $cache['nick'] === $nick && $cache['id_empresa'] === $emp) {
+            return $cache['usrId'];
+        }
+
+        $filas = man_lista(wso2(REST_MAN . '/usuario/empresa/' . $emp . '?usrNick=' . rawurlencode($nick)));
+        $usrId = $filas ? (string) $filas[0]['usrId'] : '0';
+        if ($usrId === '0') {
+            log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | man_helper | man_usuario() >> ' . $nick
+                . ' sin usuario en asset para la empresa ' . $emp . ' (se registra con usrId 0)');
+        }
+
+        $ci->session->set_userdata('man_usuario', array('nick' => $nick, 'id_empresa' => $emp, 'usrId' => $usrId));
+        return $usrId;
+    }
+}
+
+/*
+ * Valores para columnas numéricas y de fecha de assetv2.
+ *
+ * Decisión MIG-ASSET E13: la conexión de WSO2 es estricta y rechaza lo que MariaDB convertía sola
+ * (un texto vacío en una columna numérica o de fecha). Estas funciones hacen esa conversión antes de
+ * mandar el dato, para que quede lo mismo que guardaba asset. null se respeta (campo que no llegó).
+ */
+if (!function_exists('man_numero')) {
+    /** '' → '0'; '12abc' → '12' (como MariaDB); null → null. */
+    function man_numero($valor)
+    {
+        if ($valor === null) {
+            return null;
+        }
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return '0';
+        }
+        return is_numeric($valor) ? $valor : (string) (0 + floatval($valor));
+    }
+}
+
+if (!function_exists('man_fecha')) {
+    /** '' → fecha cero de MariaDB ('0000-00-00', con hora si $conHora); null → null. */
+    function man_fecha($valor, $conHora = false)
+    {
+        if ($valor === null) {
+            return null;
+        }
+        $valor = trim((string) $valor);
+        if ($valor === '') {
+            return $conHora ? '0000-00-00 00:00:00' : '0000-00-00';
+        }
+        return $valor;
+    }
+}
+
+/*
  * Archivos (PDF de componentes, adjuntos de equipos, imágenes de OT).
  *
  * Decisión MIG-ASSET E11 (2026-10-27): mientras asset siga en uso, MAN lee y escribe en la MISMA carpeta

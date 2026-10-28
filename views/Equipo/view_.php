@@ -7,10 +7,9 @@
       </div>
   </div>
 </div>
-<section class="content">
   <div class="row">
     <div class="col-xs-12">
-      <div class="box">
+      <div class="box box-primary">
         <div class="box-header">
           <h3 class="box-title">Equipo/Sector</h3>
           <?php
@@ -163,13 +162,12 @@
       </div>
     </div>
   </div>
-</section>
 
 <script>
 $('#listado').click( function(){
   wo();
   $('#content').empty();
-  $("#content").load("<?php echo MAN; ?>Equipo/index/<?php echo $permission; ?>");
+  linkTo("<?php echo base_url(MAN); ?>Equipo/index/<?php echo $permission; ?>");
   wc();
 });
 
@@ -180,7 +178,7 @@ function traer_area(){
     data: {},
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Equipo/getarea', 
+    url: '<?php echo base_url(MAN); ?>Equipo/getarea', 
     success: function(data){
       var opcion  = "<option value='-1'>Seleccione...</option>" ; 
       $('#area').append(opcion); 
@@ -203,7 +201,7 @@ function traer_proceso(){
  $.ajax({
    type: 'POST',
    data: { },
-   url: '<?php echo MAN; ?>Equipo/getproceso',
+   url: '<?php echo base_url(MAN); ?>Equipo/getproceso',
    success: function(data){
      var opcion = "<option value='-1'>Seleccione...</option>" ; 
      $('#proceso').append(opcion); 
@@ -227,7 +225,7 @@ function traer_criticidad(){
   $.ajax({
     type: 'POST',
     data: { },
-    url: '<?php echo MAN; ?>Equipo/getcriti', 
+    url: '<?php echo base_url(MAN); ?>Equipo/getcriti', 
     success: function(data){
       var opcion = "<option value='-1'>Seleccione...</option>" ; 
       $('#criticidad').append(opcion); 
@@ -250,7 +248,7 @@ function traer_etapa(){
   $.ajax({
     type: 'POST',
     data: { },
-    url: '<?php echo MAN; ?>Equipo/getetapa',
+    url: '<?php echo base_url(MAN); ?>Equipo/getetapa',
     success: function(data){
       var opcion  = "<option value='-1'>Seleccione...</option>" ; 
       $('#etapa').append(opcion); 
@@ -275,7 +273,7 @@ function traer_grupo(){
     data: { },
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Equipo/getgrupo', 
+    url: '<?php echo base_url(MAN); ?>Equipo/getgrupo', 
     success: function(data){
       console.log("estoy en area");
       console.log(data);
@@ -301,7 +299,7 @@ function traer_cliente(){
     data: { },
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Equipo/getcliente', 
+    url: '<?php echo base_url(MAN); ?>Equipo/getcliente', 
     success: function(data){
       console.log("estoy en cliente");
       console.log(data);
@@ -328,7 +326,7 @@ function traer_marca(){
     data: { },
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Equipo/getmarca', 
+    url: '<?php echo base_url(MAN); ?>Equipo/getmarca', 
     success: function(data){
       var opcion  = "<option value='-1'>Seleccione...</option>" ; 
       $('#marca').append(opcion); 
@@ -360,7 +358,7 @@ function guardararea(){
       data:{parametros:parametros},
       dataType: 'json',
       type:"POST",
-      url: "<?php echo MAN; ?>Equipo/agregar_area",
+      url: "<?php echo base_url(MAN); ?>Equipo/agregar_area",
       success: function(data){
         var datos = parseInt(data);
         console.log("ID area: " + datos);
@@ -397,7 +395,7 @@ function guardarproceso(){
       dataType: 'json',
       data:{parametros:parametros},
       type:"POST",
-      url: "<?php echo MAN; ?>Equipo/agregar_proceso", 
+      url: "<?php echo base_url(MAN); ?>Equipo/agregar_proceso", 
       success: function(data){
         var datos = parseInt(data);
         console.log("ID proceso: " + datos);
@@ -436,7 +434,7 @@ function guardarcri(){
     wo();
     $.ajax({
       type:"POST",
-      url: "<?php echo MAN; ?>Equipo/agregar_criti", 
+      url: "<?php echo base_url(MAN); ?>Equipo/agregar_criti", 
       dataType: 'json',
       data:{parametros:parametros},
       success: function(data){
@@ -479,7 +477,7 @@ function guardaretapa(){
       data:{parametros:parametros},
       dataType: 'json',
       type:"POST",
-      url: "<?php echo MAN; ?>Equipo/agregar_etapa", 
+      url: "<?php echo base_url(MAN); ?>Equipo/agregar_etapa", 
       success: function(data){
         var datos= parseInt(data);
         console.log("ID etapa: " + datos);
@@ -520,7 +518,7 @@ function guardargrupo(){
       data:{parametros:parametros},
       dataType: 'json',
       type:"POST",
-      url: "<?php echo MAN; ?>Equipo/agregar_grupo", 
+      url: "<?php echo base_url(MAN); ?>Equipo/agregar_grupo", 
       success: function(data){
         var datos = parseInt(data);
         console.log("ID grupo: " + datos);
@@ -579,7 +577,7 @@ function guardarCliente(){
       data:{parametros:parametros},
       dataType: 'json',
       type:"POST",
-      url: "<?php echo MAN; ?>Equipo/agregar_cliente",
+      url: "<?php echo base_url(MAN); ?>Equipo/agregar_cliente",
       success: function(data){
         var datos= parseInt(data);
         console.log("ID cliente: " + datos);
@@ -618,7 +616,7 @@ function guardarmarca(){
       data:{parametros:parametros},
       dataType: 'json',
       type: 'POST',
-      url: "<?php echo MAN; ?>Equipo/agregar_marca", 
+      url: "<?php echo base_url(MAN); ?>Equipo/agregar_marca", 
       success: function(data){
         var datos= parseInt(data);
         console.log("ID marca: " + datos);
@@ -667,7 +665,7 @@ $("#formAgregarEquipo").submit( function (event){
       data:formData,
       dataType: 'json',
       processData:false,
-      url: '<?php echo MAN; ?>Equipo/guardar_equipo',
+      url: '<?php echo base_url(MAN); ?>Equipo/guardar_equipo',
       type: 'POST',
       success: (data) => {
         const confirm = Swal.mixin({
@@ -754,7 +752,7 @@ function validarCampos(){
 // Recarga vista list
 function regresa(){
   $('#content').empty();
-  $("#content").load("<?php echo MAN; ?>Equipo/index/<?php echo $permission; ?>");
+  linkTo("<?php echo base_url(MAN); ?>Equipo/index/<?php echo $permission; ?>");
   wc();    
 }
 </script>

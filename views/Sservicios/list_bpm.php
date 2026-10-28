@@ -1,160 +1,733 @@
-<!-- <section class="content"> -->
-    <div class="box box-primary">
-        <div class="box-header with-border">
-            <h4 class="box-title">Solicitudes de Servicios</h4>
-        </div>
+<style>
+.switch {
+    position: relative;
+    display: inline-block;
+    width: 40px;
+    height: 20px;
+}  
+.switch input {display:none;}  
+.slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    -webkit-transition: .4s;
+    transition: .4s;
+}  
+.slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    -webkit-transition: .4s;
+    transition: .4s;
+}  
+input:checked + .slider {
+    background-color: #2196F3;
+}  
+input:focus + .slider {
+    box-shadow: 0 0 1px #2196F3;
+}  
+input:checked + .slider:before {
+    -webkit-transform: translateX(19px);
+    -ms-transform: translateX(19px);
+    transform: translateX(19px);
+}  
+/* Rounded sliders */
+  .slider.round {
+    border-radius: 34px;
+}  
+.slider.round:before {
+    border-radius: 50%;
+}
+.oculto {
+  display: none;
+}
+</style>
+<input type="hidden" id="permission" value="<?php echo $permission;?>"> 
+  <div class="row">
+    <div class="col-xs-12">
+      <div class="box box-primary">
+        <div class="box-header">
+          <div class="col-xs-12">
+            <h3 class="box-title">Solicitudes de Servicios</h3>
+          </div>
+          <?php
+           if (strpos($permission,'Add') !== false) {
+              echo '<div class="col-xs-4"><button class="btn btn-block btn-primary" style="width: 100px; margin-top: 10px;" data-toggle="modal" data-target="#modalservicio" id="btnAdd">Agregar</button></div>';
+           }          
+          ?>
+          <div class="col-xs-8" style="text-align: center;">
+            <div class="form-check">
+              <label style="margin-right: 10px;">Mostrar solicitudes conformes</label>
+            </div>
+              <label class="switch">
+                <input type="checkbox" id="check-conformes" >
+                <span class="slider round"></span>
+              </label>
+          </div><!-- /.col-xs-12 -->
+        </div><!-- /.box-header -->
         <div class="box-body">
+          <table id="servicio" class="table table-striped table-hover" style="width:100%;table-layout: fixed;">
+            <thead>
+              <tr>
+                <th width="2%">Acciones</th>
+                <th>Nro</th>
+                <th>Nro de OT</th>
+                <th>Fecha</th>
+                <th>Fecha Fin</th>
+                <th>T. de ciclo</th>
+                <th>T. Asignación</th>
+                <th>T. Generación</th>
+                <th>Solicitante</th>
+                <th>Equipo</th>
+                <th>Sector</th>
+                <th>Grupo</th>
+                <th>Causa</th>
+                <th>Mantenedor</th>
+                <th>Estado</th>
+              </tr>
+            </thead>
+            <tbody>
+             
+            </tbody>
+          </table>
+        </div><!-- /.box-body -->
+      </div><!-- /.box -->
+    </div><!-- /.col 8 -->
+  </div><!-- /.row -->
+
+
+<!--  MODAL asignar Responsable y tareas   -->
+<div class="modal bs-example-modal-lg" id="modalRespyTareas" tabindex="-1" role="dialog"
+    aria-labelledby="myLargeModalLabel">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+                <h4 class="modal-title">Asignar Responsable y Tareas</h4>
+            </div>
+
             <div class="row">
-                <div class="col-md-3">
-                    <button class="btn btn-block btn-primary" style="width: 100px; margin-top: 10px;" data-toggle="modal" data-target="#modalservicio" id="btnAdd">Agregar</button>
-                </div>
-                <div class="col-md-5">
-                    <div id="botonToggleOnOff" style="text-align: center;" class="form-group">
-                        <div class="form-check">
-                            <label class="checkboxtext">Mostrar solicitudes conformes</label>
+                <div class="col-sm-12">
+                    <div class="box">
+                        <div class="box-body">
+                            <div class="row">
+                                <div class="col-sm-12 col-md-12" id="contRespyTareas">
+
+
+                                </div>
+                            </div>
                         </div>
-                        <label class="switch">
-                            <input type="checkbox" id="check-conformes" onclick="showSolicitudesConformes()">
-                            <span class="slider round"></span>
-                        </label>
                     </div>
                 </div>
             </div>
-            <div class="box-body table-scroll table-responsive">
-                <table id="servicio" class="table table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th class="text-center">Acciones</th>
-                            <th>Nro</th>
-                            <th>Fecha</th>
-                            <th>Fecha Fin</th>
-                            <th>T. de ciclo</th>
-                            <th>T. Asignación</th>
-                            <th>T. Generación</th>
-                            <th>Solicitante</th>
-                            <th>Equipo</th>
-                            <th>Sector</th>
-                            <th>Grupo</th>
-                            <th>Causa</th>
-                            <th>Mantenedor</th>
-                            <th>Estado</th>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para eliminar solicitud -->
+<div class="modal fade" id="modalVerOT" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-lg" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                        aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title">Orden de Trabajo</h4>
+            </div>
+            <div class="modal-body">
+                <div class="panel-group" id="accordion" role="tablist" aria-multiselectable="true">
+                    <div class="panel panel-default">
+                        <div class="panel-heading" role="tab" id="headingOne">
+                            <h4 class="panel-title">
+                                <a role="button" data-toggle="collapse" data-parent="#accordion" href="#collapseOt"
+                                    aria-expanded="true" aria-controls="collapseOt">
+                                    Datos de OT
+                                </a>
+                            </h4>
+                        </div>
+                        <div id="collapseOt" class="panel-collapse collapse in" role="tabpanel"
+                            aria-labelledby="headingOne">
+                            <div class="panel-body">
+                                <div class="row">
+                                    <div class="col-xs-12 col-sm-3">
+                                        <label for="vIdOt">Nº de OT:</label>
+                                        <input type="text" class="form-control" name="vIdOt" id="vIdOt" disabled>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-9">
+                                        <label for="vDescripFalla">Descripción:</label>
+                                        <input type="text" class="form-control vDescripFalla" id="vDescripFalla" disabled>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 col-md-3">
+                                        <label for="vFechaProgram">Fecha Programación:</label>
+                                        <input type="text" class="form-control" name="vFechaProgram" id="vFechaProgram" disabled>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 col-md-3">
+                                        <label for="vFechaCreacion">Fecha Inicio:</label>
+                                        <input type="text" class="form-control" name="vFechaCreacion" id="vFechaCreacion" disabled>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 col-md-3">
+                                        <label for="vFechaTerminOT">Fecha Terminada:</label>
+                                        <input type="text" class="form-control" name="vFechaTerminOT" id="vFechaTerminOT" disabled>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 col-md-3">
+                                        <label for="vEstado">Estado:</label>
+                                        <input type="text" class="form-control" name="vEstado" id="vEstado" disabled>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" data-dismiss="modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para eliminar solicitud -->
+<div class="modal fade" id="modalEliminarSolicitud" tabindex="-1" role="dialog" aria-labelledby="modalEliminarSolicitudLabel">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title" id="modalEliminarSolicitudLabel">Eliminar Solicitud</h4>
+      </div>
+      <div class="modal-body">
+        <form id="formEliminarSolicitud">
+          <input type="hidden" id="idSolicitud" name="id_solicitud">
+          <input type="hidden" id="case_id" name="case_id">
+          <div class="form-group">
+            <label for="motivoEliminacion">Motivo de eliminación:</label>
+            <textarea class="form-control" id="motivoEliminacion" name="motivoEliminacion" rows="3" required></textarea>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-danger" onclick="confirmarEliminacion()">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Ver Orden de Trabajo Solicitud de Servicio-->
+<div class="modal" id="verOtSolServicio" tabindex="-1" role="dialog">
+  <div class="modal-dialog modal-lg" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+        <h4 class="modal-title">Solicitud de servicio</h4>
+      </div>
+      <div class="modal-body">
+        
+        <div class="panel-group" id="accordionSolServicio" role="tablist" aria-multiselectable="true">
+          <div class="panel panel-default">
+            <div class="panel-heading" role="tab" id="headingOneSolServicio">
+              <h4 class="panel-title">
+                <a role="button" data-toggle="collapse" data-parent="#accordionSolServicio" href="#collapseOtSolServicio" aria-expanded="true" aria-controls="collapseOtSolServicio">
+                  Datos
+                </a>
+              </h4>
+            </div>
+            <div id="collapseOtSolServicio" class="panel-collapse collapse in" role="tabpanel" aria-labelledby="headingOneSolServicio">
+              <div class="panel-body">
+
+                <div class="row">
+                  <!-- <div class="col-xs-12 col-sm-6">
+                    <label for="vIdOtSolServicio">Nº de SS:</label>
+                    <input type="text" class="form-control " name="vIdOtSolServicio" id="vIdOtSolServicio" disabled>
+                  </div> -->
+                 
+                  <div class="col-xs-12 col-sm-6">
+                    <label for="vSector">Sector:</label>
+                    <input type="text" class="form-control vSector" id="vSector" disabled>
+                  </div>
+
+                  <div class="col-xs-12 col-sm-6 col-md-6">
+                    <label for="vEquipo">Equipo:</label>
+                    <input type="text" class="form-control " name="vEquipo" id="vEquipo" disabled>
+                  </div>
+                  <div class="col-xs-12 col-sm-6 col-md-6">
+                    <label for="vArea">Area:</label>
+                    <input type="text" class="form-control " name="vArea" id="vArea" disabled>
+                  </div>
+                  <div class="col-xs-12 col-sm-6 col-md-6">
+                    <label for="vProceso">Proceso:</label>
+                    <input type="text" class="form-control " name="vProceso" id="vProceso" disabled>
+                  </div>
+                  <div class="col-xs-12">
+                    <label for="vDescripcion">Descripción:</label>
+                    <Textarea class="form-control " name="vDescripcion" id="vDescripcion" disabled></Textarea>
+                  </div>
+                  
+                  <div class="col-xs-12">
+                    <label for="vFalla">Falla:</label>
+                    <Textarea class="form-control " name="vFalla" id="vFalla" disabled></Textarea>
+                  </div>
+
+                  <!-- Nuevos campos para motivo, ID usuario y fecha de eliminación -->
+                  <div class="col-xs-12" style="margin-top: 30px;">
+                    <label for="motivo_eliminada" class="oculto">Motivo de Eliminación:</label>
+                    <textarea class="form-control" id="motivo_eliminada" name="motivo_eliminada" class="oculto" disabled></textarea>
+                  </div>
+                  <div class="col-xs-12 col-sm-6">
+                    <label for="fecha_eliminada" class="oculto">Fecha de Eliminación:</label>
+                    <input type="date" class="form-control oculto" id="fecha_eliminada" name="fecha_eliminada" disabled>
+                  </div>
+                  <div class="col-xs-12 col-sm-6">
+                    <label for="hora_eliminada" class="oculto">Hora de Eliminación:</label>
+                    <input type="time" class="form-control oculto" id="hora_eliminada" name="hora_eliminada" disabled>
+                  </div>
+                  <div class="col-xs-12 col-sm-6">
+                    <label for="nombre_usuario" class="oculto">Usuario que Eliminó:</label>
+                    <input type="text" class="form-control oculto" id="nombre_usuario" name="nombre_usuario" disabled>
+                  </div>
+                  <!-- Fin de nuevos campos -->  
+                </div>
+
+              </div>
+            </div>
+          </div> 
+          <br>
+          <div class="panel-group" id="panelAdj" role="tablist" aria-multiselectable="true">
+          <div class="panel panel-default">
+            <div class="panel-heading" role="tab" id="headingOneSolServicio">
+              <h4 class="panel-title">
+                <a role="button" data-toggle="collapse" data-parent="#panelAdj" href="#collapseadj" aria-expanded="false" aria-controls="collapseadj">
+                  Adjunto
+                </a>
+              </h4>
+            </div>
+            <div id="collapseadj" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingOneSolServicio">
+              <div class="panel-body">
+                <div class="row">
+                  <div class="col-xs-12">
+                    <table class="table table-bordered" id="tbladjSolicitud"> 
+                      <thead>
+                        <tr>                                       
+                          <th>Archivo/s</th>
                         </tr>
-                    </thead>
-                    <tbody>
-                    <?php
-                    if(!empty($list)){
-                        foreach($list as $s){
+                      </thead>
+                      <tbody>
+                      <tr>                                     
+                        <td>
+                          <a id="adjunto" href="" target="_blank"></a> 
+                        </td>
+                      </tr>
+                      </tbody>
+                    </table>
+                  </div><!-- ./col-xs-12 -->
+                </div><!-- ./row -->
+                <div class="row">
+                  <div class="col-md-12 col-xs-12 col-lg-12">
+                    <div id="adjuntosGallery">
+                    </div>
+                  </div>
+                </div><!-- /.row -->
+              </div><!-- ./panel-body -->
+            </div>
+          </div> 
+
+          <!-- vista herramientas -->
+          <div class="panel panel-default" hidden>
+            <div class="panel-heading" role="tab" id="headingThreePred">
+              <h4 class="panel-title">
+                <a class="collapsed" role="button" data-toggle="collapse" data-parent="#accordionBack" href="#collapseTareaSolicitudInsHerr" aria-expanded="false" aria-controls="collapseTareaSolicitudInsHerr">
+                  Herramientas - Tareas - Insumos
+                </a>
+              </h4>
+            </div>
+            <div id="collapseTareaSolicitudInsHerr" class="panel-collapse collapse" role="tabpanel" aria-labelledby="headingThreePred">
+              <div class="panel-body">
+                
+                  <div class="row">
+                      <div class="col-xs-12">
+                        <div class="nav-tabs-custom">
+                          <!--tabs -->
+                          <ul class="nav nav-tabs" role="tablist">                
+                            <li role="presentation" class="active"><a href="#herrSolicitu" aria-controls="profile" role="tab" data-toggle="tab">Herramientas</a></li>
+                            <li role="presentation"><a href="#insumSolicitu" aria-controls="messages" role="tab" data-toggle="tab">Insumos</a></li>
+                            <li role="presentation"><a href="#TabAdjuntoSolicitud" aria-controls="messages" role="tab" data-toggle="tab">Adjunto</a></li>                        
+                          </ul>
+                          <!-- /tabs -->
+        
+                          <!-- Tab panes -->
+                          <div class="tab-content">
+                            <div role="tabpanel" class="tab-pane active" id="herrSolicitu">
+                              
+                              <div class="row">
+                                <div class="col-xs-12">
+                                  <br>
+                                  <table class="table table-bordered" id="tblherrsolicitud"> 
+                                    <thead>
+                                      <tr>             
+                                        <th>Código</th>
+                                        <th>Marca</th>
+                                        <th>Descripcion</th>
+                                        <th>Cantidad</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                  </table>  
+                                </div>
+                              </div><!-- /.row -->
+                            </div> <!-- /.tabpanel #herramin--> 
+        
+                            <div role="tabpanel" class="tab-pane" id="insumSolicitu">
                             
-                            $fecTerminada = $s['fecha_terminada'];
+                              <div class="row">
+                              
+                              </div><!-- /.row -->
+                              <div class="row">
+                                <div class="col-xs-12">
+                                  <table class="table table-bordered" id="tblinsSolicitud"> 
+                                    <thead>
+                                      <tr>    
+                                        <th>Código</th>
+                                        <th>Descripcion</th>
+                                        <th>Cantidad</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody></tbody>
+                                  </table>  
+                                </div>
+                              </div><!-- /.row -->
+                            </div><!--/#insum -->
+        
+                            <div role="tabpanel" class="tab-pane" id="TabAdjuntoSolicitud">
+                              <div class="row" >  
+                              
+                                <div class="col-xs-12">
+                                  <table class="table table-bordered" id="tbladjSolicitud"> 
+                                    <thead>
+                                      <tr>                                       
+                                        <th>Archivo/s</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      
+                                    </tbody>
+                                  </table>
+                                </div>
+                  
+                              </div>
+                            </div><!--cierre de TabAdjunto--> 
+                            
+                          </div>  <!-- tab-content -->
+                          
+                        </div><!-- /.nav-tabs-custom -->
+                      </div>
+                    </div>
+              </div>
+            </div>
+          </div>
+          <!--  ./vista herramientas -->
 
-                            echo "<tr id=" . $s["id_solicitud"] . " class='" . $s['id_equipo'] . "' data-json='" . json_encode($rsp) . "'>";
+        </div>
 
-                            echo "<td class='text-center text-light-blue'>";
-                            echo '<i class="fa fa-search"  style="cursor: pointer;margin: 3px;" title="Ver solicitud" onclick="mostrarOT(this)"></i>';
-                            echo "</td>";
-                            echo '<td class="text-center">'.$s['id_solicitud'].'</td>';
-                            echo '<td class="text-center">'.$s['f_solicitado'].'</td>';
-                            //fecha fin
-                            if ( ($fecTerminada == '0000-00-00 00:00:00') || ($fecTerminada == '') ) {
-                                echo '<td class="text-center"> S/Fecha</td>';
-                            } else {
-                                echo '<td class="text-center">'.$fecTerminada.'</td>';
-                            }
-                            //tiempo de ciclo
-                            if(!is_null($s['f_asignacion']) && !is_null($s['f_inicio']) && $s['f_inicio'] != '0000-00-00 00:00:00'){
-                                $f_asignacion = new DateTime($s['f_asignacion']);
-                                $f_solicitado = new DateTime($s['f_solicitado']);
-                                $intervalo = $f_solicitado->diff($f_asignacion);
-                                $horas = $intervalo->format('%h');
-                                $minutos = $intervalo->format('%i');
-                                $minutos = str_pad($minutos, 2, '0', STR_PAD_LEFT);
-                                $t_genracion = "$horas:$minutos";                          
-                                echo '<td class="text-center">'.$t_genracion.'</td>';
-                            }else{
-                                echo '<td class="text-center">S/Datos</td>';
-                            }
-                            //tiempo asignacion
-                            if(!is_null($f['f_asignacion']) && !is_null($f['f_inicio']) && $f['f_inicio'] != '0000-00-00 00:00:00'){
-                                $f_asignacion = new DateTime($s['f_asignacion']);
-                                $f_solicitado = new DateTime($s['f_solicitado']);
-                                $intervalo = $f_solicitado->diff($f_asignacion);
-                                $horas = $intervalo->format('%h');
-                                $minutos = $intervalo->format('%i');
-                                $minutos = str_pad($minutos, 2, '0', STR_PAD_LEFT);
-                                $t_genracion = "$horas:$minutos";                          
-                                echo '<td class="text-center">'.$t_genracion.'</td>';
-                            }else{
-                                echo '<td class="text-center">S/Datos</td>';
-                            }
-                            if(!is_null($f['f_asignacion']) && !is_null($f['f_inicio']) && $f['f_inicio'] != '0000-00-00 00:00:00'){
-                                $f_asignacion = new DateTime($f['f_asignacion']);
-                                $f_solicitado = new DateTime($f['f_solicitado']);
-                                $intervalo = $f_solicitado->diff($f_asignacion);
-                                $horas = $intervalo->format('%h');
-                                $minutos = $intervalo->format('%i');
-                                // Rellena los minutos con ceros a la izquierda si es necesario
-                                $minutos = str_pad($minutos, 2, '0', STR_PAD_LEFT);
-                                $t_genracion = "$horas:$minutos";                          
-                                echo '<td class="text-center">'.$t_genracion.'</td>';
-                            }else{
-                                echo '<td class="text-center">S/Datos</td>';
-                            }
-                            echo '<td class="text-center">'.$s['solicitante'].'</td>';
-                            echo '<td class="text-center">'.$s['equipo'].'</td>';
-                            echo '<td class="text-center">'.$s['sector'].'</td>';
-                            echo '<td class="text-center">'.$s['grupo'].'</td>';  
-                            echo '<td class="text-center">'.$s['causa'].'</td>';
-                            echo '<td class="text-center">'.$s['mantenedor'].'</td>';
-                            switch ($s['estado']) {
-                                case 'S':
-                                    echo '<td class="text-center"><span data-toggle="tooltip" title="Solicitada" class="badge bg-red">Solicitada</span></td>';
-                                    break;
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cerrar</button>
+      </div>
+    </div><!-- /.modal-content -->
+  </div><!-- /.modal-dialog -->
+</div><!-- /.modal -->
 
-                                case 'PL':
-                                    echo '<td class="text-center"><span data-toggle="tooltip" title="Planificada" class="badge bg-yellow">Planificada</span></td>';
-                                    break;
+<script>  
+  //calculo diferencia entre horas
+  function calculateTimeDiff(start, end) {
+      if (!start || !end || start === '0000-00-00 00:00:00' || end === '0000-00-00 00:00:00') {
+          return 'S/Datos';
+      } else {
+          let startDate = new Date(start);
+          let endDate = new Date(end);
+          let diff = endDate - startDate;
+          let hours = Math.floor(diff / 3600000);
+          let minutes = Math.floor((diff % 3600000) / 60000);
+          return `${hours}:${minutes.toString().padStart(2, '0')}`;
+      }
+  }
 
-                                case 'AS':
-                                    echo '<td class="text-center"><span data-toggle="tooltip" title="Asignada" class="badge bg-purple">Asignada</span></td>';
-                                    break;
+  function bolita(text, color) {
+      return `<small class="label pull-left bg-${color}">${text}</small>`;
+  }  
+       
+  $(document).ready(function() {
 
-                                case 'C':
-                                    echo '<td class="text-center"><span data-toggle="tooltip" title="Curso" class="badge bg-green">Curso</span></td>';
-                                    break;
-
-                                case 'T':
-                                    echo '<td class="text-center"><span data-toggle="tooltip" title="Terminada" class="badge bg-blue">Terminada</span></td>';
-                                    break;
-
-                                case 'CE':
-                                    echo '<td class="text-center"><span data-toggle="tooltip" title="Cerrada" class="badge bg-default">Cerrada</span></td>';
-                                    break;
-
-                                case 'CN':
-                                    echo '<td class="text-center"><span data-toggle="tooltip" title="Conforme" class="badge bg-black">Conforme</span></td>';
-                                    break;
-
-                                default:
-                                    echo '<td class="text-center"><span data-toggle="tooltip" title="'.$estado.'" class="btn btn-secondary">'.$estado.'</span></td>';
-                                    break;
-                            }
-                            echo '</tr>';
-                        }
+    var table = $('#servicio').DataTable({
+        'ordering': true,
+        'lengthMenu': [[10, 25, 50, 100], [10, 25, 50, 100]],
+        'paging': true,
+        'processing': true,
+        'serverSide': true,
+        'order': [[1, 'desc']],
+        'ajax': {
+            'url': '<?php echo base_url(MAN); ?>Sservicio/paginado',
+            'type': 'POST',
+            'data': function(d) {
+                d.showConformes = $('#check-conformes').is(':checked'); // Agrega el parámetro showConformes
+            }
+        },
+        'columns': [
+            {
+                "data": null,
+                "render": function(data, type, row) {
+                    var r = `<a onclick='mostrarOT(${JSON.stringify(row)})' href="#" title="Consultar"><i class="fa fa-search text-white" style="cursor: pointer;margin-left:-3px"></i></a>`;
+                    r = r + `<td>`;
+                    if (row.estado === 'S') {
+                      var r = r + `<a onclick='mostrarModalEliminacion(${JSON.stringify(row)})' href="#" title="Eliminar"><i class="fa fa-trash text-white" style="cursor: pointer; margin-left: 15px;"></i></a>`;
                     }
-                    ?>
-                    </tbody>
-                </table>
-            </div><!--FIN box-body table-scroll table-responsive -->
-        </div><!--FIN box-body -->
-    </div><!--FIN box-primary -->
-<!-- </section> -->
-<script>
+                    if (row.estado === 'AS') {
+                      var r = r + `<a onclick='mostrarModalEditarResponsable(${JSON.stringify(row)})' href="#" title="Editar Asignado"><i class="fa fa-user text-white" style="cursor: pointer; margin-left: 15px;"></i></a>`;
+                    }
+                    return r = r + `</td>`;
+                }
+            },
+            { "data": "id_solicitud" },
+            {
+                "data": "id_orden",
+                "render": function(data, type, row) {
+                    if (data) {
+                        return `<button class="btn btn-warning" onclick='abrirModal(${JSON.stringify(row)})'>${data}</button>`;
+                    } else {
+                        return '';
+                    }
+                }
+            },
+            { "data": "f_solicitado" },
+            {
+                "data": "fecha_terminada",
+                "render": function(data, type, row) {
+                    return (data == '0000-00-00 00:00:00' || data == '') ? 'S/Fecha' : data;
+                }
+            },
+            {
+                "data": null,
+                "render": function(data, type, row) {
+                    return calculateTimeDiff(row.f_solicitado, row.f_asignacion);
+                }
+            },
+            {
+                "data": null,
+                "render": function(data, type, row) {
+                    return calculateTimeDiff(row.f_asignacion, row.f_inicio);
+                }
+            },
+            {
+                "data": null,
+                "render": function(data, type, row) {
+                    return calculateTimeDiff(row.f_solicitado, row.f_asignacion);
+                }
+            },
+            { "data": "solicitante" },
+            { "data": "equipo" },
+            { "data": "sector" },
+            { "data": "grupo" },
+            { "data": "causa" },
+            { "data": "mantenedor" },
+            {
+                "data": "estado",
+                "render": function(data, type, row) {
+                    let colors = {
+                        'EL': 'light-blue',
+                        'S': 'red',
+                        'PL': 'yellow',
+                        'AS': 'purple',
+                        'C': 'green',
+                        'T': 'blue',
+                        'CE': 'gray',
+                        'CN': 'black'
+                    };
+                    let labels = {
+                        'EL': 'Eliminada',
+                        'S': 'Solicitada',
+                        'PL': 'Planificada',
+                        'AS': 'Asignada',
+                        'C': 'Curso',
+                        'T': 'Terminada',
+                        'CE': 'Cerrada',
+                        'CN': 'Conforme'
+                    };
+                    return bolita(labels[data], colors[data]);
+                }
+            }
+        ]
+    });
 
+    $('#check-conformes').on('change', function() {
+        table.ajax.reload();
+    });
+});
+
+function abrirModal(rowData) {
+    // Función para formatear fechas
+    function formatDate(datetime) {
+        if (!datetime || datetime === '0000-00-00 00:00:00') {
+            return 'Sin fecha';
+        }
+        const date = new Date(datetime);
+        const options = {
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit', 
+            hour: '2-digit', 
+            minute: '2-digit', 
+            second: '2-digit'
+        };
+        return date.toLocaleDateString('es-AR', options);
+    }
+
+    // Rellenar el modal con los datos formateados
+    $('#vIdOt').val(rowData.id_orden || '');
+    $('#vDescripFalla').val(rowData.descripcion || 'Sin descripción');
+    $('#vFechaProgram').val(formatDate(rowData.fecha_program));
+    $('#vFechaCreacion').val(formatDate(rowData.f_inicio));
+    $('#vFechaTerminOT').val(formatDate(rowData.fecha_terminada));
+    
+    // Mapeo de estados
+    let estadoLabels = {
+        'EL': 'Eliminada',
+        'S': 'Solicitada',
+        'PL': 'Planificada',
+        'AS': 'Asignada',
+        'C': 'Curso',
+        'T': 'Terminada',
+        'CE': 'Cerrada',
+        'CN': 'Conforme'
+    };
+    $('#vEstado').val(estadoLabels[rowData.estado] || rowData.estado || '');
+
+    // Mostrar el modal
+    $('#modalVerOT').modal('show');
+}
+
+/*function mostrarModalEliminacion(row) {
+  console.log(row);
+  Swal.fire({
+      title: 'Atención!',
+      text: 'Solo los usuarios solicitantes pueden eliminar solicitudes!',
+      confirmButtonText: 'Aceptar',
+    }).then((result) => {
+      if (result.value) {
+        console.log('Confirmado');
+        var validacionSolicitante = validaUserSolicitante();
+        console.log(validacionSolicitante);
+        document.getElementById('idSolicitud').value = row.id_solicitud;
+        $('#modalEliminarSolicitud').modal('show');
+      }
+    });
+} */
+
+async function mostrarModalEliminacion(row) {
+  console.log(row);
+  Swal.fire({
+    title: 'Atención!',
+    text: 'Solo los usuarios solicitantes pueden eliminar solicitudes!',
+    confirmButtonText: 'Aceptar',
+  }).then(async (result) => {
+    if (result.value) {
+      console.log('Confirmado');
+      
+      try {
+        var validacionSolicitante = await validaUserSolicitante();
+        console.log(validacionSolicitante);
+        if (validacionSolicitante.trim() == "true") { // Aquí puedes verificar si el usuario es solicitante
+          document.getElementById('idSolicitud').value = row.id_solicitud;
+          document.getElementById('case_id').value = row.case_id;
+          $('#modalEliminarSolicitud').modal('show');
+        } else {
+          Swal.fire('Error', 'No tienes permisos para eliminar esta solicitud.', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'Ocurrió un error al validar el usuario.', 'error');
+      }
+    }
+  });
+}
+
+/* function validaUserSolicitante()
+{
+  $.ajax({
+    url: '<?php echo base_url(MAN); ?>Sservicio/validaUsuarioSolicitante', 
+    method: 'POST',
+    data: {},
+    success: function(response) {
+      return response;
+    },
+    error: function(error) {
+      WaitingClose();
+      alert('Error al eliminar la solicitud.');
+    }
+  });
+}
+ */
+function validaUserSolicitante() {
+  return new Promise((resolve, reject) => {
+    $.ajax({
+      url: '<?php echo base_url(MAN); ?>Sservicio/validaUsuario',
+      method: 'POST',
+      data: {filtro1: 'Solicitante',},
+      success: function(response) {
+        resolve(response);
+      },
+      error: function(error) {
+        reject(error);
+      }
+    });
+  });
+}
+
+function confirmarEliminacion() {
+  WaitingOpen('Eliminando Solcitud');
+  var motivo = document.getElementById('motivoEliminacion').value;
+  var idSolicitud = document.getElementById('idSolicitud').value;
+  var case_id = document.getElementById('case_id').value;
+
+  if (motivo.trim() === "") {
+    alert("Por favor, ingrese un motivo para la eliminación.");
+    return;
+  }
+  
+  $.ajax({
+    url: '<?php echo base_url(MAN); ?>Sservicio/eliminar_solicitud', 
+    method: 'POST',
+    data: {
+      id_solicitud: idSolicitud,
+      motivo: motivo,
+      case_id : case_id
+    },
+    success: function(response) {
+      WaitingClose('Eliminado con éxito...');
+      var permisos = '<?php echo $permission; ?>';
+      linkTo('<?php echo base_url(MAN); ?>Sservicio/index/' + permisos) ; 
+    },
+    error: function(error) {
+      WaitingClose();
+      alert('Error al eliminar la solicitud.');
+    }
+  });
+
+  $('#modalEliminarSolicitud').modal('hide');
+}
+
+let baseUrl = "<?php echo base_url(); ?>";
   // VER OT 
   function mostrarOT(o){
-
-    let idSS = $(o).closest('tr').attr('id');
+    
+    //let idSS = $(o).closest('tr').attr('id');
     //console.log(idSS); 
+    let idSS = o.id_solicitud;
     
     WaitingOpen('Obteniendo datos de OT...');
     // datos = getDataOtSolServicio(idSS, "Solicitud de Servicio");
@@ -164,7 +737,7 @@
         data: { idSS: idSS },
         dataType: 'json',
         method: 'POST',
-        url: 'index.php/Sservicio/getSS',
+        url: '<?php echo base_url(MAN); ?>Sservicio/getSS',
       })
       .done( (data) => {
         // console.table(data);
@@ -180,7 +753,46 @@
           $("#adjunto").attr("href", data.SS[0].sol_adjunto);
 
         }
-        
+        // Validación del estado y manipulación de campos
+        if (data.SS[0].estado === "EL") {
+            $("#motivo_eliminada").val(data.SS[0].motivo_eliminada).removeClass('oculto');
+            $("#nombre_usuario").val(data.SS[0].nombre_usuario).removeClass('oculto');
+            // Extracción de la parte de la fecha y la hora del campo datetime
+            let [fechaEliminada, horaEliminada] = data.SS[0].fecha_eliminada.split(' ');
+            $("#fecha_eliminada").val(fechaEliminada).removeClass('oculto');
+            $("#hora_eliminada").val(horaEliminada).removeClass('oculto');
+            
+            // Mostrar las etiquetas también
+            $("label[for='motivo_eliminada']").removeClass('oculto');
+            $("label[for='fecha_eliminada']").removeClass('oculto');
+            $("label[for='hora_eliminada']").removeClass('oculto');
+            $("label[for='nombre_usuario']").removeClass('oculto');
+        } else {
+            $("#motivo_eliminada").addClass('oculto');
+            $("#nombre_usuario").addClass('oculto');
+            $("#fecha_eliminada").addClass('oculto');
+            $("#hora_eliminada").addClass('oculto');
+            
+            // Ocultar las etiquetas también
+            $("label[for='motivo_eliminada']").addClass('oculto');
+            $("label[for='fecha_eliminada']").addClass('oculto');
+            $("label[for='hora_eliminada']").addClass('oculto');
+            $("label[for='nombre_usuario']").addClass('oculto');
+        }
+        if(data.adjuntos != null){
+          $contenedor = $('#adjuntosGallery');
+          $contenedor.empty();
+          data.adjuntos.forEach((adjunto) => {
+            $contenedor.append(`
+              <div class="col-md-3 col-xs-6">
+                <a href="${baseUrl + adjunto.url + adjunto.nombre}" target="_blank">
+                  <img src="${baseUrl + adjunto.url + adjunto.nombre}" class="img-responsive" style="width: 100%; height: 100px;">
+                </a>
+              </div>
+            `);
+          });
+
+        }
       })
       .fail( () => alert( "Error al traer los datos de la OT." ) )
       .always( () => WaitingClose() );
@@ -197,7 +809,7 @@
         data: { idOt:idOt, idSolServicio:idSolServicio },
         dataType: 'json',
         method: 'POST',
-        url: 'index.php/Otrabajo/getViewDataSolServicio',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/getViewDataSolServicio',
       })
       .done( (data) => {
         console.table(data);
@@ -262,7 +874,7 @@
   $('#btnAdd').click( function cargarVista(){
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Sservicio/nuevaSS/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Sservicio/nuevaSS/<?php echo $permission; ?>");
     WaitingClose();
   });
 </script>
@@ -272,7 +884,7 @@
  $('#activarSol').click( function cargarVista(){
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Sservicio/get_SolicTerminada/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Sservicio/get_SolicTerminada/<?php echo $permission; ?>");
     WaitingClose();
   });
 </script>
@@ -289,12 +901,12 @@
         $.ajax({
                 type: 'POST',
                 data: { id_solic: id_solic},
-                url: 'index.php/Sservicio/elimSolicitud',
+                url: '<?php echo base_url(MAN); ?>Sservicio/elimSolicitud',
                 success: function(result){
                             WaitingClose('Guardado exitosamente...');
                             //var permisos = '<?php //echo $permission; ?>';
                             var permisos = 'Add-Edit-Del-View-Asignar-Finalizar-OP-';
-                            cargarView('Sservicio', 'index', permisos) ;                        
+                            linkTo('<?php echo base_url(MAN); ?>Sservicio/index/' + permisos) ;                        
                       },
                 error: function(result){
                       WaitingClose();
@@ -315,7 +927,7 @@
     $.ajax({
         type: 'POST',
         data: { idservicio: idservicio},
-        url: 'index.php/Sservicio/getsolImp',
+        url: '<?php echo base_url(MAN); ?>Sservicio/getsolImp',
         success: function(data){
                     data = JSON.parse(data,true);
                     console.log(data);
@@ -609,7 +1221,7 @@
     $('#resp').remove();    
 
     var imag = $(this).data('imagen');
-    if (imag != 'assets/files/orders/sinImagen.jpg') {
+    if (imag != '<?php echo man_asset_url(); ?>assets/files/orders/sinImagen.jpg') {
       $('#imgSolServ').attr('src',imag); 
     }else{
       $('.imagen').append('<h5 id="resp">Sin imagen cargada.<h5>');
@@ -633,7 +1245,7 @@
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getSector",
+      'url': "Sservicio/getSector",
       'success': function (data) {
         tmp = data;
       }
@@ -715,52 +1327,49 @@
   //   });
   // }
 
-// Trae Operarios
-var dataO = function () {
-  var tmp = null;
-  $.ajax({
-    'async': false,
-    'type': "POST",
-    'global': false,
-    'dataType': 'json',
-    'url': "<?php echo MAN; ?>ordenservicio/getOperario",
-    'success': function (data) {
-        tmp = data;
+  // Trae Operarios
+  var dataO = function () {
+    var tmp = null;
+    $.ajax({
+      'async': false,
+      'type': "POST",
+      'global': false,
+      'dataType': 'json',
+      'url': "ordenservicio/getOperario",
+      'success': function (data) {
+          tmp = data;
+      }
+    });
+    return tmp;
+  }();
+  $("#vstsolicita").autocomplete({
+    autoFocus: true,
+    delay: 300,
+    minLength: 1,
+    source: dataO,
+    /*focus: function(event, ui) {
+      // prevent autocomplete from updating the textbox
+      event.preventDefault();
+      // manually update the textbox
+      $(this).val(ui.item.label);
+      $("#id-Operario").val(ui.item.value);
+    },*/
+    select: function(event, ui) {
+      // prevent autocomplete from updating the textbox
+      event.preventDefault();
+      // manually update the textbox and hidden field
+      $(this).val(ui.item.label); 
+      $("#id_vstsolicita").val(ui.item.value);                 
+    },
+    /*open: function( event, ui ) {
+      $("#ui-id-3").css('z-index',1050);
+    },*/
+    change: function (event, ui) {
+      if (!ui.item) {
+        this.value = '';
+      }
     }
   });
-  return tmp;
-}();
-$("#vstsolicita").autocomplete({
-  autoFocus: true,
-  delay: 300,
-  minLength: 1,
-  source: dataO,
-  /*focus: function(event, ui) {
-    // prevent autocomplete from updating the textbox
-    event.preventDefault();
-    // manually update the textbox
-    $(this).val(ui.item.label);
-    $("#id-Operario").val(ui.item.value);
-  },*/
-  select: function(event, ui) {
-    // prevent autocomplete from updating the textbox
-    event.preventDefault();
-    // manually update the textbox and hidden field
-    $(this).val(ui.item.label); 
-    $("#id_vstsolicita").val(ui.item.value);                 
-  },
-  /*open: function( event, ui ) {
-    $("#ui-id-3").css('z-index',1050);
-  },*/
-  change: function (event, ui) {
-    if (!ui.item) {
-      this.value = '';
-    }
-  }
-});
-
-
-
   // Guardado de datos y validaciones
   $("#btnSave").click(function(){
 
@@ -803,14 +1412,14 @@ $("#vstsolicita").autocomplete({
                     falla: $('#vstNote').val(),
                     tarea: $('#tareaSelec').val()
                   },
-        		url: 'index.php/Sservicio/lanzarProcesoBPM',
+        		url: '<?php echo base_url(MAN); ?>Sservicio/lanzarProcesoBPM',
         		success: function(data){
                     WaitingClose();
                     console.log(data);
                     if (data.status == true){
                       //alert("Solicitud generada exitosamente");
                      
-                      cargarView('Sservicio', 'index', permisos) ;           
+                      linkTo('<?php echo base_url(MAN); ?>Sservicio/index/' + permisos) ;           
                     } else{             
                         alert("Falla: "+data.msj);
                     }                   
@@ -853,11 +1462,11 @@ $("#vstsolicita").autocomplete({
     $.ajax({
             type: 'POST',
             data: data,
-            url: 'index.php/Sservicio/confSolicitud',
+            url: '<?php echo base_url(MAN); ?>Sservicio/confSolicitud',
             success: function(result){
                         WaitingClose('Guardado exitosamente...');
                         var permisos = '<?php echo $permission; ?>';
-                        cargarView('Sservicio', 'index', permisos) ;
+                        linkTo('<?php echo base_url(MAN); ?>Sservicio/index/' + permisos) ;
                         //alert("guardado con exito");
                   },
             error: function(result){
@@ -867,28 +1476,56 @@ $("#vstsolicita").autocomplete({
             dataType: 'json'
         });
   }
-  // Datatables
-  $('#servicio').DataTable({
-    <?php echo (!DT_SIZE_ROWS ? '"paging": false,' : null) ?>
-    "autoWidth": false,
-    "paging": true,
-    "aLengthMenu": [ 10, 25, 50, 100 ],
-    "columnDefs": [ 
-      {
-        "targets": [ 0 ], 
-        "searchable": false,
-      },
-      {
-        "targets": [ 0 ], 
-        "orderable": false,
-      },
-      { 
-        "targets": [ 1, 8 ],
-        "type": "num",
+
+  //cartel de aviso modificacion responsable
+  async function mostrarModalEditarResponsable(row) {
+    console.log(row);
+  Swal.fire({
+    title: 'Atención!',
+    text: 'Solo los usuarios supervisores pueden editar solicitudes!',
+    confirmButtonText: 'Aceptar',
+  }).then(async (result) => {
+    if (result.value) {
+      console.log('Confirmado');
+      
+      try {
+        var validacionUser = await validaUserAsignacion();
+        console.log(validacionUser);
+
+        if (validacionUser.trim() == "true") { 
+          var id_orden = row.id_orden;
+          WaitingOpen();
+          $('#contRespyTareas').empty();
+          $("#contRespyTareas").load("<?php echo base_url(MAN); ?>Calendario/verEjecutarOT/" + id_orden + "/" + true);
+          $('#modalRespyTareas').modal('show'); 
+          WaitingClose();  
+
+        } else {
+          Swal.fire('Error', 'No tienes permisos para editar esta solicitud.', 'error');
+        }
+      } catch (error) {
+        Swal.fire('Error', 'Ocurrió un error al validar el usuario.', 'error');
       }
-    ],
-    "order": [[1, "desc"]],
+    }
   });
+}
+
+
+  function validaUserAsignacion() {
+       return new Promise((resolve, reject) => {
+      $.ajax({
+        url: '<?php echo base_url(MAN); ?>Sservicio/validaUsuario',
+        method: 'POST',
+        data: {filtro1: 'Supervisor de Taller', filtro2: 'Administrador'},
+        success: function(response) {
+          resolve(response);
+        },
+        error: function(error) {
+          reject(error);
+        }
+      });
+    }); 
+  }
 </script>
 
 
@@ -1084,9 +1721,39 @@ $("#vstsolicita").autocomplete({
   </div>
 </div>
 
+<!-- Modal Aviso eliminar -->
+<div class="modal" id="modalEliminarSolServicio2" tabindex="-1" role="dialog">
+  <div class="modal-dialog" role="document">
+    <div class="modal-content">
+      <div class="modal-header">
+        <button type="button" class="close" data-dismiss="modal" aria-hidden="true">&times;</button>
+        <h4 class="modal-title"><span class="fa fa-fw fa-times-circle text-light-blue"></span>Eliminar</h4>
+      </div>
+      <div class="modal-body">
+        <div class="col-xs-12">
+            <input type="hidden" id="e_idSolicitud" name="e_idSolicitud">
+            <label for="e_motivo">Motivo: </label>
+            <textarea class="form-control" id="e_motivo" name="e_motivo"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-default" data-dismiss="modal">Cancelar</button>
+        <button type="button" class="btn btn-primary" data-dismiss="modal" onclick="#">Eliminar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- / Modal -->
+
+
+
 <script>
+// $(document).ready(function(){
+//   //Oculto solicitudes conformes
+//   showSolicitudesConformes();
+// });
 //Oculta/Muestra solicitudes con estado Conforme
-function showSolicitudesConformes() {
+/*function showSolicitudesConformes() {
   showConformes = $('#check-conformes').is(':checked');
   table = $('#servicio').DataTable();
 
@@ -1096,7 +1763,7 @@ function showSolicitudesConformes() {
     data: {
         showConformes: showConformes
     },
-    url: '<?php echo MAN; ?>Sservicio/getServiciosConformes',
+    url: '<?php echo base_url(MAN); ?>Sservicio/getServiciosConformes',
     success: function(data){
       // Limpio tabla
       table.clear();
@@ -1207,5 +1874,6 @@ function showSolicitudesConformes() {
       table.draw();
     }
   });
-}
+}*/
+
 </script>

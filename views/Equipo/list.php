@@ -70,7 +70,7 @@ $(document).ready(function(){
         'search': true,
         'ajax':{
             type: 'POST',
-            url: '<?php echo MAN; ?>Equipo/paginado'
+            url: '<?php echo base_url(MAN); ?>Equipo/paginado'
         },
         'columnDefs':[
             {
@@ -212,7 +212,7 @@ datos = Array()
 $('#btnAgre').click(function cargarVista() {
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Equipo/cargarequipo/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Equipo/cargarequipo/<?php echo $permission; ?>");
     WaitingClose();
 });
 
@@ -240,7 +240,7 @@ function inhabilitarEquipo(idEquipo){
         data: {
             idequipo: idEquipo
         },
-        url: '<?php echo MAN;?>Equipo/cambio_equipo',
+        url: '<?php echo base_url(MAN); ?>Equipo/cambio_equipo',
         success: function(data) {
             console.log(data);
             //alert("Se cambio el estado del equipo a INACTIVO");
@@ -266,7 +266,7 @@ function habilitarEquipo(idequipo) {
         },
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/estado_alta',
+        url: '<?php echo base_url(MAN); ?>Equipo/estado_alta',
         success: function(data) {
             wc();
             hecho("Hecho","Se cambio el estado del equipo a ACTIVO");
@@ -282,379 +282,6 @@ function habilitarEquipo(idequipo) {
     });
 }
 
-function alta_historial_lectura(parametros) {
-    console.log("parametros:");
-    console.table(parametros);
-    $.ajax({
-        data: {
-            parametros: parametros
-        },
-        dataType: 'json',
-        type: 'POST',
-        url: 'index.php/Equipo/alta_historial_lectura',
-        success: function(data) {
-            console.table(data);
-            //alert("Se agregó historial lecturas");
-        },
-        error: function(result) {
-            console.error("Error al agregar historial lecturas");
-            console.table(result);
-        },
-    });
-}
-
-//cambio el estado a activo, sin importar si el anterior es alta, inhabilitado, etc...
-function cambiar_estado(idequipo, vuelve = true) {
-    $.ajax({
-        data: {
-            idequipo: idequipo
-        },
-        dataType: 'json',
-        type: 'POST',
-        url: 'index.php/Equipo/cambio_estado',
-        success: function(data) {
-            console.log(data);
-            WaitingClose();
-            alert("Se cambio el estado del equipo a ACTIVO");
-            if (vuelve == true) {
-                regresa();
-            }
-        },
-        error: function(result) {
-            console.error("Error al cambiar el estado");
-            console.table(result);
-        },
-    });
-}
-
-// Impresion - Chequeado
-$(".fa-print").click(function(e) {
-    e.preventDefault();
-    var idequip = $(this).parent('td').parent('tr').attr('id');
-    console.log("El id de orden al imprimir es :");
-    console.log(idequip);
-    // alert(id_orden);
-    $.ajax({
-        type: 'POST',
-        data: {
-            idequip: idequip
-        },
-        dataType: 'json',
-        url: 'index.php/Equipo/getsolImp', 
-        success: function(data) {
-            console.log("Entre a la impresion");
-            console.log(data);
-            console.log(data.datos.codigo);
-            console.log(data.equipos.asegurado);
-            console.log(data.orden.nombre);
-            var fecha = new Date(data.datos.fechain);
-            var day = fecha.getDate();
-            var month = fecha.getMonth();
-            var year = fecha.getUTCFullYear();
-            fecha = day + '-' + month + '-' + year;
-            //data.equipos.fecha_vigencia
-            //data.equipos.fecha_inicio
-            var fechav = new Date(data.equipos.fecha_vigencia);
-            var day = fechav.getDate();
-            var month = fechav.getMonth();
-            var year = fechav.getUTCFullYear();
-            fechav = day + '-' + month + '-' + year;
-            var fechai = new Date(data.equipos.fecha_inicio);
-            var day = fechai.getDate();
-            var month = fechai.getMonth();
-            var year = fechai.getUTCFullYear();
-            fechai = day + '-' + month + '-' + year;
-            var trequipos = '';
-            for (var i = 0; i < data['orden'].length; i++) {
-                var fecha1 = new Date(data['orden'][i]['fecha']);
-                var day = fecha1.getDate();
-                var month = fecha1.getMonth();
-                var year = fecha1.getUTCFullYear();
-                fecha1 = day + '-' + month + '-' + year;
-                trequipos = trequipos + "<tr>  <td width='10%'>" + fecha1 +
-                    "</td> <td width='10%'>" + data['orden'][i]['causa'] +
-                    "</td> <td width='10%'>" + data['orden'][i]['causa'] +
-                    "</td> <td width='10%'>" + data['orden'][i]['nombre'] +
-                    "</td><td width='10%'>" + data['orden'][i]['estado'] + "</td>  </tr>";
-            }
-            var texto =
-                '<div class="" id="vistaimprimir">' +
-                '<div class="container">' +
-                '<div class="thumbnail">' +
-
-                '<div class="caption">' +
-                '<div class="row" >' +
-                '<div class="panel panel-default">' +
-                '<div class="form-group">' +
-                '<h3 class="text-center" align="center"></h3>' +
-                '</div>' +
-                '<hr/>' +
-                '<div class="panel-body">' +
-                '<div class="container">' +
-                '<div class="thumbnail">' +
-                '<div class="row">' +
-                '<div class="col-sm-12 col-md-12">' +
-                '<table width="100%" style="text-align:justify" >' +
-                '<tr>' +
-                '<tr>' +
-                '<td  colspan="1"  align="left" >' +
-                '<div class="text-left"> <img src="img/LOGO.jpg" width="280" height="80" /> </div></td>' +
-                '</td>' +
-                '<td >' +
-                '<div  class="col-md-4 "><h3> FICHA TECNICA DE SERVICIO</h3>' +
-                '</div>' +
-                '</td>' +
-                '</tr>' +
-                '</tr>' +
-                '</table>' +
-                '</div>' +
-                '</div>' +
-                '<div class="row">' +
-                '<div class="col-sm-12 col-md-12">' +
-                '<table width="100%" style="text-align:justify" border="1px solid black" >' +
-                '<tr>' +
-                '<td>Numero de serie</td>' +
-                '<td>' + data.datos.numero_serie + '</td>' +
-                '<td style="text-align: left"" >Codigo del equipo</td>' +
-                '<td>' + data.datos.codigo + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Marca del motor</td>' +
-                '<td>' + data.datos.marca + '</td>' +
-                '<td align="left" >Estado del equipo</td>' +
-                '<td>' + data.datos.estado + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Modelo del motor</td>' +
-                '<td>' + data.datos.modelo + '</td>' +
-                '<td>Dominio</td>' +
-                '<td>' + data.datos.dominio + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Numero de motor</td>' +
-                '<td>' + data.datos.numero_motor + '</td>' +
-                '<td>Marca de equipo</td>' +
-                '<td>' + data.datos.marcaeq + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Año de fabricacion</td>' +
-                '<td>' + data.datos.fabricacion + '</td>' +
-                '<td>Modelo de equipo</td>' +
-                '<td>' + data.datos.modelo + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Baterias</td>' +
-                '<td>' + data.datos.bateria + '</td>' +
-                '<td>Ubicacion</td>' +
-                '<td>' + data.datos.ubicacion + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Peso Operativo</td>' +
-                '<td>' + data.datos.ubicacion + '</td>' +
-                '<td>Sector</td>' +
-                '<td>' + data.datos.sector + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Ingreso a la Reparacion</td>' +
-                '<td>' + fecha + '</td>' + //data.datos.fechain
-                '<td>Horas del equipo a la fecha</td>' +
-                '<td>' + data.datos.hora_lectura + '</td>' +
-                '</tr>' +
-
-                '</table>' +
-                '</div>' +
-                '</div>' +
-                '<br>' +
-                '<br>' +
-                '<div class="row">' +
-                '<div class="col-sm-12 col-md-12">' +
-                '<table width="100%" style="text-align:justify" border="1px solid black" >' +
-                '<tr>' +
-                '<td colspan="4" align="center">Datos de Poliza de Seguro</td>' +
-                '</tr>' +
-                '<tr>' +
-                '<td colspan="4" align="left">Seguro Obligatorio Automotor</td>' +
-                '</tr>' +
-                '<tr>' +
-                '<td colspan="4" align="left">Decreto 1716/08 - Reclamo Ley: 26.363</td>' +
-                '</tr>' +
-                '<tr>' +
-                '<td>Asegurado</td>' +
-                '<td colspan="4">' + data.equipos.asegurado + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Ref</td>' +
-                '<td>' + data.equipos.ref + '</td>' +
-                '<td >Poliza</td>' +
-                '<td>' + data.equipos.numero_pliza + '</td>' +
-                '</tr>' +
-
-                '<tr>' +
-                '<td>Vigencia desde</td>' +
-                '<td>' + fechav + '</td>' + //data.equipos.fecha_vigencia
-                '<td>Hasta</td>' +
-                '<td>' + fechai + '</td>' + //data.equipos.fecha_inicio
-                '</tr>' +
-
-                '</table>' +
-                '</div>' +
-                '</div>' +
-                '<div class="col-sm-6 col-md-6" border="1" >' +
-                '</div>' +
-
-                '<br>' +
-                '<br>' +
-
-                //aca va la tabla
-
-                '<div class="row">' +
-                '<div class="col-xs-10 col-xs-offset-1 text-center">' +
-
-                '<table class="table table-bordered"  style="text-align:justify" border="1px solid black" >' +
-                //class="table table-bordered"
-                '<thead>' +
-                '<tr colspan="6" height="30">' +
-                '<th width="20%">Fecha </th>' +
-                '<th width="40%">Descripcion del arreglo</th>' +
-                '<th width="25%">Diagnostico realizado por </th>' +
-                '<th width="25%">Reparacion realizado por </th>' +
-                '<th width="10%">Estado de la reparacion </th>' +
-                '</tr>' +
-                '</thead>' +
-
-                '<tbody style="text-align:center">' + trequipos +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr>' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr>' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr>' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '<tr colspan="2">' +
-                '<td style="text-align: center" ></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '<td><br></td>' +
-                '</tr>' +
-                '</tbody>' +
-                '</table>' +
-                '</div>' +
-                '</div>' +
-                //'<div class="container-fluid">'+
-
-                '</div>' +
-                '</div>' +
-                '</div>' +
-
-
-                '</div>' +
-                '</div>' +
-                '</div>' +
-                '<style>' +
-                '.table, .table>tr, .table>td  {} ' +
-                '</styl>';
-            //border:  1px solid black;
-
-
-            var mywindow = window.open('', 'Imprimir', 'height=700,width=900');
-            mywindow.document.write('<html><head><title></title>');
-            //mywindow.document.write('<link rel="stylesheet" href="main.css" type="text/css" />');
-            //mywindow.document.write('<link rel="stylesheet" href="main.css">
-            mywindow.document.write('</head><body onload="window.print();">');
-            mywindow.document.write(texto);
-            mywindow.document.write('</body></html>');
-
-            mywindow.document.close(); // necessary for IE >= 10
-            mywindow.focus(); // necessary for IE >= 10
-            //mywindow.print();
-            //mywindow.close();
-            return true;
-        },
-        error: function(result) {
-            console.log(result);
-            console.log("error en la vistaimprimir");
-        },
-    });
-});
 
     $(".clear").val(""); //llimpia los inputs del modal lectura
 
@@ -757,7 +384,7 @@ function limpiarselect() {
 // Chequeado
 function regresa() {
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Equipo/index/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Equipo/index/<?php echo $permission; ?>");
     WaitingClose();
 }
 
@@ -819,7 +446,7 @@ function guardar() {
             data: parametros,
             idEquipo: idEquipo
         },
-        url: '<?php echo MAN; ?>Equipo/editar_equipo',
+        url: '<?php echo base_url(MAN); ?>Equipo/editar_equipo',
         success: function(data) {
             wc();
             hecho();
@@ -836,7 +463,7 @@ function guardar() {
 function traer_grupo() {
     $.ajax({
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getgrupo', 
+        url: '<?php echo base_url(MAN); ?>Equipo/getgrupo', 
         success: function(data) {
 
             //var opcion  = "<option value='-1'>Seleccione...</option>" ;
@@ -859,7 +486,7 @@ function traer_grupo() {
 function traer_criticidad() {
     $.ajax({
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getcriti', 
+        url: '<?php echo base_url(MAN); ?>Equipo/getcriti', 
         success: function(data) {
 
             for (var i = 0; i < data.length; i++) {
@@ -879,7 +506,7 @@ function traer_criticidad() {
 function traer_etapa() {
     $.ajax({
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getetapa', 
+        url: '<?php echo base_url(MAN); ?>Equipo/getetapa', 
         success: function(data) {
             for (var i = 0; i < data.length; i++) {
                 var nombre = data[i]['descripcion'];
@@ -900,7 +527,7 @@ function traer_marca() {
     $.ajax({
         type: 'POST',
         data: {},
-        url: '<?php echo MAN; ?>Equipo/getmarca', 
+        url: '<?php echo base_url(MAN); ?>Equipo/getmarca', 
         success: function(data) {
 
             //var opcion  = "<option value='-1'>Seleccione...</option>" ;
@@ -926,7 +553,7 @@ function traer_contratista() {
     $.ajax({
         type: 'POST',
         data: {},
-        url: '<?php echo MAN; ?>Equipo/getcontra',
+        url: '<?php echo base_url(MAN); ?>Equipo/getcontra',
         dataType: 'json',
         success: function(data) {
             var opcion = "<option value='-1'>Seleccione...</option>";
@@ -956,7 +583,7 @@ function llenaContratistasEquipo(id_equipo) {
         },
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getContratistasEquipo',
+        url: '<?php echo base_url(MAN); ?>Equipo/getContratistasEquipo',
         success: function(data) {
             tabla = $('#tablaempresa').DataTable();
             tabla.clear().draw();
@@ -1009,7 +636,7 @@ $("#adde").click(function(e) {
             },
             dataType: 'json',
             type: "POST",
-            url: '<?php echo MAN; ?>Equipo/guardarcontra',
+            url: '<?php echo base_url(MAN); ?>Equipo/guardarcontra',
             success: (data) => {
                 if(data){
                     hecho("Hecho","Contratista guardado con éxito");
@@ -1041,7 +668,7 @@ function eliminarContratista(id_contratista){
         },
         dataType: 'json',
         type: "POST",
-        url: '<?php echo MAN; ?>Equipo/delContratista',
+        url: '<?php echo base_url(MAN); ?>Equipo/delContratista',
         success: (data) => {
             llenaContratistasEquipo(id_equipo);
             hecho("Hecho","Contratista eliminado con éxito");
@@ -1073,12 +700,12 @@ $(document).on("click", ".btnDel", function() {
             },
             dataType: 'json',
             type: "POST",
-            url: 'index.php/Equipo/delContra',
+            url: '<?php echo base_url(MAN); ?>Equipo/delContra',
         })
         .done(function(data) {
             llenaContratistasEquipo(id_equipo);
         })
-        .error(function(result) {
+        .fail(function(result) {
             alert("Error eliminando contratista...");
             console.log("Error: " + result['status']);
             console.table(result);
@@ -1097,7 +724,7 @@ function click_co(id_equipo) {
             id_equipo: id_equipo
         },
         dataType: 'json',
-        url: '<?php echo MAN; ?>Equipo/getco',
+        url: '<?php echo base_url(MAN); ?>Equipo/getco',
         success: function(data) {
             //aca trae la marca erronea
             console.table(data);
@@ -1131,7 +758,7 @@ function historialLectura(idEquipo){
         data: {
             idequipo: idEquipo
         },
-        url: 'index.php/Equipo/getHistoriaLect',
+        url: '<?php echo base_url(MAN); ?>Equipo/getHistoriaLect',
         success: function(data) {
             console.table(data);
             llenarModal(data);
@@ -1154,7 +781,7 @@ function historialLectura(idEquipo){
 	//         data: {
 	//             idequipo: $id_equipo
 	//         },
-	//         url: 'index.php/Equipo/getHistoriaLect',
+	//         url: '<?php echo base_url(MAN); ?>Equipo/getHistoriaLect',
 	//         success: function(data) {
 	//             console.table(data);
 	//             llenarModal(data);
@@ -1176,7 +803,7 @@ function recargarTabla() {
         data: {
             idequipo: $id_equipo
         },
-        url: 'index.php/Equipo/getHistoriaLect',
+        url: '<?php echo base_url(MAN); ?>Equipo/getHistoriaLect',
         success: function(data) {
             console.table(data);
             llenarModal(data);
@@ -1210,7 +837,7 @@ function llenarModal(data) {
         $('#tblhistorial').DataTable().clear().draw(); 
 
         /*  harkodeo muestra formulario de empresas*/
-        var formulario = <?php if(EMPRESAS_FORM == empresa()) echo 1; else echo 0; ?>;
+        var formulario = 0 /* E14: mantenimiento autónomo apagado en MAN */;
 
         for (var i = 0; i < data.length; i++) {
             var fecha =  data[i]['fecha'].substr(0,10);
@@ -1291,7 +918,7 @@ function guardarEdit() {
 
         $.ajax({
             type: "POST",
-            url: "index.php/Equipo/setLecturaObservacionEdit",
+            url: "<?php echo base_url(MAN); ?>Equipo/setLecturaObservacionEdit",
             data: {
                 id_equipo,
                 lectura,
@@ -1303,7 +930,6 @@ function guardarEdit() {
                 if(!data){
                     $('#errorEditLectura2').fadeIn('slow');
                 }else{
-																	debugger;
                     console.log("Guardado con exito...");
                     $("#modalEditLecturaObservacion").modal('hide');
                     //recargarTabla();
@@ -1365,7 +991,7 @@ function guardarlectura() {
         console.table(lectura);
         $.ajax({
             type: "POST",
-            url: "index.php/Equipo/setLectura",
+            url: "<?php echo base_url(MAN); ?>Equipo/setLectura",
             data: lectura,
             success: function(data) {               
                 guardaForm(equipo);
@@ -1412,7 +1038,7 @@ function guradaInfo_id(info_id = '', equipo)
     console.log(info_id)
     $.ajax({
             type: "POST",
-            url: "index.php/Equipo/guardaInfo_idLectura",
+            url: "<?php echo base_url(MAN); ?>Equipo/guardaInfo_idLectura",
             data: {'info_id':info_id, 'equipo': equipo},
             success: function(data) {
 
@@ -1441,7 +1067,7 @@ function eliminarEquipo(idEquipo){
                 idEquipo: idEquipo
             },
             dataType: 'json',
-            url: '<?php echo MAN; ?>Equipo/baja_equipo',
+            url: '<?php echo base_url(MAN); ?>Equipo/baja_equipo',
             success: function(data) {
                 hecho("Éxito","Equipo/sector ANULADO");
                 reloadTable();
@@ -1465,7 +1091,7 @@ function editarEquipo(idEquipo){
         },
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getEditar',
+        url: '<?php echo base_url(MAN); ?>Equipo/getEditar',
         success: function(result) {
             console.log(result);
             llenarCampos(result);
@@ -1510,7 +1136,7 @@ function llenar_area(id) {
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getarea',
+        url: '<?php echo base_url(MAN); ?>Equipo/getarea',
         success: function(data) {
             //console.table(data);
             $('#area').text("");
@@ -1536,7 +1162,7 @@ function llenar_proceso(id) {
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getproceso',
+        url: '<?php echo base_url(MAN); ?>Equipo/getproceso',
         success: function(data) {
             //console.log("proceso: "+id);
             //console.table(data);
@@ -1563,7 +1189,7 @@ function llenar_criticidad(id) {
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getcriti',
+        url: '<?php echo base_url(MAN); ?>Equipo/getcriti',
         success: function(data) {
             //console.log("criticidad: "+id);
             //console.table(data);
@@ -1590,7 +1216,7 @@ function llenar_sector(id) {
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getetapa', 
+        url: '<?php echo base_url(MAN); ?>Equipo/getetapa', 
         success: function(data) {
             //console.log("sector/etapa: "+id);
             //console.table(data);
@@ -1618,7 +1244,7 @@ function llenar_grupo(id) {
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getgrupo', 
+        url: '<?php echo base_url(MAN); ?>Equipo/getgrupo', 
         success: function(data) {
             //console.table(data);
             $('#grupo').text("");
@@ -1647,7 +1273,7 @@ function llenar_marca(id) {
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getmarca',
+        url: '<?php echo base_url(MAN); ?>Equipo/getmarca',
         success: function(data) {
             //console.log("marca: "+id);
             //console.table(data);
@@ -1674,7 +1300,7 @@ function llenar_cliente(id) {
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Equipo/getcliente', 
+        url: '<?php echo base_url(MAN); ?>Equipo/getcliente', 
         success: function(data) {
             //console.log("cliente: "+id);
             //console.table(data);
@@ -1705,7 +1331,7 @@ function llenar_adjunto(adjunto) {
     if (adjunto){
         for (let i = 0; i < adjunto.length; i++) {
             accion += 
-                '<a href="assets/filesequipos/'+ adjunto[i].adjunto +'" target="_blank">'+ adjunto[i].adjunto +'</a>' +
+                '<a href="<?php echo man_asset_url(); ?>assets/filesequipos/'+ adjunto[i].adjunto +'" target="_blank">'+ adjunto[i].adjunto +'</a>' +
                 '<i class="fa fa-times-circle text-light-blue" style="cursor:pointer; margin-right:10px" title="Eliminar Adjunto"  onclick=eliminaAdjunto('+adjunto[i].id_adjunto+')></i>' +
                 '<i class="fa fa-pencil text-light-blue" style="cursor:pointer; margin-right:10px" title="Editar Adjunto" onclick=editaAdjunto('+adjunto[i].id_adjunto+')></i>';
             }
@@ -1727,7 +1353,7 @@ function guardararea() {
         wo();
         $.ajax({
             type: "POST",
-            url: "<?php echo MAN; ?>Equipo/agregar_area",
+            url: "<?php echo base_url(MAN); ?>Equipo/agregar_area",
             dataType: 'json',
             data: {
                 parametros: parametros
@@ -1771,7 +1397,7 @@ function guardarproceso() {
         $.ajax({
             type: "POST",
             dataType: 'json',
-            url: "<?php echo MAN; ?>Equipo/agregar_proceso",
+            url: "<?php echo base_url(MAN); ?>Equipo/agregar_proceso",
             data: {
                 parametros: parametros
             },
@@ -1812,7 +1438,7 @@ function guardarcri() {
         wo();
         $.ajax({
             type: "POST",
-            url: "<?php echo MAN; ?>Equipo/agregar_criti",
+            url: "<?php echo base_url(MAN); ?>Equipo/agregar_criti",
             dataType: 'json',
             data: {
                 parametros: parametros
@@ -1855,7 +1481,7 @@ function guardargrupo() {
         wo();
         $.ajax({
             type: "POST",
-            url: "<?php echo MAN; ?>Equipo/agregar_grupo",
+            url: "<?php echo base_url(MAN); ?>Equipo/agregar_grupo",
             dataType: 'json',
             data: {
                 parametros: parametros
@@ -1898,7 +1524,7 @@ function guardaretapa() {
         wo();
         $.ajax({
             type: "POST",
-            url: "<?php echo MAN; ?>Equipo/agregar_etapa",
+            url: "<?php echo base_url(MAN); ?>Equipo/agregar_etapa",
             dataType: 'json',
             data: {
                 parametros: parametros
@@ -1958,7 +1584,7 @@ function guardarCliente() {
             },
             dataType: 'json',
             type: "POST",
-            url: "<?php echo MAN; ?>Equipo/agregar_cliente",
+            url: "<?php echo base_url(MAN); ?>Equipo/agregar_cliente",
             success: function(data){
                 var datos= parseInt(data);
                 console.log("ID cliente: " + datos);
@@ -2002,7 +1628,7 @@ function guardarmarca() {
             },
             dataType: 'json',
             type: 'POST',
-            url: "<?php echo MAN; ?>Equipo/agregar_marca", 
+            url: "<?php echo base_url(MAN); ?>Equipo/agregar_marca", 
             success: function(data) {
                 var datos= parseInt(data);
                 console.log("ID marca: " + datos);
@@ -2052,17 +1678,16 @@ $("#formEliminarAdjunto").submit(function(event) {
         $.ajax({
                 dataType: 'json',    
                 type: 'POST',
-                url: 'index.php/Equipo/eliminaAdjunto',
+                url: '<?php echo base_url(MAN); ?>Equipo/eliminaAdjunto',
                 data: { 
                     idEquipo:idEquipo,
                     idAdjunto:idAdjunto
                     }
             })
-            .success(function(data) {
-                debugger;
+            .done(function(data) {
                 llenar_adjunto(data);
             })
-            .error(function(result) {
+            .fail(function(result) {
                 console.error(result);
             });
 });
@@ -2085,7 +1710,6 @@ function editaAdjunto(idAdjunto) {
 //agregar adjunto
 $("#formAgregarAdjunto").submit(function(event) {
     $('#modalAgregarAdjunto').modal('hide');
-   debugger
     event.preventDefault();
      if (document.getElementById("inputPDF").files.length == 0) {
         $('#error').fadeIn('slow');
@@ -2099,12 +1723,12 @@ $("#formAgregarAdjunto").submit(function(event) {
                 dataType: 'json',
                 processData: false,
                 type: 'POST',
-                url: 'index.php/Equipo/agregarAdjunto',
+                url: '<?php echo base_url(MAN); ?>Equipo/agregarAdjunto',
             })
             .done(function(data) {
                 llenar_adjunto(data);
             })
-            .error(function(result) {
+            .fail(function(result) {
                 console.error(result);
             });
     }
@@ -2112,13 +1736,12 @@ $("#formAgregarAdjunto").submit(function(event) {
 /*
 $('#modaleditar').on('hidden.bs.modal', function(e) {
     $('#content').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Equipo/index/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Equipo/index/<?php echo $permission; ?>");
 })*/
 
 //editar adjunto
 $("#formEditarAdjunto").submit(function(event) {
     $('#modalEditarAdjunto').modal('hide');
-    debugger
     event.preventDefault();
     if (document.getElementById("inputEditarPDF").files.length == 0) {
         $('#error').fadeIn('slow');
@@ -2133,13 +1756,12 @@ $("#formEditarAdjunto").submit(function(event) {
                 dataType: 'json',
                 processData: false,
                 type: 'POST',
-                url: 'index.php/Equipo/EditarAdjunto',
+                url: '<?php echo base_url(MAN); ?>Equipo/EditarAdjunto',
             })
             .done(function(data) {
-                debugger;
                 llenar_adjunto(data);
             })
-            .error(function(result) {
+            .fail(function(result) {
                 console.error(result);
             });
     }
@@ -2561,7 +2183,8 @@ $('#tablaempresa').DataTable({
                     <input type="hidden" name="form_id" id="form_id">
 
                     <!-- si la empresa quiere que se largue la solicitud cuando se pone en RE el equipo -->
-                    <?php if(EMPRESAS_FORM == empresa()) 
+                    <?php if (false) // E14: mantenimiento autónomo apagado en MAN
+
                 
                         echo '<div class="form-group" id="divFalla" style="display: none;">
                                 <label for="falla">Falla <strong style="color: #dd4b39">*</strong>:</label>
@@ -2572,7 +2195,8 @@ $('#tablaempresa').DataTable({
                     
                 </form>
                  <!-- si la empresa tiene formularios -->
-                <?php if(EMPRESAS_FORM == empresa()) 
+                <?php if (false) // E14: mantenimiento autónomo apagado en MAN
+
                 
                     echo '<div class="frm-new" id="formulario"></div> '
                 
@@ -3081,7 +2705,7 @@ function asignar_meta(meta,eq){
     $.ajax({
         type: 'POST',
         dataType: 'JSON',
-        url: '<?php echo MAN;?>Equipo/getMeta',
+        url: '<?php echo base_url(MAN); ?>Equipo/getMeta',
         data: {eq},
         success: function(rsp) {
             wc();
@@ -3103,14 +2727,13 @@ function guardarMeta(){
 
     $('#asignar_meta').modal('show');
     $('#content').empty();            
-    $("#content").load("<?php echo base_url(); ?>index.php/Equipo/index/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Equipo/index/<?php echo $permission; ?>");
 }
 
 $('#asignar_meta .btn-accion').click(function(event) {
     
     var eq = $('#eq_modal_meta').val();
     var meta = $('#meta_modal_eq').val();
-    debugger;
     if (meta == null || meta == '') {
         error("Error",'No se ingreso ningún valor.');
         return;
@@ -3128,7 +2751,7 @@ $('#asignar_meta .btn-accion').click(function(event) {
     $.ajax({
         type: 'POST',
         dataType: 'JSON',
-        url: '<?php echo MAN; ?>Equipo/asignarMeta',
+        url: '<?php echo base_url(MAN); ?>Equipo/asignarMeta',
         data: {eq, meta},
         success: function(rsp) {
             hecho();
@@ -3181,7 +2804,7 @@ function mantenimientoAutonomo(id,deeq, form_id){
         },
         dataType: 'json',
         type: 'POST',
-        url: 'index.php/Equipo/getEqPorId',
+        url: '<?php echo base_url(MAN); ?>Equipo/getEqPorId',
         success: function(data) {
             console.table(data);
             $("#spanNuevaLectura").text(data[0].lectura);

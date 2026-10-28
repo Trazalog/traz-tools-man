@@ -50,7 +50,7 @@
                     
                     } 
                     if ($a['pred_adjunto']) {
-                        echo '<a href="'.base_url().'assets/filespredictivos/'.$a['pred_adjunto'].'" target="_blank"><i class="fa fa-file-pdf-o text-light-blue" style="cursor: pointer; margin-left: 15px;" title="Ver Archivo"></i></a>';
+                        echo '<a href="'.man_asset_url().'assets/filespredictivos/'.$a['pred_adjunto'].'" target="_blank"><i class="fa fa-file-pdf-o text-light-blue" style="cursor: pointer; margin-left: 15px;" title="Ver Archivo"></i></a>';
                     }     
                     echo '</td>';
                     echo '<td>'.$a['predId'].'</td>';
@@ -100,7 +100,7 @@ $(document).ready(function(event) {
   $('#btnAgre').click( function cargarVista(){
     wo();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Predictivo/cargarpredictivo/<?php echo $permission; ?>", () => wc());
+    linkTo("<?php echo base_url(MAN); ?>Predictivo/cargarpredictivo/<?php echo $permission; ?>", () => wc());
   });
 
   //Eliminar
@@ -125,7 +125,7 @@ $(document).ready(function(event) {
     $.ajax({
       type: 'POST',
       data: { idpred: idpred, datos:datos},
-      url: 'index.php/Predictivo/getEditar', 
+      url: '<?php echo base_url(MAN); ?>Predictivo/getEditar', 
       success: function(data){             
               
               datos = {             
@@ -167,7 +167,7 @@ $(document).ready(function(event) {
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN; ?>Preventivo/gettarea',
+      'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
       success: function(data) {
         tmp = data;
       },
@@ -199,7 +199,7 @@ $(function(){
     $.ajax({
         type: 'POST',
         data: { },
-        url: '<?php echo MAN; ?>Preventivo/getUnidTiempo',
+        url: '<?php echo base_url(MAN); ?>Preventivo/getUnidTiempo',
         dataType: 'json',
         success: function(data){ 
             var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -222,7 +222,7 @@ $(function(){
     $.ajax({
         type: 'POST',
         data: { },
-        url: '<?php echo MAN; ?>Preventivo/getherramienta',
+        url: '<?php echo base_url(MAN); ?>Preventivo/getherramienta',
         dataType: 'json',
         success: function(data){                   
             var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -246,7 +246,7 @@ $(function(){
     $.ajax({
       type: 'POST',
       data: { id_herramienta: id_herramienta},
-        url: 'index.php/Preventivo/getdatos', //index.php/
+        url: '<?php echo base_url(MAN); ?>Preventivo/getdatos',
         success: function(data){    
 
           console.log(data);
@@ -303,7 +303,7 @@ $(function(){
     $.ajax({
         type: 'POST',
         data: { },
-        url: '<?php echo MAN; ?>Preventivo/getinsumo',
+        url: '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
         dataType: 'json',
         success: function(data){
             var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -330,7 +330,7 @@ $(function(){
     $.ajax({
       type: 'POST',
       data: { id_insumo: id_insumo},
-          url: 'index.php/Preventivo/getinsumo', //index.php/
+          url: '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
           success: function(data){
             console.log(data);
             var d = data[0]['label']; 
@@ -412,14 +412,14 @@ function eliminarAdjunto() {
     data: { idprev: idprev },
     dataType: 'json',
     type: 'POST',
-    url: 'index.php/Preventivo/eliminarAdjunto',
+    url: '<?php echo base_url(MAN); ?>Predictivo/eliminarAdjunto',
   }) 
   .done( function(data){     
     //console.table(data); 
     let prevAdjunto = '';
     recargaTablaAdjunto(prevAdjunto);
   })                
-  .error( function(result){                      
+  .fail( function(result){                      
     console.error(result);
   }); 
 }
@@ -461,13 +461,13 @@ $("#formAgregarAdjunto").submit(function (event){
       dataType:'json',
       processData:false,
       type:'POST',
-      url:'index.php/Predictivo/agregarAdjunto',
+      url:'<?php echo base_url(MAN); ?>Predictivo/agregarAdjunto',
     })
     .done( function(data){     
       console.table(data['pred_adjunto']); 
       recargaTablaAdjunto( data['pred_adjunto'] );
     })                
-    .error( function(result){                      
+    .fail( function(result){                      
       console.error(result);
     }); 
   }
@@ -476,7 +476,7 @@ $("#formAgregarAdjunto").submit(function (event){
 function recargaTablaAdjunto(prevAdjunto) {
   //console.info( "adjunto: "+prevAdjunto );
   $('#adjunto').text(prevAdjunto);
-  $('#adjunto').attr('href', 'assets/filespredictivos/'+prevAdjunto);
+  $('#adjunto').attr('href', '<?php echo man_asset_url(); ?>assets/filespredictivos/'+prevAdjunto);
   if( prevAdjunto == null || prevAdjunto == '') {
     var accion = '<i class="fa fa-plus-square agregaAdjunto text-light-blue" style="color:#f39c12; cursor:pointer; margin-right:10px" title="Agregar Adjunto"></i>';
   } else {
@@ -577,7 +577,7 @@ function traer_periodo(periodoE) {
       data: {periodoE:periodoE },
       dataType: 'json',
       type: 'POST',
-      url: 'index.php/Calendario/getperiodo',
+      url: '<?php echo base_url(MAN); ?>Calendario/getperiodo',
       success: function(data){
         var opcion = "<option value='-1'>Seleccione...</option>" ; 
         $('#periodo').append(opcion); 
@@ -655,7 +655,7 @@ function guardar(){
                   cantInsum: cantInsum                  
                 },
                 
-          url: 'index.php/Predictivo/updatePredictivo',  
+          url: '<?php echo base_url(MAN); ?>Predictivo/updatePredictivo',  
           success: function(data){
             WaitingClose("Guardando...");
             $('#modalSale').modal('hide');
@@ -686,7 +686,7 @@ function eliminarpred(){
   $.ajax({
     type: 'POST',
     data: { idpre: gloid},
-    url: 'index.php/Predictivo/baja_predictivo', 
+    url: '<?php echo base_url(MAN); ?>Predictivo/baja_predictivo', 
     success: function(data){  
             console.log(data);  
             Refrescar();
@@ -702,7 +702,7 @@ function eliminarpred(){
 function Refrescar(){
 
   $('#content').empty();
-  $("#content").load("<?php echo base_url(); ?>index.php/Predictivo/index/<?php echo $permission; ?>");
+  linkTo("<?php echo base_url(MAN); ?>Predictivo/index/<?php echo $permission; ?>");
   WaitingClose('Cargando...');
 }
   
