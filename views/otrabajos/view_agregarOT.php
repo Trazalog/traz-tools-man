@@ -7,267 +7,279 @@
         </div>
     </div>
 </div>
-<div class="box">
-    <div class="box-header with-border">
-        <h3 class="box-title">Nueva Orden de Trabajo</h3>
-    </div><!-- /.box-header -->
     <div class="row">
-        <div class="col-md-3">
-        <?php
-            echo '<button class="btn btn-block btn-primary" style="width: 250px; margin-top: 10px; margin-left: 10px" id="listadoOT">Ver Listado Ordenes de Trabajo</button>';
-        ?>
+        <div class="col-xs-12">
+            <div class="box">
+                <div class="box-header">
+                    <h3 class="box-title">Nueva Orden de Trabajo</h3>
+                    <?php
+                        echo '<button class="btn btn-block btn-primary" style="width: 250px; margin-top: 10px;" id="listadoOT">Ver Listado Ordenes de Trabajo</button>';
+                        ?>
+                </div><!-- /.box-header -->
+                <form id="formOT" role="form" action="<?php echo base_url(MAN); ?>Otrabajo/guardar_agregar" method="POST">
+
+                    <div class="box-body">
+                        <div class="panel panel-default">
+                            <div class="panel-heading">
+                                <h3 class="panel-title"><span class="fa fa-cogs"></span> Datos del equipo </h3>
+                            </div>
+
+                            <div class="panel-body">
+                                <div class="row">
+                                    <div class="col-xs-12 col-sm-6 com-md-4">
+                                        <label for="idSector">Sector <strong style="color: #dd4b39">*</strong></label>
+                                        <input type="text" class="form-control buscSector" placeholder="Buscar Sector..." id="buscSector" name="buscSector" >
+                                        <input type="text" class="hidden idSector" id="idSector" name="idSector" >
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 com-md-4">
+                                        <label for="equipo">Equipos <strong style="color: #dd4b39">*</strong></label>
+                                        <select id="equipo" name="equipo" class="form-control equipo" >
+                                            <option value="-1" selected disabled>Seleccione opción</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    
+                                    <div class="col-xs-12 col-sm-6 com-md-4">
+                                        <label for="cliente">Cliente:</label>
+                                        <input type="text" id="nomCliente" name="cliente" class="form-control input-md"
+                                            disabled />
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 com-md-4">
+                                        <label for="fecha_ingreso">Fecha:</label>
+                                        <input type="text" id="fecha_ingreso" name="fecha_ingreso"
+                                            class="form-control input-md" disabled />
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 com-md-4">
+                                        <label for="marca">Marca:</label>
+                                        <input type="text" id="marca" name="marca" class="form-control input-md"
+                                            disabled required/>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 com-md-4">
+                                        <label for="ubicacion">Ubicacion:</label>
+                                        <input type="text" id="ubicacion" name="ubicacion" class="form-control input-md"
+                                            disabled />
+                                    </div>
+                                    <div class="col-xs-12">
+                                        <label for="descripcion">Descripcion: </label>
+                                        <textarea class="form-control" id="descripcion" name="descripcion"
+                                            disabled></textarea>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel panel-default">
+                            <div class="panel-heading">
+                                <h4 class="panel-title"><span class="fa fa-building-o"></span> Programación</h4>
+                            </div>
+
+                            <div class="panel-body">
+                                <div class="row">
+                                    <div class="col-xs-12 col-sm-6">
+                                        <label for="tarea">Tarea Estandar<strong
+                                                style="color: #dd4b39">*</strong>:</label>
+                                        <input type="text" id="tarea" name="tarea" class="form-control"
+                                            placeholder="Buscar Tarea..." >
+                                        <input type="hidden" id="id_tarea" name="id_tarea" required>
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6">
+                                        <label for="tarea_manual">Tarea Personalizada<strong
+                                                style="color: #dd4b39">*</strong>:</label>
+                                        <input type="text" id="tareacustom" name="tareacustom" class="form-control"
+                                            placeholder="Ingresar Tarea...">
+                                    </div>
+                                </div>
+                                <div class="row">
+
+                                    <!-- <div class="col-xs-12 col-sm-6">
+                      <label for="fechaEntrega">Fecha Entrega:</label>
+                      <input type="text" class="datepicker form-control fecha" id="fechaEntrega" name="fechaEntrega" value="<?php echo date_format(date_create(date("Y-m-d H:i:s")), 'd-m-Y H:i:s') ; ?>" size="27"/>
+                    </div> -->
+
+                                    <div class="col-xs-12 col-sm-6 hidden">
+                                        <label for="suci">Sucursal</label>
+                                        <input type="text" id="suci" name="suci" value="1">
+
+                                        <!-- <select  id="suci" name="suci" class="form-control" /> -->
+                                    </div>
+                                    <div class="col-xs-12 col-sm-6 hidden">
+                                        <label for="prov">Proveedor</label>
+                                        <input type="text" id="prov" name="prov" value="1">
+
+                                        <!-- <select  id="prov" name="prov" class="form-control" /> -->
+                                    </div>
+
+                                    <input type="hidden" id="suci" name="suci" value="1">
+                                    <input type="hidden" id="prov" name="prov" value="1">
+
+                                    <div class="col-xs-12 col-sm-6">
+                                        <label for="fechaInicio">Fecha Programación:</label>
+                                        <input type="text" class="datepicker form-control fecha" id="fechaInicio"
+                                            name="fechaInicio"
+                                            value="<?php echo date_format(date_create(date("Y-m-d H:i:s")), 'd-m-Y H:i:s') ; ?>"
+                                            size="27" />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-xs-12">
+                                <div class="nav-tabs-custom">
+                                    <!--tabs -->
+                                    <ul class="nav nav-tabs" role="tablist">
+                                        <li role="presentation" class="active"><a href="#herramin"
+                                                aria-controls="profile" role="tab" data-toggle="tab">Herramientas</a>
+                                        </li>
+                                        <li role="presentation"><a href="#insum" aria-controls="messages" role="tab"
+                                                data-toggle="tab">Insumos</a></li>
+                                        <li role="presentation"><a href="#adj" aria-controls="messages" role="tab"
+                                                data-toggle="tab">Adjunto</a></li>
+                                    </ul>
+                                    <!-- /tabs -->
+
+                                    <!-- Tab panes -->
+                                    <div class="tab-content">
+                                        <div role="tabpanel" class="tab-pane active" id="herramin">
+                                            <div class="row">
+                                                <div class="col-xs-12 col-sm-6 col-md-4">
+                                                    <label for="herramienta">Codigo <strong
+                                                            style="color: #dd4b39">*</strong>:</label>
+                                                    <input type="text" id="herramienta" name="" class="form-control" />
+                                                    <input type="hidden" id="id_herramienta" name="id_herramienta">
+                                                </div>
+                                                <div class="col-xs-12 col-sm-6 col-md-4">
+                                                    <label for="marcaherram">Marca <strong
+                                                            style="color: #dd4b39">*</strong>:</label>
+                                                    <input type="text" id="marcaherram" name="" class="form-control" />
+                                                </div>
+                                                <div class="col-xs-12 col-sm-6 col-md-4">
+                                                    <label for="descripcionherram">Descripcion <strong
+                                                            style="color: #dd4b39">*</strong>:</label>
+                                                    <input type="text" id="descripcionherram" name=""
+                                                        class="form-control" />
+                                                </div>
+                                                <div class="col-xs-12 col-sm-6 col-md-4">
+                                                    <label for="cantidadherram">Cantidad <strong
+                                                            style="color: #dd4b39">*</strong>:</label>
+                                                    <input type="text" id="cantidadherram" name="" class="form-control"
+                                                        placeholder="Ingrese Cantidad" />
+                                                </div>
+                                                <br>
+                                                <div class="col-xs-12">
+                                                    <label></label>
+                                                    <br>
+                                                    <button type="button" class="btn btn-primary" id="agregarherr"><i
+                                                            class="fa fa-check">Agregar</i></button>
+                                                </div>
+                                            </div><!-- /.row -->
+                                            <div class="row">
+                                                <div class="col-xs-12 col-sm-8 col-md-6">
+                                                    <label for="herrlibre">Herramienta fuera del maestro (texto libre):</label>
+                                                    <input type="text" id="herrlibre" class="form-control" placeholder="Ej.: Zuncho de izaje 3 t (prestado)" />
+                                                </div>
+                                                <div class="col-xs-12 col-sm-4 col-md-3">
+                                                    <label>&nbsp;</label><br>
+                                                    <button type="button" class="btn btn-default" id="agregarherrlibre"><i class="fa fa-plus"></i> Agregar texto libre</button>
+                                                </div>
+                                            </div><!-- /.row texto libre -->
+                                            <div class="row">
+                                                <div class="col-xs-12">
+                                                    <br>
+                                                    <table class="table table-bordered" id="tablaherramienta">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Acciones</th>
+                                                                <th>Código</th>
+                                                                <th>Marca</th>
+                                                                <th>Descripcion</th>
+                                                                <th>Cantidad</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody></tbody>
+                                                    </table>
+                                                </div>
+                                            </div><!-- /.row -->
+                                        </div> <!-- /.tabpanel #herramin-->
+
+                                        <div role="tabpanel" class="tab-pane" id="insum">
+                                            <div class="row">
+                                                <div class="col-xs-12 col-sm-6 col-md-4">
+                                                    <label for="insumo">Codigo <strong
+                                                            style="color: #dd4b39">*</strong>:</label>
+                                                    <input type="text" id="insumo" name="insumo" class="form-control" />
+                                                    <input type="hidden" id="id_insumo" name="">
+                                                </div>
+                                                <div class="col-xs-12 col-sm-6 col-md-4">
+                                                    <label for="">Descripcion:</label>
+                                                    <input type="text" id="descript" name="" class="form-control" />
+                                                </div>
+                                                <div class="col-xs-12 col-sm-6 col-md-4">
+                                                    <label for="cant">Cantidad <strong
+                                                            style="color: #dd4b39">*</strong>:</label>
+                                                    <input type="text" id="cant" name="" class="form-control"
+                                                        placeholder="Ingrese Cantidad" />
+                                                </div>
+                                            </div><!-- /.row -->
+                                            <div class="row">
+                                                <div class="col-xs-12">
+                                                    <br>
+                                                    <button type="button" class="btn btn-primary" id="agregarins"><i
+                                                            class="fa fa-check">Agregar</i></button>
+                                                </div>
+                                            </div><!-- /.row -->
+                                            <div class="row">
+                                                <div class="col-xs-12">
+                                                    <table class="table table-bordered" id="tablainsumo">
+                                                        <thead>
+                                                            <tr>
+                                                                <th>Acciones</th>
+                                                                <th>Código</th>
+                                                                <th>Descripcion</th>
+                                                                <th>Cantidad</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody></tbody>
+                                                    </table>
+                                                </div>
+                                            </div><!-- /.row -->
+                                        </div>
+                                        <!--/#insum -->
+
+                                        <div role="tabpanel" class="tab-pane" id="adj">
+                                            <div class="row">
+                                                <div class="col-xs-12">
+                                                    <input id="inputPDF" name="inputPDF" type="file"
+                                                        class="form-control input-md">
+                                                    <style type="text/css">
+                                                    #inputPDF {
+                                                        padding-bottom: 40px;
+                                                    }
+                                                    </style>
+                                                </div>
+                                            </div><!-- /.row -->
+                                        </div> <!-- /.tab-pane #adj -->
+                                    </div> <!-- tab-content -->
+
+                                    <!-- <div class="modal-footer">
+                      <button type="submit" class="btn btn-primary">Guardar</button>
+                    </div>  -->
+                                </div><!-- /.nav-tabs-custom -->
+                            </div>
+                        </div>
+
+                    </div><!-- /.box-body -->
+
+                    <div class="modal-footer">
+                        <button type="submit" id="btn_guardar" class="btn btn-primary">Guardar</button>
+                    </div>
+                </form>
+                <!--cierre form-->
+            </div>
         </div>
     </div>
-    <form id="formOT" role="form" action="<?php echo MAN;?>Otrabajo/guardar_agregar" method="POST">
 
-        <div class="box-body">
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <h3 class="panel-title"><span class="fa fa-cogs"></span> Datos del equipo </h3>
-                </div>
-
-                <div class="panel-body">
-                    <div class="row">
-                        <div class="col-xs-12 col-sm-6 com-md-4">
-                            <label for="idSector">Sector <strong style="color: #dd4b39">*</strong></label>
-                            <input type="text" class="form-control buscSector" placeholder="Buscar Sector..." id="buscSector" name="buscSector" >
-                            <input type="text" class="hidden idSector" id="idSector" name="idSector" >
-                        </div>
-                        <div class="col-xs-12 col-sm-6 com-md-4">
-                            <label for="equipo">Equipos <strong style="color: #dd4b39">*</strong></label>
-                            <select id="equipo" name="equipo" class="form-control equipo" >
-                                <option value="-1" selected disabled>Seleccione opción</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="row">
-                        
-                        <div class="col-xs-12 col-sm-6 com-md-4">
-                            <label for="cliente">Cliente:</label>
-                            <input type="text" id="nomCliente" name="cliente" class="form-control input-md"
-                                disabled />
-                        </div>
-                        <div class="col-xs-12 col-sm-6 com-md-4">
-                            <label for="fecha_ingreso">Fecha:</label>
-                            <input type="text" id="fecha_ingreso" name="fecha_ingreso"
-                                class="form-control input-md" disabled />
-                        </div>
-                        <div class="col-xs-12 col-sm-6 com-md-4">
-                            <label for="marca">Marca:</label>
-                            <input type="text" id="marca" name="marca" class="form-control input-md"
-                                disabled required/>
-                        </div>
-                        <div class="col-xs-12 col-sm-6 com-md-4">
-                            <label for="ubicacion">Ubicacion:</label>
-                            <input type="text" id="ubicacion" name="ubicacion" class="form-control input-md"
-                                disabled />
-                        </div>
-                        <div class="col-xs-12">
-                            <label for="descripcion">Descripcion: </label>
-                            <textarea class="form-control" id="descripcion" name="descripcion"
-                                disabled></textarea>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="panel panel-default">
-                <div class="panel-heading">
-                    <h4 class="panel-title"><span class="fa fa-building-o"></span> Programación</h4>
-                </div>
-
-                <div class="panel-body">
-                    <div class="row">
-                        <div class="col-xs-12 col-sm-6">
-                            <label for="tarea">Tarea Estandar<strong
-                                    style="color: #dd4b39">*</strong>:</label>
-                            <input type="text" id="tarea" name="tarea" class="form-control"
-                                placeholder="Buscar Tarea..." >
-                            <input type="hidden" id="id_tarea" name="id_tarea" required>
-                        </div>
-                        <div class="col-xs-12 col-sm-6">
-                            <label for="tarea_manual">Tarea Personalizada<strong
-                                    style="color: #dd4b39">*</strong>:</label>
-                            <input type="text" id="tareacustom" name="tareacustom" class="form-control"
-                                placeholder="Ingresar Tarea...">
-                        </div>
-                    </div>
-                    <div class="row">
-
-                        <!-- <div class="col-xs-12 col-sm-6">
-            <label for="fechaEntrega">Fecha Entrega:</label>
-            <input type="text" class="datepicker form-control fecha" id="fechaEntrega" name="fechaEntrega" value="<?php echo date_format(date_create(date("Y-m-d H:i:s")), 'd-m-Y H:i:s') ; ?>" size="27"/>
-        </div> -->
-
-                        <div class="col-xs-12 col-sm-6 hidden">
-                            <label for="suci">Sucursal</label>
-                            <input type="text" id="suci" name="suci" value="1">
-
-                            <!-- <select  id="suci" name="suci" class="form-control" /> -->
-                        </div>
-                        <div class="col-xs-12 col-sm-6 hidden">
-                            <label for="prov">Proveedor</label>
-                            <input type="text" id="prov" name="prov" value="1">
-
-                            <!-- <select  id="prov" name="prov" class="form-control" /> -->
-                        </div>
-
-                        <input type="hidden" id="suci" name="suci" value="1">
-                        <input type="hidden" id="prov" name="prov" value="1">
-
-                        <div class="col-xs-12 col-sm-6">
-                            <label for="fechaInicio">Fecha Programación:</label>
-                            <input type="text" class="datepicker form-control fecha" id="fechaInicio"
-                                name="fechaInicio"
-                                value="<?php echo date_format(date_create(date("Y-m-d H:i:s")), 'd-m-Y H:i:s') ; ?>"
-                                size="27" />
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row">
-                <div class="col-xs-12">
-                    <div class="nav-tabs-custom">
-                        <!--tabs -->
-                        <ul class="nav nav-tabs" role="tablist">
-                            <li role="presentation" class="active"><a href="#herramin"
-                                    aria-controls="profile" role="tab" data-toggle="tab">Herramientas</a>
-                            </li>
-                            <li role="presentation"><a href="#insum" aria-controls="messages" role="tab"
-                                    data-toggle="tab">Insumos</a></li>
-                            <li role="presentation"><a href="#adj" aria-controls="messages" role="tab"
-                                    data-toggle="tab">Adjunto</a></li>
-                        </ul>
-                        <!-- /tabs -->
-
-                        <!-- Tab panes -->
-                        <div class="tab-content">
-                            <div role="tabpanel" class="tab-pane active" id="herramin">
-                                <div class="row">
-                                    <div class="col-xs-12 col-sm-6 col-md-4">
-                                        <label for="herramienta">Codigo <strong
-                                                style="color: #dd4b39">*</strong>:</label>
-                                        <input type="text" id="herramienta" name="" class="form-control" />
-                                        <input type="hidden" id="id_herramienta" name="id_herramienta">
-                                    </div>
-                                    <div class="col-xs-12 col-sm-6 col-md-4">
-                                        <label for="marcaherram">Marca <strong
-                                                style="color: #dd4b39">*</strong>:</label>
-                                        <input type="text" id="marcaherram" name="" class="form-control" />
-                                    </div>
-                                    <div class="col-xs-12 col-sm-6 col-md-4">
-                                        <label for="descripcionherram">Descripcion <strong
-                                                style="color: #dd4b39">*</strong>:</label>
-                                        <input type="text" id="descripcionherram" name=""
-                                            class="form-control" />
-                                    </div>
-                                    <div class="col-xs-12 col-sm-6 col-md-4">
-                                        <label for="cantidadherram">Cantidad <strong
-                                                style="color: #dd4b39">*</strong>:</label>
-                                        <input type="text" id="cantidadherram" name="" class="form-control"
-                                            placeholder="Ingrese Cantidad" />
-                                    </div>
-                                    <br>
-                                    <div class="col-xs-12">
-                                        <label></label>
-                                        <br>
-                                        <button type="button" class="btn btn-primary" id="agregarherr"><i
-                                                class="fa fa-check">Agregar</i></button>
-                                    </div>
-                                </div><!-- /.row -->
-                                <div class="row">
-                                    <div class="col-xs-12">
-                                        <br>
-                                        <table class="table table-bordered" id="tablaherramienta">
-                                            <thead>
-                                                <tr>
-                                                    <th>Acciones</th>
-                                                    <th>Código</th>
-                                                    <th>Marca</th>
-                                                    <th>Descripcion</th>
-                                                    <th>Cantidad</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody></tbody>
-                                        </table>
-                                    </div>
-                                </div><!-- /.row -->
-                            </div> <!-- /.tabpanel #herramin-->
-
-                            <div role="tabpanel" class="tab-pane" id="insum">
-                                <div class="row">
-                                    <div class="col-xs-12 col-sm-6 col-md-4">
-                                        <label for="insumo">Codigo <strong
-                                                style="color: #dd4b39">*</strong>:</label>
-                                        <input type="text" id="insumo" name="insumo" class="form-control" />
-                                        <input type="hidden" id="id_insumo" name="">
-                                    </div>
-                                    <div class="col-xs-12 col-sm-6 col-md-4">
-                                        <label for="">Descripcion:</label>
-                                        <input type="text" id="descript" name="" class="form-control" />
-                                    </div>
-                                    <div class="col-xs-12 col-sm-6 col-md-4">
-                                        <label for="cant">Cantidad <strong
-                                                style="color: #dd4b39">*</strong>:</label>
-                                        <input type="text" id="cant" name="" class="form-control"
-                                            placeholder="Ingrese Cantidad" />
-                                    </div>
-                                </div><!-- /.row -->
-                                <div class="row">
-                                    <div class="col-xs-12">
-                                        <br>
-                                        <button type="button" class="btn btn-primary" id="agregarins"><i
-                                                class="fa fa-check">Agregar</i></button>
-                                    </div>
-                                </div><!-- /.row -->
-                                <div class="row">
-                                    <div class="col-xs-12">
-                                        <table class="table table-bordered" id="tablainsumo">
-                                            <thead>
-                                                <tr>
-                                                    <th>Acciones</th>
-                                                    <th>Código</th>
-                                                    <th>Descripcion</th>
-                                                    <th>Cantidad</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody></tbody>
-                                        </table>
-                                    </div>
-                                </div><!-- /.row -->
-                            </div>
-                            <!--/#insum -->
-
-                            <div role="tabpanel" class="tab-pane" id="adj">
-                                <div class="row">
-                                    <div class="col-xs-12">
-                                        <input id="inputPDF" name="inputPDF" type="file"
-                                            class="form-control input-md">
-                                        <style type="text/css">
-                                        #inputPDF {
-                                            padding-bottom: 40px;
-                                        }
-                                        </style>
-                                    </div>
-                                </div><!-- /.row -->
-                            </div> <!-- /.tab-pane #adj -->
-                        </div> <!-- tab-content -->
-
-                        <!-- <div class="modal-footer">
-            <button type="submit" class="btn btn-primary">Guardar</button>
-        </div>  -->
-                    </div><!-- /.nav-tabs-custom -->
-                </div>
-            </div>
-
-        </div><!-- /.box-body -->
-
-        <div class="modal-footer">
-            <button type="submit" id="btn_guardar" class="btn btn-primary">Guardar</button>
-        </div>
-    </form><!--/. form-->
-</div><!-- /.box -->
 <script>
 
 // Trae Sectores y autocompleta el campo
@@ -278,7 +290,7 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getSector",
+      'url': "Sservicio/getSector",
       'success': function (data) {
         tmp = data;
       }
@@ -289,6 +301,21 @@ var dataF = function () {
     source: dataF,
     delay: 100,
     minLength: 1,
+    /*
+    focus: function(event, ui) {
+        console.log('Focus');
+        // prevent autocomplete from updating the textbox
+        event.preventDefault();
+        // manually update the textbox
+        $(this).val(ui.item.label);
+        console.log(ui.item);
+        if(ui.item === null){
+            $("#equipo").html('<option value="-1" disabled selected>Seleccione opción</option>');
+            $("#idSector").val('');
+            alert("Debe seleccionar un Sector");
+        }
+    },
+    */
     change: function(event,ui){
       // prevent autocomplete from updating the textbox
       console.log('Change');
@@ -297,16 +324,17 @@ var dataF = function () {
       if(ui.item === null){
         $("#equipo").html('<option value="-1" disabled selected>Seleccione opción</option>');
         $("#idSector").val('');
-        notificar("Alerta","Debe seleccionar un sector","warning");
+        alert("Debe seleccionar un Sector");
       }else{
         $("#idSector").val(ui.item.value);
         $(this).val(ui.item.label);
+        $("#equipo").html('<option value="-1" disabled selected>Seleccione opción</option>');
         // guardo el id de sector
         var idSect =  $("#idSector").val();
         if(idSect && idSect != '')
           getEquiSector(idSect);
         else
-          notificar("Alerta","Debe seleccionar un sector","warning");
+          alert("Debe seleccionar un sector");
       }
     },
     select: function(event, ui) {
@@ -321,15 +349,24 @@ var dataF = function () {
       }else{
         $("#idSector").val(ui.item.value);
         $(this).val(ui.item.label);
+        $("#equipo").html('<option value="-1" disabled selected>Seleccione opción</option>');
         // guardo el id de sector
         var idSect =  $("#idSector").val();
         getEquiSector(idSect);
       }
+      /*$(this).val(ui.item.label);
+      $("#idSector").val(ui.item.value);
+      $("#equipo").html('<option value="-1" disabled selected>Seleccione opcion</option>');
+      // guardo el id de sector
+      var idSect =  $("#idSector").val();
+      getEquiSector(idSect);
+      //console.log("id sector en autocompletar: ");
+      //console.log(ui.item.value);
+      */
     },
   }); 
   //  llena select de equipos segun sector
   function getEquiSector(idSect){
-    wo();
     var id =  idSect;
     $("#fecha_ingreso").val("");
     $("#marca").val("");
@@ -343,25 +380,21 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN;?>Sservicio/getEquipSector",
-      success: function (data) {
-        if(data !== null){
-            // Asigna opciones al select Equipo en modal
-            var $select = $("#equipo");
-            $select.empty();
-            $select.html('<option value="-1" disabled selected>Seleccione opción</option>');
-            for (var i = 0; i < data.length; i++) {
-                $select.append($('<option />', { value: data[i]['id_equipo'], text: data[i]['descripcion'] }));
-            }
-        }else{
-            notificar('Alerta','No se encontraron equipos para este sector','warning');
+      'url': "Sservicio/getEquipSector",
+      'success': function (data) {
+        console.log("Entro por getEquiSector ok");
+        console.table(data);//[0]['id_equipo']);
+        // Asigna opciones al select Equipo en modal
+        //console.log("length: "+data.length);
+        var $select = $("#equipo");
+        for (var i = 0; data.length; i++) {
+          $select.append($('<option />', { value: data[i]['id_equipo'], text: data[i]['descripcion'] }));
         }
       },
-      error : function(data){
+      'error' : function(data){
         console.log('Error en getEquiSector');
         console.table(data);
       },
-      complete: () => wc()
     });
   }
 
@@ -369,9 +402,10 @@ var dataF = function () {
 
 //va listado de OTs
 $("#listadoOT").click(function(e) {
-    wo();
+    WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Otrabajo/listOrden/<?php echo $permission; ?>", () => wc());
+    linkTo("<?php echo base_url(MAN); ?>Otrabajo/listOrden/<?php echo $permission; ?>");
+    WaitingClose();
 });
 
 // limpia un input al seleccionar o llenar otro
@@ -388,7 +422,7 @@ $('#tareacustom').change(function() {
 
 $("#formOT").submit(function(event) {
     event.preventDefault();
-    wo();
+    WaitingOpen('Guardando Nueva Orden de Trabajo');
     var equipo = $('#equipo').val();
     var tarea = $('#id_tarea').val();
     var tareacustom = $('#tareacustom').val();
@@ -434,33 +468,39 @@ $("#formOT").submit(function(event) {
             contentType: false,
             processData: false,
             success: function(respuesta) {
-                if (respuesta) {
-                    confRefresh(recargaLista,'',"La OT se generó correctamente");
-                }else if(respuesta==="error"){
-                    error("Error","Los datos no se han podido guardar");
-                }
+                WaitingClose(),
+                    recargaLista();
             },
             error: function(result) {
-                error('Error','Ocurrio un error en el guardado...');
-                console.log(result);
-            },
-            complete: () => wc()
+                WaitingClose();
+                alert('Ocurrio un error en el guardado...');
+                console.error(
+                    "Error al agregar nueva OT. Ver console.table");
+                console.table(result);
+            }
         });
     }
 
 });
+
+
 // Limpia modales y regresa al listado de OTs - Ok test 
 function recargaLista() {
-    wo();
+    //WaitingOpen('');
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Otrabajo/listOrden/<?php echo $permission; ?>", () => wc());
+    linkTo(
+        "<?php echo base_url(MAN); ?>Otrabajo/listOrden/<?php echo $permission; ?>");
+    WaitingClose();
 }
 
 $("#fechaEntrega, #fechaInicio").datepicker({
     dateFormat: 'dd/mm/yy',
     firstDay: 1
 }).datepicker("setDate", new Date());
+
+
 // Fin Nuevos //
+
 
 $("#formPredictivo").submit(function(event) {
     event.preventDefault();
@@ -515,8 +555,8 @@ $("#formPredictivo").submit(function(event) {
 $('#listado').click(function cargarVista() {
     WaitingOpen();
     $('#content').empty();
-    $("#content").load(
-        "<?php echo base_url(); ?>index.php/Predictivo/index/<?php echo $permission; ?>"
+    linkTo(
+        "<?php echo base_url(MAN); ?>Predictivo/index/<?php echo $permission; ?>"
     );
     WaitingClose();
 });
@@ -527,6 +567,32 @@ $(".datepicker").datepicker({
     changeYear: true
 });
 
+// Trae equipos por empresa logueada - Chequeado
+/** Desactivamos esta funcion para que no cargue a la primera */
+/*$(function() {
+    $.ajax({
+        type: 'POST',
+        data: {},
+        url: '<?php echo base_url(MAN); ?>Otrabajo/getEquiposNuevaOT',
+        success: function(data) {
+
+            var opcion = "<option value='-1'>Seleccione...</option>";
+            $('#equipo').append(opcion);
+            for (var i = 0; i < data.length; i++) {
+                var nombre = data[i]['codigo'];
+                var opcion = "<option value='" + data[i]['id_equipo'] +
+                    "'>" + nombre + "</option>";
+                $('#equipo').append(opcion);
+            }
+        },
+        error: function(result) {
+
+            console.log(result);
+        },
+        dataType: 'json'
+    });
+});*/
+
 // Trae info de equipos por ID - Chequeado 
 $('#equipo').change(function() {
     var id_equipo = $(this).val();
@@ -535,7 +601,7 @@ $('#equipo').change(function() {
         data: {
             id_equipo: id_equipo
         },
-        url: '<?php echo MAN ?>Otrabajo/getInfoEquipoNuevaOT',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/getInfoEquipoNuevaOT',
         success: function(data) {
             console.table(data);
             var fecha_ingreso = data[0]['fecha_ingreso'];
@@ -565,7 +631,7 @@ var dataTarea = function() {
             'async': false,
             'type': "POST",
             'dataType': 'json',
-            'url': '<?php echo MAN; ?>Preventivo/gettarea',
+            'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
         })
         .done((data) => {
             tmp = data
@@ -595,8 +661,7 @@ $(function() {
     $.ajax({
         type: 'POST',
         data: {},
-        url: '<?php echo MAN; ?>Preventivo/getUnidTiempo',
-        dataType: 'json',
+        url: '<?php echo base_url(MAN); ?>Predictivo/getUnidTiempo',
         success: function(data) {
 
             var opcion = "<option value='-1'>Seleccione...</option>";
@@ -609,8 +674,10 @@ $(function() {
             }
         },
         error: function(result) {
+
             console.log(result);
         },
+        dataType: 'json'
     });
 });
 
@@ -628,7 +695,7 @@ function traer_periodo(periodoId) {
         },
         dataType: 'json',
         type: 'POST',
-        url: '<?php echo MAN; ?>Calendario/getperiodo',
+        url: '<?php echo base_url(MAN); ?>Calendario/getperiodo',
         success: function(data) {
             var opcion = "<option value='-1'>Seleccione...</option>";
             $('#periodo').append(opcion);
@@ -687,8 +754,8 @@ $('#duracion, #unidad, #cantOper').change(function() {
 function cargarVista() {
     WaitingOpen();
     $('#content').empty();
-    $("#content").load(
-        "<?php echo base_url(); ?>index.php/Predictivo/index/<?php echo $permission; ?>");
+    linkTo(
+        "<?php echo base_url(MAN); ?>Predictivo/index/<?php echo $permission; ?>");
     WaitingClose();
 }
 
@@ -712,15 +779,12 @@ var dataHerramientas = function() {
             'async': false,
             'type': "POST",
             'dataType': 'json',
-            'url': '<?php echo MAN; ?>Preventivo/getHerramientasB',
-            success: function(data) {
-                tmp = data;
-            },
-            error: function(result) {
-                error('Error','Error al traer Herramientas');
-                console.log(result);
-            },
+            'url': '<?php echo base_url(MAN); ?>Preventivo/getHerramientasB',
         })
+        .done((data) => {
+            tmp = data
+        });
+    //.fail( () => alert("Error al traer Herramientas") );
     return tmp;
 }();
 
@@ -896,15 +960,12 @@ var dataInsumos = function() {
             'async': false,
             'type': "POST",
             'dataType': 'json',
-            'url': '<?php echo MAN; ?>Preventivo/getinsumo',
-            success: function(data) {
-                tmp = data;
-            },
-            error: function(result) {
-                error('Error','Error al traer Insumos');
-                console.log(result);
-            },
+            'url': '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
+        })
+        .done((data) => {
+            tmp = data
         });
+    //.fail( () => alert("Error al traer Herramientas") );
     return tmp;
 }();
 
@@ -1038,4 +1099,23 @@ $(document).ready(function() {
         }
     });
 });
+
+$("#agregarherrlibre").click(function(e){
+    var txt = $("#herrlibre").val();
+    if (!txt) { $("#herrlibre").focus(); return; }
+    nrofila = nrofila + 1;
+    var tr = "<tr data-nrofila='"+nrofila+"'>"+
+        "<td><i class='fa fa-ban elirow' style='color:#f39c12;cursor:pointer'></i></td>"+
+        "<td class='herr'><span class='label label-default'>texto libre</span></td>"+
+        "<td class='marca'>-</td>"+
+        "<td class='descrip'>"+txt+"</td>"+
+        "<td class='cant'>1</td>"+
+        "<input type='hidden' name='id_her["+nrofila+"]' value='0'>"+
+        "<input type='hidden' name='cant_herr["+nrofila+"]' value='1'>"+
+        "<input type='hidden' name='desc_libre["+nrofila+"]' value=\""+txt.replace(/"/g,'&quot;')+"\">"+
+        "</tr>";
+    $("#tablaherramienta tbody").append(tr);
+    $("#herrlibre").val('');
+});
+
 </script>

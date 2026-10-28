@@ -906,6 +906,45 @@ def paridad_solicitud(asset, man, emp_asset):
     sql("DELETE FROM solicitud_reparacion WHERE solicitante LIKE '%s%%'" % PREFIJO)
 
 
+def paridad_ot(asset, man, emp_asset):
+    """Órdenes de trabajo, parte de lectura (MIG-ASSET-2)."""
+    pa, pm = ASSET + 'Otrabajo/', MAN + 'Otrabajo/'
+    orden = lambda l: sorted(l, key=lambda r: json.dumps(r, sort_keys=True)) if isinstance(l, list) else l
+    comparar('ot · listado (pantalla)', celdas_tabla(asset.get(pa + 'listOrden/Add-Edit-Del')), celdas_tabla(man.get(pm + 'listOrden/Add-Edit-Del')))
+    eq = sql("SELECT id_equipo FROM orden_trabajo WHERE id_empresa=%d ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0][0]
+    for nombre, filtros in (('sin filtros', {}), ('estado PL', {'estadoFilt': 'PL'}), ('estado T', {'estadoFilt': 'T'}), ('equipo', {'equipoFilt': eq}),
+                            ('desde', {'fec_desde': '2023-01-01'}), ('desde y hasta', {'fec_desde': '2020-01-01', 'fec_hasta': '2030-12-31'})):
+        comparar('ot · filtrar ' + nombre, orden(jload(asset.post(pa + 'filtrarListado', filtros))), orden(jload(man.post(pm + 'filtrarListado', filtros))))
+    for accion, datos in (('getproveedor', None), ('traer_sucursal', None), ('getequipo', None), ('getEquiposNuevaOT', None), ('getusuario', None),
+                          ('traer_cli', None), ('getInfoEquipoNuevaOT', {'id_equipo': eq})):
+        ra = asset.get(pa + accion) if datos is None else asset.post(pa + accion, datos)
+        rm = man.get(pm + accion) if datos is None else man.post(pm + accion, datos)
+        comparar('ot · ' + accion, orden(jload(ra)), orden(jload(rm)))
+    vistas = {'1': ('getViewDataOt', {}), '2': ('getViewDataSolServicio', 'idSolServicio'), '3': ('getViewDataPreventivo', 'idPreventivo'),
+              '4': ('getViewDataBacklog', 'idBacklog'), '5': ('getViewDataPredictivo', 'idPredictivo')}
+    for ot, tipo, sol, cli in sql("SELECT id_orden, tipo, id_solicitud, cliId FROM orden_trabajo WHERE id_empresa=%d ORDER BY id_orden" % emp_asset):
+        comparar('ot %s · editar' % ot, jload(asset.post(pa + 'getpencil', {'idp': ot})), jload(man.post(pm + 'getpencil', {'idp': ot})))
+        comparar('ot %s · origen' % ot, jload(asset.post(pa + 'getOrigenOt', {'idot': ot})), jload(man.post(pm + 'getOrigenOt', {'idot': ot})))
+        comparar('ot %s · asignar' % ot, jload(asset.get(pa + 'getasigna?id_orden=%s' % ot)), jload(man.get(pm + 'getasigna?id_orden=%s' % ot)))
+        comparar('ot %s · pedidos' % ot, jload(asset.get(pa + 'getpedidos?fechai=%s' % ot)), jload(man.get(pm + 'getpedidos?fechai=%s' % ot)))
+        if sql("SELECT id_empresa FROM admcustomers WHERE cliId=%s" % cli) == [[str(emp_asset)]]:
+            comparar('ot %s · cliente' % ot, jload(asset.post(pa + 'getcliente', {'idcliente': cli})), jload(man.post(pm + 'getcliente', {'idcliente': cli})))
+        else:
+            # La OT apunta a un cliente de otra empresa (T29): asset lo muestra, MAN no.
+            comparar('ot %s · cliente de otra empresa (MAN no lo muestra, T29)' % ot, 'nada', man.post(pm + 'getcliente', {'idcliente': cli}).strip())
+        if tipo in vistas:
+            accion, campo = vistas[tipo]
+            datos = {'idOt': ot}
+            if campo:
+                datos[campo] = sol
+            comparar('ot %s · %s' % (ot, accion), jload(asset.post(pa + accion, datos)), jload(man.post(pm + accion, datos)))
+    ajena = sql("SELECT id_orden, cliId FROM orden_trabajo WHERE id_empresa<>%d ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0]
+    comparar('ot · aislamiento: MAN no trae OTs ajenas', {'datos': 0}, jload(man.post(pm + 'getpencil', {'idp': ajena[0]})))
+    comparar('ot · aislamiento: MAN no trae el origen de OTs ajenas', None, jload(man.post(pm + 'getOrigenOt', {'idot': ajena[0]})))
+    comparar('ot · aislamiento: MAN no trae la vista de OTs ajenas', [], jload(man.post(pm + 'getViewDataPreventivo', {'idOt': ajena[0]})).get('preventivo'))
+    comparar('ot · aislamiento: MAN no trae pedidos de OTs ajenas', 'nada', man.get(pm + 'getpedidos?fechai=%s' % ajena[0]).strip())
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
@@ -914,6 +953,7 @@ PANTALLAS = {
     'equipo': paridad_equipo,
     'planes': paridad_planes,
     'solicitud': paridad_solicitud,
+    'ot': paridad_ot,
 }
 
 if __name__ == '__main__':

@@ -1,4 +1,4 @@
-<input type="hidden" id="permission" value="<?php echo $permission ?>">
+﻿<input type="hidden" id="permission" value="<?php echo $permission ?>">
 
 <style>
 .datagrid table {
@@ -58,97 +58,103 @@ ul.dropdown-menu {
     position: relative !important;
 }
 </style>
-<div class="box box-primary">
-    <div class="box-header with-border">
-        <h3 class="box-title">Orden de trabajo</h3>
-    </div><!-- /.box-header -->
     <div class="row">
-        <div class="col-md-3">
-            <?php
-                if (strpos($permission,'Add') !== false) {
-                    echo '<button class="btn btn-block btn-primary" style="width: 100px; margin-top: 10px; margin-left: 10px" id="btnAdd">Agregar</button>'; 
-                }
-            ?>
-        </div>
-    </div>
-    <form id="frm-filtros">
-            <input type="hidden" id="permissionFilt" name="permissionFilt" value="<?php echo $permission ?>">
-        <div class="row">
-            <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" style="padding-top: 2%;">
-                <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2">
-                    <label>Programada Desde</label>
-                    <input type="date" class="form-control" id="fec_desde" name="fec_desde" onchange="habilitaFecHasta()">
+        <div class="col-xs-12">
+            <div class="box">
+                <div class="box-header">
+                    <h3 class="box-title">Orden de trabajo</h3>
+                    <?php
+          if (strpos($permission,'Add') !== false) {
+            echo '<button class="btn btn-block btn-primary" style="width: 100px; margin-top: 10px;" id="btnAdd">Agregar</button>'; 
+          }
+          ?>
+                </div><!-- /.box-header -->
+           <form id="frm-filtros">
+                <input type="hidden" id="permissionFilt" name="permissionFilt" value="<?php echo $permission ?>">
+              <div class="row">
+                <div class="col-xs-12 col-sm-12 col-md-12 col-lg-12" style="padding-top: 2%;">
+                    <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2">
+                        <label>Programada Desde</label>
+                        <input type="date" class="form-control" id="fec_desde" name="fec_desde" onchange="habilitaFecHasta()">
+                    </div>
+                    <!-- /.form-group -->
+                    <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2">
+                        <label>Programada Hasta</label>
+                        <input type="date" class="form-control" id="fec_hasta" name="fec_hasta" readonly>
+                    </div>
+                  <!-- /.form-group -->
+                  <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2">
+                    <label>Equipo</label>
+                        <select id="equipoFilt" name="equipoFilt" class="form-control" style="width: 100%">
+                            <option value="" selected disabled> - Seleccionar - </option>
+                                <?php 
+                                foreach ($equipos as $key => $o) {
+                                    echo "<option value='".$o['id_equipo']."'>".$o['codigo']."</option>";
+                                }
+                                ?>
+                        </select>
+                    
+                  </div>
+                  <!-- /.form-group -->
+                  <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2">
+                    <label>Estado</label>
+                        <select id="estadoFilt" name="estadoFilt" class="form-control">
+                            <option value="" selected disabled> - Seleccionar - </option>
+                            <option value="S">Solicitada</option>
+                            <option value="PL">Planificada</option>
+                            <option value="AS">Asignada</option>
+                            <option value="C">Curso</option>
+                            <option value="T">Terminada</option>
+                            <option value="CE">Cerrada</option>
+                            <option value="CN">Conforme</option>
+                        </select>
+                  </div>
+                  <!-- /.form-group -->
                 </div>
-                <!-- /.form-group -->
-                <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2">
-                    <label>Programada Hasta</label>
-                    <input type="date" class="form-control" id="fec_hasta" name="fec_hasta" readonly>
-                </div>
-            <!-- /.form-group -->
-            <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2">
-                <label>Equipo</label>
-                    <select id="equipoFilt" name="equipoFilt" class="form-control" style="width: 100%">
-                        <option value="" selected disabled> - Seleccionar - </option>
-                            <?php 
-                            foreach ($equipos as $key => $o) {
-                                echo "<option value='".$o['id_equipo']."'>".$o['codigo']."</option>";
-                            }
-                            ?>
-                    </select>
-                
-            </div>
-            <!-- /.form-group -->
-            <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2">
-                <label>Estado</label>
-                <select id="estadoFilt" name="estadoFilt" class="form-control">
-                    <option value="" selected disabled> - Seleccionar - </option>
-                    <option value="S">Solicitada</option>
-                    <option value="PL">Planificada</option>
-                    <option value="AS">Asignada</option>
-                    <option value="C">Curso</option>
-                    <option value="T">Terminada</option>
-                    <option value="CE">Cerrada</option>
-                    <option value="CN">Conforme</option>
-                </select>
-            </div>
-            <!-- /.form-group -->
-            </div>
-            <!-- /.col -->
-            <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2" style="float:right; margin-right: 1%">
-                <label class="col-xs-12 col-sm-12 col-md-12 col-lg-12">&nbsp;</label>
-                <button type="button" class="btn btn-success btn-flat col-xs-12 col-sm-6 col-md-6 col-lg-6" onclick="filtrar()">Filtrar</button>
-                <button type="button" class="btn btn-danger btn-flat flt-clear col-xs-12 col-sm-6 col-md-6 col-lg-6" onclick="limpiar()">Limpiar</button>
-            </div>
-            <!-- /.form-group -->
-        </div>
-        <!-- /.row -->
-        <br>
-    </form>
-    <!-- <br> -->
-    <hr>
-    <div class="box-body">
-        <table id="otrabajo" class="table table-striped table-hover">
-            <thead>
-                <tr>
-                    <th></th>
-                    <th>Nº Orden</th>
-                    <th>Fecha Program.</th>
-                    <th>Fecha Inicio</th>
-                    <th>Fecha Terminada</th>
-                    <th>Detalle</th>
-                    <th>Tarea STD</th>
-                    <th>Equipo</th>
-                    <th>Origen</th>
-                    <th>Id Solicitud</th>
-                    <th>Asignado</th>
-                    <th>Cliente</th>
-                    <th>Estado</th>
-                </tr>
-            </thead>
-            <tbody>
-            <?php
-                if( $list!=false && count($list) > 0){
-                    foreach($list as $a){
+                <!-- /.col -->
+                <div class="form-group col-xs-12 col-sm-2 col-md-2 col-lg-2" style="float:right; margin-right: 1%">
+                    <label class="col-xs-12 col-sm-12 col-md-12 col-lg-12">&nbsp;</label>
+                    <button type="button" class="btn btn-success btn-flat col-xs-12 col-sm-6 col-md-6 col-lg-6" onclick="filtrar()">Filtrar</button>
+                    <button type="button" class="btn btn-danger btn-flat flt-clear col-xs-12 col-sm-6 col-md-6 col-lg-6" onclick="limpiar()">Limpiar</button>
+                  </div>
+                  <!-- /.form-group -->
+              </div>
+              <!-- /.row -->
+              <br>
+           </form>
+            <!-- <br> -->
+            <hr>
+                <div class="box-body">
+                    <table id="otrabajo" class="table table-striped table-hover">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Nº Orden</th>
+                                <th>Fecha Program.</th>
+                                <th>Fecha Inicio</th>
+                                <th>Fecha Terminada</th>
+                                <th>Detalle</th>
+																																<th>Tarea STD</th>
+                                <th>Equipo</th>
+                                <th>Origen</th>
+                                <th>Id Solicitud</th>
+                                <th>Asignado</th>
+                                <th>Cliente</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php
+              //dump_exit($list);
+                if( $list!=false && count($list) > 0)
+                {
+                  $usrId    = man_usuario(); 
+                  foreach($list as $a)
+                  {
+                    //$gr = $a['grpId'];
+                    //echo "grupo: ".$gr;
+                   // if ($gr=='1') { 
+                      //if (($a['estado'] =='As') || ($a['estado'] =='P') || ($a['estado'] =='C') || $a['estado']=='Ej' || ($a['estado'] =='PL')) {
                         $id          = $a['id_orden'];
                         $id_equipo   = $a['id_equipo'];
                         $causa       = $a['descripcion'];
@@ -158,11 +164,11 @@ ul.dropdown-menu {
                         $ordenservicioId = $a['ordenservicioId'];                       
                         echo $opciones;
                         if($ordenservicioId != NULL){
-                            // Ver informe de servicios generado
-                            echo '<li role="presentation" id="cargOrden"><a onclick="ver_informe_servicio(this)" style="color:white;" role="menuitem" tabindex="-1" href="#" ><i class="fa fa-file-text text-white" style="color:white; cursor: pointer;margin-left:-1px"></i>Informe de Servicios</a></li>';
-                            echo '</ul><div>';
+                          // Ver informe de servicios generado
+                          echo '<li role="presentation" id="cargOrden"><a onclick="ver_informe_servicio(this)" style="color:white;" role="menuitem" tabindex="-1" href="#" ><i class="fa fa-file-text text-white" style="color:white; cursor: pointer;margin-left:-1px"></i>Informe de Servicios</a></li>';
+                          echo '</ul><div>';
                         }else{
-                            echo '</ul><div>';
+                          echo '</ul><div>';
                         }
                         echo '</td>';                        
                         echo '<td>'.floatval($a['id_orden']).'</td>';
@@ -173,7 +179,7 @@ ul.dropdown-menu {
                         $fecha_terminada = ($a['fecha_terminada'] == '0000-00-00 00:00:00') ? "0000-00-00" : date_format(date_create($a['fecha_terminada']), 'Y-m-d');
                         echo '<td>'.$fecha_terminada.'</td>';
                         echo '<td>'.$a['descripcion'].'</td>';
-                        echo '<td>'.$a['descripcion'].'</td>';
+																								echo '<td>'.$a['descripcion'].'</td>';
                         echo '<td>'.$a['codigo'].' </td>';
                         echo '<td>'.$a['tipoDescrip'].'</td>';
                         echo '<td>'.$a['id_solicitud'].'</td>';
@@ -181,42 +187,46 @@ ul.dropdown-menu {
                         echo '<td>'.$a['nomCli'].'</td>';
                         echo '<td>';  
                         
-                        if ($a['estado'] == 'S') {
+                          if ($a['estado'] == 'S') {
                             // echo  '<small class="label pull-left bg-red">Solicitada</small>';
-                            echo bolita('Solicitada', 'red');
-                        }
-                        if($a['estado'] == 'PL'){                           
-                            //echo '<small class="label pull-left bg-orange">Planificada</small>';
-                            echo bolita('Planificada', 'yellow');
-                        }
-                        if($a['estado'] == 'AS'){
-                            // echo '<small class="label pull-left bg-yellow">Asignada</small>';
-                            echo bolita('Asignada', 'purple');
-                        }
-                        if ($a['estado'] == 'C') {
-                            //echo '<small class="label pull-left bg-blue">Curso</small>' ;
-                            echo bolita('Curso', 'green');
-                        }
-                        if ($a['estado'] == 'T') {
-                            //echo  '<small class="label pull-left bg-navy">Terminada</small>';
-                            echo bolita('Terminada', 'blue');
-                        }
-                        if ($a['estado'] == 'CE') {
-                            //echo  '<small class="label pull-left bg-green">Cerrada</small>';
-                            echo bolita('Cerrada', 'default');
-                        }  
-                        if ($a['estado'] == 'CN') {
-                            //echo  '<small class="label pull-left bg-black">Conforme</small>';
-                            echo bolita('Conforme', 'black');
-                        }
+                             echo bolita('Solicitada', 'red');
+                           }
+                           if($a['estado'] == 'PL'){                           
+                             //echo '<small class="label pull-left bg-orange">Planificada</small>';
+                             echo bolita('Planificada', 'yellow');
+                           }
+                           if($a['estado'] == 'AS'){
+                             // echo '<small class="label pull-left bg-yellow">Asignada</small>';
+                             echo bolita('Asignada', 'purple');
+                           }
+                           if ($a['estado'] == 'C') {
+                             //echo '<small class="label pull-left bg-blue">Curso</small>' ;
+                             echo bolita('Curso', 'green');
+                           }
+                           if ($a['estado'] == 'T') {
+                             //echo  '<small class="label pull-left bg-navy">Terminada</small>';
+                             echo bolita('Terminada', 'blue');
+                           }
+                           if ($a['estado'] == 'CE') {
+                             //echo  '<small class="label pull-left bg-green">Cerrada</small>';
+                             echo bolita('Cerrada', 'default');
+                           }  
+                           if ($a['estado'] == 'CN') {
+                             //echo  '<small class="label pull-left bg-black">Conforme</small>';
+                             echo bolita('Conforme', 'black');
+                           }
+
                         echo '</td>';
-                    }
+                   // }
+                  }
                 }
-            ?>
-            </tbody>
-        </table>
-    </div><!-- /.box-body -->
-</div><!-- /.box -->
+              ?>
+                        </tbody>
+                    </table>
+                </div><!-- /.box-body -->
+            </div><!-- /.box -->
+        </div><!-- /.col -->
+    </div><!-- /.row -->
 
 <script>
 // var globales
@@ -239,13 +249,63 @@ $('#fechaEntrega,#fechaInicio, #fecha_inicio1, #fecha_inicio, #fecha_entrega1, #
     format: 'YYYY-MM-DD H:mm:ss', //format: 'YYYY-MM-DD', // es igaul a campo date
     locale: 'es',
 });
+// llena select de proveedores - Ok
+// traer_prov();
+// function traer_prov(){
+//   $.ajax({
+//     type: 'POST',
+//     data: {},
+//     url: '<?php echo base_url(MAN); ?>Otrabajo/getproveedor',
+//     success: function(data){
+//       var opcion  = "<option value='-1'>Seleccione...</option>" ; 
+//       $('#prov').append(opcion); 
+//       for(var i=0; i < data.length ; i++) 
+//       {    
+//         var nombre = data[i]['provnombre'];
+//         var opcion = "<option value='"+data[i]['provid']+"'>" +nombre+ "</option>" ; 
+//         $('#prov').append(opcion);                
+//       }
+//     },
+//     error: function(result){
+//       console.error("Error al traer proveedor. Ver console.table")
+//       console.table(result);
+//     },
+//     dataType: 'json'
+//   });
+// }
+// llena el select de sucursales - Ok 
+// traer_sucursal()
+// function traer_sucursal(){
+//   $.ajax({
+//     type: 'POST',
+//     data: { },
+//     url: '<?php echo base_url(MAN); ?>Otrabajo/traer_sucursal',
+//     success: function(data){
+//       var opcion  = "<option value='-1'>Seleccione...</option>" ; 
+//       $('#suci').append(opcion); 
+//       for(var i=0; i < data.length ; i++) 
+//       {    
+//         var nombre = data[i]['descripc'];
+//         var opcion = "<option value='"+data[i]['id_sucursal']+"'>" +nombre+ "</option>" ;
+//         $('#suci').append(opcion);        
+//       }
+//     },
+//     error: function(result){
+//       console.error("Error al traer sucursal. Ver console.table");
+//       console.table(result);
+//     },
+//     dataType: 'json'
+//   });
+// } 
+// llena el select de equipos - Ok 
+//traer_equipo()
 
 function traer_equipo() {
     $.ajax({
         data: {},
         dataType: 'json',
         type: 'POST',
-        url: 'index.php/Otrabajo/getequipo',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/getequipo',
         success: function(data) {
             $('#equipo').empty();
             var opcion = "<option value='-1'>Seleccione...</option>";
@@ -267,16 +327,17 @@ function regresa1() {
     $('#content').empty();
     $('#modalOT').empty();
     $('#modalAsig').empty(); //local index 
-    $("#content").load("<?php echo base_url(); ?>index.php/Otrabajo/listOrden/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Otrabajo/listOrden/<?php echo $permission; ?>");
     WaitingClose();
 }
 
 
 // boton agregar nueva ot
 $("#btnAdd").click(function(e) {
-    wo();
+    WaitingOpen('Cargando Nueva OT...');
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Otrabajo/nuevaOT/<?php echo $permission; ?>", () => wc());
+    linkTo("<?php echo base_url(MAN); ?>Otrabajo/nuevaOT/<?php echo $permission; ?>");
+    WaitingClose();
 });
 // boton guardar 
 $("#btn_cancGuardado").click(function(e) {
@@ -285,6 +346,9 @@ $("#btn_cancGuardado").click(function(e) {
     $('.text_box').val('');
     $('.select_box').val('-1');
 });
+
+
+
 // Elimina OT (estado = AN) - Ok
 function eliminarpred() {
     var idpre = $(this).parent('td').parent('tr').attr('id');
@@ -296,7 +360,7 @@ function eliminarpred() {
         data: {
             gloid: gloid
         },
-        url: 'index.php/Otrabajo/baja_predictivo',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/baja_predictivo',
         success: function(data) {
             regresa1();
         },
@@ -312,21 +376,18 @@ function eliminarpred() {
 
 	//Trae tareas y permite busqueda en el input
 	var dataTarea = function() {
-        var tmp = null;
-        $.ajax({
-            'async': false,
-            'type': "POST",
-            'dataType': 'json',
-            'url': '<?php echo MAN; ?>Preventivo/gettarea',
-            success: function(data) {
-                tmp = data
-            },
-            error: function(result) {
-                error("Error","Error al traer tareas");
-                console.log(result);
-            },
-        })
-        return tmp;
+					var tmp = null;
+					$.ajax({
+													'async': false,
+													'type': "POST",
+													'dataType': 'json',
+													'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
+									})
+									.done((data) => {
+													tmp = data
+									})
+									.fail(() => alert("Error al traer tareas"));
+					return tmp;
 	}();
 	$("#tarea").autocomplete({
 					source: dataTarea,
@@ -355,58 +416,59 @@ function eliminarpred() {
 
 	// Trae datos para llenar el modal Editar OT - Ok
 	function editar(o) {
-        $('#errorE').hide();
-        $('#btnEditar').prop("disabled", false);
-        var idp = $(o).closest('tr').attr('id');
-        // agrega id de ot par guardar con adjuntos
-        $('#idAgregaAdjunto').val(idp);
-        //borra la tabla de adjuntos antes de cargar 
-        $('#tablaadjunto tbody tr').remove();
 
-        $.ajax({
-            data: {
-                idp: idp
-            },
-            dataType: 'json',
-            type: 'POST',
-            url: '<?php echo MAN; ?>Otrabajo/getpencil',
-            success: function(data) {
-                //console.table(data);
-                var resp = data['datos'];
+					$('#errorE').hide();
+					$('#btnEditar').prop("disabled", false);
+					var idp = $(o).closest('tr').attr('id');
+					// agrega id de ot par guardar con adjuntos
+					$('#idAgregaAdjunto').val(idp);
+					//borra la tabla de adjuntos antes de cargar 
+					$('#tablaadjunto tbody tr').remove();
 
-                datos = {
-                    'id_ot': resp[0]['id_orden'], //
-                    'nro': resp[0]['nro'],
-                    'equipo_descrip': resp[0]['codigo'], //
-                    'fecha_ingreso': resp[0]['fecha_ingreso'],
-                    'id_equipo': resp[0]['id_equipo'], //
-                    'marca': resp[0]['marca'],
-                    'ubicacion': resp[0]['ubicacion'],
-                    'descripcion': resp[0]['equipodescrip'],
-                    'id_tarea': resp[0]['id_tarea'],
-                    'fecha_program': resp[0]['fecha_program'], //            
-                    'fecha_inicio': resp[0]['fecha_inicio'], //
-                    'fecha_terminada': resp[0]['fecha_terminada'], //
-                    'idusuario': resp[0]['id_usuario'], //
-                    'tareadescrip': resp[0]['tareadescrip'], //,     //
-                    'nomCli': resp[0]['nomCli']
-                    //'id_sucu'       : resp[0]['id_sucursal'],     //
-                    //'sucursal'      : resp[0]['descripc']//,        //
-                    //'id_proveedor'  : resp[0]['provid'],          //
-                    //'nombreprov'    : resp[0]['provnombre']//,      
-                }
+					$.ajax({
+									data: {
+													idp: idp
+									},
+									dataType: 'json',
+									type: 'POST',
+									url: '<?php echo base_url(MAN); ?>Otrabajo/getpencil',
+									success: function(data) {
+													//console.table(data);
+													var resp = data['datos'];
 
-                var herram = data['herramientas'];
-                var insum = data['insumos'];
-                var adjunto = data['adjunto'];
-                console.table(adjunto);
-                completarEdit(datos, herram, insum, adjunto);
-            },
-            error: function(result) {
-                console.error("Error al Editar OT. Ver console.table");
-                console.table(result);
-            },
-        });
+													datos = {
+																	'id_ot': resp[0]['id_orden'], //
+																	'nro': resp[0]['nro'],
+																	'equipo_descrip': resp[0]['codigo'], //
+																	'fecha_ingreso': resp[0]['fecha_ingreso'],
+																	'id_equipo': resp[0]['id_equipo'], //
+																	'marca': resp[0]['marca'],
+																	'ubicacion': resp[0]['ubicacion'],
+																	'descripcion': resp[0]['equipodescrip'],
+																	'id_tarea': resp[0]['id_tarea'],
+																	'fecha_program': resp[0]['fecha_program'], //            
+																	'fecha_inicio': resp[0]['fecha_inicio'], //
+																	'fecha_terminada': resp[0]['fecha_terminada'], //
+																	'idusuario': resp[0]['id_usuario'], //
+																	'tareadescrip': resp[0]['tareadescrip'], //,     //
+																	'nomCli': resp[0]['nomCli']
+																	//'id_sucu'       : resp[0]['id_sucursal'],     //
+																	//'sucursal'      : resp[0]['descripc']//,        //
+																	//'id_proveedor'  : resp[0]['provid'],          //
+																	//'nombreprov'    : resp[0]['provnombre']//,      
+													}
+
+													var herram = data['herramientas'];
+													var insum = data['insumos'];
+													var adjunto = data['adjunto'];
+													console.table(adjunto);
+													completarEdit(datos, herram, insum, adjunto);
+									},
+									error: function(result) {
+													console.error("Error al Editar OT. Ver console.table");
+													console.table(result);
+									},
+					});
 	}
 
 	// completa los datos del modal Editar - Ok
@@ -525,28 +587,58 @@ function eliminarpred() {
 									cantInsum.push(cant_insum);
 					});
 
+					//validaciones
+					// if($('#equipo').val() == '')
+					// {
+					//   hayError = true;
+					// }      
+					// if ((tareacustom == '') && (id_tarea == '')){
+					//   hayError = true;
+					// }
+					// if($('#fechaInicio').val()=='' || $('#fechaEntrega').val()=='0000-00-00 00:00:00')
+					// {
+					//   hayError = true;
+					// }
+					// if(fecha_entrega=='' || fecha_entrega=='0000-00-00 00:00:00')
+					// {
+					//   hayError = true;
+					// }
+					// if($('#suci').val() == '-1')
+					// {
+					//   hayError = true;
+					// }
+					// if($('#prov').val() == '-1')
+					// {
+					//   hayError = true;
+					// }
+					// //console.error( hayError );
+					// if(hayError == true){
+					//   $('#errorE').fadeIn('slow');     
+					//   return;
+					// }
+
 					$.ajax({
-                        type: 'POST',
-                        data: {
-                            parametros: parametros,
-                            idOT: idp,
-                            idsherramienta: idsherramienta,
-                            cantHerram: cantHerram,
-                            idsinsumo: idsinsumo,
-                            cantInsum: cantInsum
-                        },
-                        url: 'index.php/Otrabajo/guardar_editar',
-                        success: function(data) {
-                            WaitingClose();
-                            $('#modaleditar').modal('hide');
-                            regresa1();
-                        },
-                        error: function(result) {
-                            WaitingClose();
-                            $('#btnEditar').prop("disabled", false);
-                            console.error("Error al guardar en modal Editar Ot");
-                            console.table(result);
-                        }
+									type: 'POST',
+									data: {
+													parametros: parametros,
+													idOT: idp,
+													idsherramienta: idsherramienta,
+													cantHerram: cantHerram,
+													idsinsumo: idsinsumo,
+													cantInsum: cantInsum
+									},
+									url: '<?php echo base_url(MAN); ?>Otrabajo/guardar_editar',
+									success: function(data) {
+													WaitingClose();
+													$('#modaleditar').modal('hide');
+													regresa1();
+									},
+									error: function(result) {
+													WaitingClose();
+													$('#btnEditar').prop("disabled", false);
+													console.error("Error al guardar en modal Editar Ot");
+													console.table(result);
+									}
 					});
 
 	}
@@ -570,7 +662,7 @@ function eliminarpred() {
 													},
 													dataType: 'json',
 													type: 'POST',
-													url: 'index.php/Otrabajo/eliminarAdjunto',
+													url: '<?php echo base_url(MAN); ?>Otrabajo/eliminarAdjunto',
 									})
 									.done(function(data) {
 													//console.table(data); 
@@ -578,7 +670,7 @@ function eliminarpred() {
 													borrarRegistro(id_adjunto);
 													//recargaTablaAdjunto(prevAdjunto);
 									})
-									.error(function(result) {
+									.fail(function(result) {
 													console.error(result);
 									});
 	}
@@ -612,6 +704,7 @@ function eliminarpred() {
 					} else {
 									$('#error').fadeOut('slow');
 									var formData = new FormData($("#formAgregarAdjunto")[0]);
+									//debugger
 									$.ajax({
 																	cache: false,
 																	contentType: false,
@@ -619,13 +712,13 @@ function eliminarpred() {
 																	dataType: 'json',
 																	processData: false,
 																	type: 'POST',
-																	url: 'index.php/Otrabajo/agregarAdjunto',
+																	url: '<?php echo base_url(MAN); ?>Otrabajo/agregarAdjunto',
 													})
 													.done(function(data) {
 																	nuevoAdjunto(data);
 																	WaitingClose();
 													})
-													.error(function(result) {
+													.fail(function(result) {
 																	WaitingClose();
 																	console.error(result);
 													});
@@ -678,21 +771,18 @@ function eliminarpred() {
 	}
 	//Trae herramientas
 	var dataHerramientas = function() {
-        var tmp = null;
-        $.ajax({
-            'async': false,
-            'type': "POST",
-            'dataType': 'json',
-            'url': '<?php echo MAN; ?>Preventivo/getHerramientasB',
-            success: function(data) {
-                tmp = data
-            },
-            error: function(result) {
-                error("Error","Error al traer Herramientas");
-                console.log(result);
-            },
-        })
-        return tmp;
+					var tmp = null;
+					$.ajax({
+													'async': false,
+													'type': "POST",
+													'dataType': 'json',
+													'url': '<?php echo base_url(MAN); ?>Preventivo/getHerramientasB',
+									})
+									.done((data) => {
+													tmp = data
+									})
+					// .fail( () => alert("Error al traer Herramientas") );
+					return tmp;
 	}();
 
 	// data busqueda por codigo de herramientas
@@ -858,23 +948,21 @@ function eliminarpred() {
 ////// HERRAMIENTAS //////
 
 ////// INSUMOS //////
+
 	//Trae insumos
 	var dataInsumos = function() {
-        var tmp = null;
-        $.ajax({
-            'async': false,
-            'type': "POST",
-            'dataType': 'json',
-            'url': '<?php echo MAN; ?>Preventivo/getinsumo',
-            success: function(data) {
-                tmp = data
-            },
-            error: function(result) {
-                error("Error","Error al traer Insumos");
-                console.log(result);
-            },
-        })
-        return tmp;
+					var tmp = null;
+					$.ajax({
+													'async': false,
+													'type': "POST",
+													'dataType': 'json',
+													'url': '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
+									})
+									.done((data) => {
+													tmp = data
+									})
+					// .fail( () => alert("Error al traer Herramientas") );
+					return tmp;
 	}();
 
 	// data busqueda por codigo de herramientas
@@ -993,7 +1081,7 @@ $(".fa-check-square-o").click(function(e) {
     iort = id;
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Otrabajo/cargartarea/<?php echo $permission; ?>/" +
+    linkTo("<?php echo base_url(MAN); ?>Otrabajo/cargartarea/<?php echo $permission; ?>/" +
         iort + "");
     WaitingClose();
 });
@@ -1008,7 +1096,7 @@ $(".fa-thumb-tack").click(function(e) {
         data: {
             id_orden: id_orden
         },
-        url: 'index.php/Otrabajo/getasigna',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/getasigna',
         success: function(data) {
             datos = {
                 'id_orden': id_orden,
@@ -1090,7 +1178,7 @@ function orden() {
             case_id: case_id,
             task_id: task_id
         },
-        url: 'index.php/Otrabajo/guardar',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/guardar',
         success: function(data) {
             WaitingClose();
             sessionStorage.clear();
@@ -1109,7 +1197,7 @@ function traer_clientes(id_cliente) {
     $.ajax({
         type: 'POST',
         data: {},
-        url: 'index.php/Otrabajo/traer_cli',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/traer_cli',
         success: function(data) {
             console.info(data);
             /*var selectAttr = '';
@@ -1192,7 +1280,7 @@ $(document).ready(function(event) {
                 cli: $('#cliid').val()
 
             },
-            url: 'index.php/Otrabajo/setotrabajo',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/setotrabajo',
             success: function(result) {
                 WaitingClose();
                 //$('#modalOT').modal('hide');
@@ -1237,7 +1325,7 @@ function LoadOT(id_, action) {
             id: id_,
             act: action
         },
-        url: 'index.php/otrabajo/getotrabajo',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/getotrabajo',
         success: function(result) {
             WaitingClose();
             $("#modalBodyOT").html(result.html);
@@ -1262,7 +1350,7 @@ function traer_clientes(idcliente) {
         data: {
             idcliente: idcliente
         },
-        url: 'index.php/Otrabajo/getcliente', //index.php/
+        url: '<?php echo base_url(MAN); ?>Otrabajo/getcliente',
         async: false,
         success: function(data) {
 
@@ -1297,7 +1385,7 @@ function finalOT(id_, action) { //esto es nuevo
             act: action,
             estado: est
         },
-        url: 'index.php/otrabajo/setfinal',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/setfinal',
         success: function(data) {
             WaitingClose();
 
@@ -1319,7 +1407,7 @@ function click_pedent() {
             fechai: fechai
         },
         /* destinodo*/
-        url: 'index.php/Otrabajo/getpedidos', //index.php/
+        url: '<?php echo base_url(MAN); ?>Otrabajo/getpedidos',
         success: function(data) {
 
             console.log(data);
@@ -1369,7 +1457,7 @@ function guardarpedido() {
             data: parametros,
             ido: ido
         },
-        url: 'index.php/Otrabajo/agregar_pedido', //index.php/
+        url: '<?php echo base_url(MAN); ?>Otrabajo/agregar_pedido',
         success: function(data) {
             console.log("Estoy guardando pedido");
             regresa1();
@@ -1395,7 +1483,7 @@ function generar_informe_servicio(o) {
     var id_solicitud = parseInt($(o).closest('tr').attr('data-idsolicitud'));
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Ordenservicio/cargarOrden/<?php echo $permission; ?>/" +
+    linkTo("<?php echo base_url(MAN); ?>Ordenservicio/cargarOrden/<?php echo $permission; ?>/" +
         id_sol + "/" + id_eq + "/" + id_solicitud + "/");
     WaitingClose();
 }
@@ -1409,7 +1497,7 @@ function ver_informe_servicio(o) {
     WaitingOpen();
     $('#modalInforme').modal('show');
     $('#modalInformeServicios').empty();
-    $("#modalInformeServicios").load("<?php echo base_url(); ?>P+" / "+id_solicitud+" / "");
+    $("#modalInformeServicios").load("<?php echo base_url(MAN); ?>Ordenservicio/verInforme/"+id_OT+"/"+id_eq+"/");
     WaitingClose();
 }
 
@@ -1422,7 +1510,7 @@ function guardartotal() {
         data: {
             idfin: idfin
         },
-        url: 'index.php/Otrabajo/FinalizaOt', //index.php/
+        url: '<?php echo base_url(MAN); ?>Otrabajo/FinalizaOt',
         success: function(data) {
             console.log(data);
             alert("Se Finalizando la ORDEN TRABAJO");
@@ -1441,7 +1529,7 @@ function mostrar_pedido(o) {
     var idorde = $(o).closest('tr').attr('id');
     $.ajax({
         type: 'GET',
-        url: "<?php echo base_url('index.php/'.ALM) ?>/new/Pedido_Material/getPedidos/" + idorde,
+        url: "<?php echo base_url(ALM) ?>new/Pedido_Material/getPedidos/" + idorde,
         success: function(data) {
             $('#modallista .body').html(data);
             $('#modallista .body').find('.btn-primary').remove();
@@ -1452,15 +1540,12 @@ function mostrar_pedido(o) {
             alert('Error');
         }
     });
-    //$('#modallista .body').load("<?php #echo base_url('index.php/'.ALM) ?>/new/Pedido_Material/getPedidos/"+idorde);
 
     // WaitingOpen();
     // $('#box-header').empty();
     // WaitingClose();
-    // $('#box-header > btn').remove("<?php #echo base_url(); ?>index.php/<?php #echo ALM ?>/new/Pedido_Material/getPedidos/"+idorde);
 
     // $('#content').empty();
-    // $('#content').load("<?php #echo base_url(); ?>index.php/<?php#echo ALM ?>/new/Pedido_Material/getPedidos/"+idorde);
 
 };
 
@@ -1472,7 +1557,7 @@ function nota_pedido(o) {
     iort = id;
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Notapedido/agregarnota/<?php echo $permission; ?>/" + iort);
+    linkTo("<?php echo base_url(MAN); ?>Notapedido/agregarnota/<?php echo $permission; ?>/" + iort);
     WaitingClose();
 }
 
@@ -1482,7 +1567,7 @@ function verEjecutarOT(o) {
     var id_orden = $(o).closest('tr').attr('id');
     WaitingOpen();
     $('#contRespyTareas').empty();
-    $("#contRespyTareas").load("<?php echo base_url(); ?>index.php/Calendario/verEjecutarOT/" + id_orden + "/");
+    $("#contRespyTareas").load("<?php echo base_url(MAN); ?>Calendario/verEjecutarOT/" + id_orden + "/");
     $('#modalRespyTareas').modal('show');
     
     WaitingClose();  
@@ -1495,7 +1580,7 @@ function agregar_tareas(o) {
     iort = id;
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Otrabajo/cargartarea/<?php echo $permission; ?>/" + iort +
+    linkTo("<?php echo base_url(MAN); ?>Otrabajo/cargartarea/<?php echo $permission; ?>/" + iort +
         "");
     WaitingClose();
 };
@@ -1503,31 +1588,32 @@ function agregar_tareas(o) {
 function mostrarOT(o) {
     console.log(o);
     let idot = $(o).closest('tr').attr('id');
-    wo();
+    //console.log("id Orden de trabajo: "+idot);
+
+    WaitingOpen('Obteniendo datos de OT...');
     //buscar datos 
     $.ajax({
-        data: {
-            idot: idot
-        },
-        dataType: 'json',
-        method: 'POST',
-        url: '<?php echo MAN; ?>Otrabajo/getOrigenOt',
-        success: (data) => {
+            data: {
+                idot: idot
+            },
+            dataType: 'json',
+            method: 'POST',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/getOrigenOt',
+        })
+        .done((data) => {
             console.table(data);
             traerDatosOt(idot, data.tipo, data.id_solicitud);
-        },
-        error: () => {
-            error("Error","Error al traer los datos de la OT.");
-        },
-        complete: () => {
-            wc();
-        }
-    });
+        })
+        .fail(() => {
+            alert("Error al traer los datos de la OT.");
+            WaitingClose();
+        })
+        .always(() => WaitingClose());
 }
 // Elige a que fcion que trae datos de OT llamar, según su origen
 function traerDatosOt(idOt, tipo, idSolicitud) {
     console.info('id deot' + idOt + ' - ' + idSolicitud + 'id solic');
-    var datos = null;
+    var datos = null;debugger;
     switch (tipo) {
         case '1': //Orden de trabajo
             datos = getDataOt(idOt, "orden de Trabajo");
@@ -1598,17 +1684,19 @@ function getEstadosVer(letraestado) {
 /***** 1 OT *****/ //LISTO Ver con adjunto y sin adjunto
 // Trae datos de OT 
 function getDataOt(idOt, origen) {
-    wo();
+    WaitingOpen('Cargando datos...');
     var datos = null;
     $.ajax({
-        async: false,
-        data: {
-            idOt: idOt
-        },
-        dataType: 'json',
-        method: 'POST',
-        url: '<?php echo MAN; ?>Otrabajo/getViewDataOt',
-        success: (data) => {
+            async: false,
+            data: {
+                idOt: idOt
+            },
+            dataType: 'json',
+            method: 'POST',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/getViewDataOt',
+        })
+        .done((data) => {
+
             datos = {
                 //Panel datos de OT
                 'id_ot': data['otrabajo'][0]['id_orden'],
@@ -1660,12 +1748,8 @@ function getDataOt(idOt, origen) {
                 $('#tblinsOT tbody').append(tr);
             }
             recargaTablaAdjuntoOT(adjunto);
-        },
-        error: () => {
-            error("Error","Error al traer los datos de la OT.");
-        },
-        complete: () => wc(),
-    });
+        })
+        .fail(() => alert("Error al traer los datos de la OT."));
     return datos;
 }
 //llena datos del modal preventivo
@@ -1704,9 +1788,9 @@ function fillModalView(datos) {
 
 // recarga tablas de adjuntos al iniciar la edicion
 function recargaTablaAdjuntoOT(Adjunto) {
-    $('#TabAdjuntoOT tbody').empty();
+    $('#TabAdjuntoOT tbody tr').remove();
     if (Adjunto == 0) {
-        $('#tblAdjuntoOT tbody').append("<tr><td colspan='1'>Sin Adjuntos</td></tr>");
+        $('#TabAdjuntoOT').html('<p>Sin Adjuntos</p>');
     } else {
         for (var i = 0; i < Adjunto.length; i++) {
             var tr = "<tr id='" + Adjunto[i]['id'] + "'>" +
@@ -1733,7 +1817,7 @@ function getDataOtSolServicio(idOt, idSolServicio, origen) {
             },
             dataType: 'json',
             method: 'POST',
-            url: 'index.php/Otrabajo/getViewDataSolServicio',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/getViewDataSolServicio',
         })
         .done((data) => {
             console.table(data);
@@ -1860,7 +1944,7 @@ function getDataOtPreventivo(idOt, idPreventivo, origen) {
             },
             dataType: 'json',
             method: 'POST',
-            url: 'index.php/Otrabajo/getViewDataPreventivo',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/getViewDataPreventivo',
         })
         .done((data) => {
 
@@ -1882,7 +1966,7 @@ function getDataOtPreventivo(idOt, idPreventivo, origen) {
                 'ubicacion': data['preventivo'][0]['ubicacion'],
                 'descripcion_eq': data['preventivo'][0]['descripcionEquipo'],
                 'nomCli': data['preventivo'][0]['nomCli'],
-                'tarea': data['preventivo'][0]['tarea'],
+                'tarea': data['preventivo'][0]['tarea']
             };
 
             var herram = data['herramientas'];
@@ -2014,7 +2098,7 @@ function getDataOtBacklog(idOt, idBacklog, origen) {
             },
             dataType: 'json',
             method: 'POST',
-            url: 'index.php/Otrabajo/getViewDataBacklog',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/getViewDataBacklog',
         })
         .done((data) => {
 
@@ -2153,7 +2237,7 @@ function getDataOtPredictivo(idOt, idPredictivo, origen) {
             },
             dataType: 'json',
             method: 'POST',
-            url: 'index.php/Otrabajo/getViewDataPredictivo',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/getViewDataPredictivo',
         })
         .done((data) => {
             console.table(data);
@@ -2276,27 +2360,27 @@ $('#collapseHerramientas, #collapseInsumos').on('shown.bs.collapse', function() 
 // IMPRIMIR
 $(".fa-print").click(function(e) {
     let idot = $(this).parent('td').parent('tr').attr('id');
-    wo();
+    //console.log("id Orden de trabajo: "+idot);
+
+    WaitingOpen('Obteniendo datos de OT...');
     //buscar datos 
     $.ajax({
-        data: {
-            idot: idot
-        },
-        dataType: 'json',
-        method: 'POST',
-        url: '<?php echo MAN; ?>Otrabajo/getOrigenOt',
-        success: function(data) {
+            data: {
+                idot: idot
+            },
+            dataType: 'json',
+            method: 'POST',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/getOrigenOt',
+        })
+        .done((data) => {
             console.table(data);
             traerDatosImprimirOt(idot, data.tipo, data.id_solicitud);
-        },
-        error: function(result) {
-            console.log(result);
-            console.log("error en la vista imprimir");
-        },
-        complete: function() {
-            wc();
-        }
-    });
+        })
+        .fail(() => {
+            alert("Error al traer los datos de la OT.");
+            WaitingClose();
+        })
+        .always(() => WaitingClose());
 });
 
 // Elige a que fcion que trae datos de OT llamar, según su origen
@@ -2348,7 +2432,7 @@ function fillPrintView(datos, tipo) {
             tipo: tipo
         },
         dataType: 'text',
-        url: 'index.php/Otrabajo/printOT',
+        url: '<?php echo base_url(MAN); ?>Otrabajo/printOT',
         success: function(data) {
             texto = data;
             var mywindow = window.open('', 'Imprimir', 'height=700,width=900');
@@ -3309,24 +3393,24 @@ $("#fechaProgramacion").datetimepicker({
                                                 <!--/#insum -->
 
                                                 <div role="tabpanel" class="tab-pane" id="TabAdjuntoOT">
-                                                    <div class="row">
-                                                        <div class="col-xs-12">
-                                                            <table class="table table-bordered" id="tblAdjuntoOT">
-                                                                <thead>
-                                                                    <tr>
-                                                                        <th>Archivo</th>
-                                                                    </tr>
-                                                                </thead>
-                                                                <tbody>
-                                                                    <tr>
-                                                                        <td>
-                                                                            <a id="adjunto" href="" target="_blank"></a>
-                                                                        </td>
-                                                                    </tr>
-                                                                </tbody>
-                                                            </table>
-                                                        </div>
+
+                                                    <div class="col-xs-12">
+                                                        <table class="table table-bordered" id="tblAdjuntoOT">
+                                                            <thead>
+                                                                <tr>
+                                                                    <th>Archivo</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                <tr>
+                                                                    <td>
+                                                                        <a id="adjunto" href="" target="_blank"></a>
+                                                                    </td>
+                                                                </tr>
+                                                            </tbody>
+                                                        </table>
                                                     </div>
+
                                                 </div>
                                                 <!--cierre de TabAdjunto-->
 
@@ -4581,7 +4665,7 @@ function imprimir(e) {
             },
             dataType: 'json',
             method: 'POST',
-            url: 'index.php/Otrabajo/getOrigenOt',
+            url: '<?php echo base_url(MAN); ?>Otrabajo/getOrigenOt',
         })
         .done((data) => {
             console.table(data);
@@ -4603,11 +4687,15 @@ function limpiar(){
 function filtrar() {
       var data = new FormData($('#frm-filtros')[0]);
       data = formToObject(data);
-      wo();
-      var url = "<?php echo MAN; ?>Otrabajo/filtrarListado";
+
+      WaitingOpen();
+
+      var url = "<?php echo base_url(MAN); ?>Otrabajo/filtrarListado";
       $.ajax({
         type: 'POST',
+
         data: data,
+
         url: url,
         success: function(data) {
             WaitingClose();
@@ -4622,149 +4710,142 @@ function filtrar() {
                 for(var i=0; i<resp.length; i++){
                     var movimCabecera = resp[i];
                     var row = `<tr id="${resp[i].id_orden}" class="${resp[i].id_orden} ot-row" data-id_equipo="${resp[i].id_equipo}" data-causa="${resp[i].descripcion}" data-idsolicitud="${resp[i].id_solicitud}">`;
-                    row += `<td>`;
-                    row += `<?php echo $opciones; ?>`;
-                    if(resp[i].ordenservicioId !=  null){
-                        row += '<li role="presentation" id="cargOrden"><a onclick="ver_informe_servicio(this)" style="color:white;" role="menuitem" tabindex="-1" href="#" ><i class="fa fa-file-text text-white" style="color:white; cursor: pointer;margin-left:-1px"></i>Informe de Servicios</a></li>';
-                        row += "</ul><div></td>";
-                    }else{
-                        row += "</ul><div></td>";
-                    } 
-                    //N° ORDEN
-                    if(resp[i].id_orden){
-                        row += `<td>${resp[i].id_orden}</td>`;
-                    }else{
-                        row += `<td></td>`;
-                    }
-                    //Fecha Programada
-                    if(resp[i].fecha_program != '0000-00-00 00:00:00'){
-                        var programada = resp[i].fecha_program.slice(0, 10);
-                        Date.prototype.toDateInputValue = (function(){
-                            var local = new Date(programada);
-                            return local.toJSON().slice(0,10);
-                        });
-                        fecha = new Date().toDateInputValue();
+                        row += `<td>`;
+                        row += `<?php echo $opciones; ?>`;
+                        if(resp[i].ordenservicioId !=  null){
+                            row += '<li role="presentation" id="cargOrden"><a onclick="ver_informe_servicio(this)" style="color:white;" role="menuitem" tabindex="-1" href="#" ><i class="fa fa-file-text text-white" style="color:white; cursor: pointer;margin-left:-1px"></i>Informe de Servicios</a></li>';
+                            row += "</ul><div></td>";
+                        }else{
+                            row += "</ul><div></td>";
+                        } 
+                        
+                                //N° ORDEN
+                                if(resp[i].id_orden){
+                                    row += `<td>${resp[i].id_orden}</td>`;
+                                }else{
+                                    row += `<td></td>`;
+                                }
+                                //Fecha Programada
+                                if(resp[i].fecha_program != '0000-00-00 00:00:00'){
+                                    var programada = resp[i].fecha_program.slice(0, 10);
+                                    Date.prototype.toDateInputValue = (function(){
+                                        var local = new Date(programada);
+                                        return local.toJSON().slice(0,10);
+                                    });
+                                    fecha = new Date().toDateInputValue();
 
-                        row += `<td>`+ fecha +`</td>`;
-                        // row += `<td>${resp[i].fecha_program}</td>`;
-                    }else{
-                        row += `<td></td>`;
-                    }
-                    //Fecha Inicio
-                    if(resp[i].fecha_inicio != '0000-00-00 00:00:00'){
-                        var inicio = resp[i].fecha_inicio.slice(0, 10);
-                        Date.prototype.toDateInputValue = (function(){
-                            var local = new Date(inicio);
-                            return local.toJSON().slice(0,10);
-                        });
-                        fecha = new Date().toDateInputValue();
+                                    row += `<td>`+ fecha +`</td>`;
+                                    // row += `<td>${resp[i].fecha_program}</td>`;
+                                }else{
+                                    row += `<td></td>`;
+                                }
+                                //Fecha Inicio
+                                if(resp[i].fecha_inicio != '0000-00-00 00:00:00'){
+                                    row += `<td>`+ resp[i].fecha_inicio +`</td>`;
+                                }
+                                else{ row += `<td></td>`}
+                                //Fecha Terminada
+                                if(resp[i].fecha_terminada != '0000-00-00 00:00:00'){
+                                    row += `<td>`+ resp[i].fecha_terminada +`</td>`;
+                                }
+                                else{ row += `<td></td>`
+                                }
+                                //Detalle
+                                if(resp[i].descripcion){
+                                    row += `<td>${resp[i].descripcion}</td>`;
+                                }else{ row += `<td></td>`
+                                }
+																																//Tarea Estandar
+                                if(resp[i].tareaSTD){
+                                    row += `<td>${resp[i].tareaSTD}</td>`;
+                                }else{ row += `<td></td>`
+                                }
+                                //Equipo
+                                if(resp[i].codigo){
+                                    row += `<td>${resp[i].codigo}</td>`;
+                                }else{ row += `<td></td>`;
+                                }
+                                //Origen
+                                if(resp[i].tipoDescrip){
+                                    row += `<td>${resp[i].tipoDescrip}</td>`;
+                                }else{ row += `<td></td>`;
+                                }
+                                //ID Solicitud
+                                if(resp[i].id_solicitud){
+                                    row += `<td>${resp[i].id_solicitud}</td>`;
+                                }else{ row += `<td></td>`;
+                                }
+                                //Asignado
+                                if(resp[i].nombre){
+                                    row += `<td>${resp[i].nombre}</td>`;
+                                }else{ row += `<td></td>`;
+                                }
+                                //Cliente
+                                if(resp[i].nomCli){
+                                    row += `<td>${resp[i].nomCli}</td>`;
+                                }else{ row += `<td></td>`;
+                                }
+                                //formateo de la fecha
+                                // if(resp[i].fec_alta){
+                                //     var fecha_alta = resp[i].fec_alta.slice(0, 10);
+                                //     Date.prototype.toDateInputValue = (function(){
+                                //         var local = new Date(fecha_alta);
+                                //         return local.toJSON().slice(0,10);
+                                //     });
+                                //     fecha = new Date().toDateInputValue();
 
-                        row += `<td>`+ fecha +`</td>`;
-                    }else{ row += `<td></td>`}
-                    //Fecha Terminada
-                    if(resp[i].fecha_terminada != '0000-00-00 00:00:00'){
-                        var terminada = resp[i].fecha_terminada.slice(0, 10);
-                        Date.prototype.toDateInputValue = (function(){
-                            var local = new Date(terminada);
-                            return local.toJSON().slice(0,10);
-                        });
-                        fecha = new Date().toDateInputValue();
-
-                        row += `<td>`+ fecha +`</td>`;
-                    }else{ row += `<td></td>`
-                    }
-                    //Detalle
-                    if(resp[i].descripcion){
-                        row += `<td>${resp[i].descripcion}</td>`;
-                    }else{ row += `<td></td>`
-                    }
-                    //Tarea Estandar
-                    if(resp[i].tareaSTD){
-                        row += `<td>${resp[i].tareaSTD}</td>`;
-                    }else{ row += `<td></td>`
-                    }
-                    //Equipo
-                    if(resp[i].codigo){
-                        row += `<td>${resp[i].codigo}</td>`;
-                    }else{ row += `<td></td>`;
-                    }
-                    //Origen
-                    if(resp[i].tipoDescrip){
-                        row += `<td>${resp[i].tipoDescrip}</td>`;
-                    }else{ row += `<td></td>`;
-                    }
-                    //ID Solicitud
-                    if(resp[i].id_solicitud){
-                        row += `<td>${resp[i].id_solicitud}</td>`;
-                    }else{ row += `<td></td>`;
-                    }
-                    //Asignado
-                    if(resp[i].nombre){
-                        row += `<td>${resp[i].nombre}</td>`;
-                    }else{ row += `<td></td>`;
-                    }
-                    //Cliente
-                    if(resp[i].nomCli){
-                        row += `<td>${resp[i].nomCli}</td>`;
-                    }else{ row += `<td></td>`;
-                    }
-                    //formateo de la fecha
-                    // if(resp[i].fec_alta){
-                    //     var fecha_alta = resp[i].fec_alta.slice(0, 10);
-                    //     Date.prototype.toDateInputValue = (function(){
-                    //         var local = new Date(fecha_alta);
-                    //         return local.toJSON().slice(0,10);
-                    //     });
-                    //     fecha = new Date().toDateInputValue();
-
-                    //     row += `<td>`+ fecha +`</td>`;
-                    // }else{ row += `<td></td>`}
-                    //Estado
-                    if(resp[i].estado){
-                        var span_estado = '';
-                        switch (resp[i].estado) {
-                            case 'S':
-                                span_estado = estado('Solicitada', 'red');
-                                break;
-                            case 'PL':
-                                span_estado = estado('Planificada', 'yellow');
-                                break;
-                            case 'AS':
-                                span_estado = estado('Asignada', 'purple');
-                                break;
-                            case 'C':
-                                span_estado = estado('Curso', 'green');
-                                break;
-                            case 'T':
-                                span_estado = estado('Terminada', 'blue');
-                                break;
-                            case 'CE':
-                                span_estado = estado('Cerrada', 'default');
-                                break;
-                            case 'CN':
-                                span_estado = estado('Conforme', 'black');
-                                break;
-                            default:
-                                break;
-                        }
-                        // var span_estado = estado(resp[i].estado);
-                        row += `<td>`+span_estado+`</td>`;
-                    }else{
-                        row += `<td></td>`;
-                    }
-                    row += `</tr>`;
+                                //     row += `<td>`+ fecha +`</td>`;
+                                // }else{ row += `<td></td>`}
+                                //Estado
+                                if(resp[i].estado){
+                                    var span_estado = '';
+                                    switch (resp[i].estado) {
+                                        case 'S':
+                                            span_estado = estado('Solicitada', 'red');
+                                            break;
+                                        case 'PL':
+                                            span_estado = estado('Planificada', 'yellow');
+                                            break;
+                                        case 'AS':
+                                            span_estado = estado('Asignada', 'purple');
+                                            break;
+                                        case 'C':
+                                            span_estado = estado('Curso', 'green');
+                                            break;
+                                        case 'T':
+                                            span_estado = estado('Terminada', 'blue');
+                                            break;
+                                        case 'CE':
+                                            span_estado = estado('Cerrada', 'default');
+                                            break;
+                                        case 'CN':
+                                            span_estado = estado('Conforme', 'black');
+                                            break;
+                                        default:
+                                            break;
+                                    }
+                                    // var span_estado = estado(resp[i].estado);
+                                    row += `<td>`+span_estado+`</td>`;
+                                }else{
+                                    row += `<td></td>`;
+                                }
+                                row += `</tr>`;
                     table.row.add($(row)).draw();
                     movimDetalle = "";
                 }
             }
-            $($.fn.dataTable.tables(true)).DataTable().columns.adjust();
+												$($.fn.dataTable.tables(true)).DataTable().columns.adjust();
+            WaitingClose();
         },
         error: function() {
-          error("Error",'Ha ocurrido un error');
+          alert('Ha ocurrido un error');
         },
         complete: function(result) {
-          wc();
-        }
+          WaitingClose();
+        },
+        beforeSend: function(){
+            // $("table#stock").empty();
+        },
       });
     }
     function estado($texto,$color,$detalle=null){
