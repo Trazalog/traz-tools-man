@@ -25,6 +25,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -803,18 +804,19 @@ def paridad_planes(asset, man, emp_asset):
                                                                  'hshombre': '1', 'alerta': '', 'lectura_base': ''}, **detalle('M')), False)
     comparar('planes · aislamiento: MAN no acepta tareas de otra empresa (T22)', n, maxid('preventivo', 'prevId'))
 
-    limpiar_planes(base, creados_p, creados_r)
+    limpiar_planes(base, creados_p, creados_r, emp_asset)
 
 
-def limpiar_planes(base, prevs=(), preds=()):
+def limpiar_planes(base, prevs=(), preds=(), emp=1):
     """Borra los planes de prueba, su detalle y sus archivos."""
     def borrar(tabla, pk, ids, th, ti, col, carpeta):
         if not ids:
             return
         lista = ','.join(ids)
-        # Los archivos se llaman [preventivo]<id>_<empresa>_<fecha>: se borran todos los de los ids de prueba
-        # (incluidos los que quedaron sin referencia al reemplazar el adjunto).
-        patron = re.compile(r'^(preventivo)?(%s)_\d*_\d{4}-' % '|'.join(ids))
+        # Los archivos se llaman [preventivo]<id>_<empresa>_<fecha>: se borran los de los ids de prueba, de la empresa
+        # de prueba y de hoy (incluidos los que quedaron sin referencia al reemplazar el adjunto). Sin empresa ni fecha,
+        # un id de prueba coincidía con archivos viejos de otra empresa con el mismo número.
+        patron = re.compile(r'^(preventivo)?(%s)_%s_%s-' % ('|'.join(ids), emp, time.strftime('%Y-%m-%d')))
         for nombre in os.listdir(base + carpeta):
             if patron.match(nombre):
                 os.remove(base + carpeta + '/' + nombre)
