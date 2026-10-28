@@ -1,288 +1,184 @@
 <?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
+/**
+ * Backlogs: ABM de backlog con herramientas e insumos.
+ *
+ * MIG-ASSET-2: portado desde el asset actual (diverge del fork). Datos por MANDataService (ADR-014), limitado a
+ * la empresa de la sesión; herramientas e insumos del pañol y del almacén de tools (man_tools_helper). El alta con
+ * detalle va por toolsMANAPI (regla 3). Se conservan firmas y formato de salida del model de asset (E9: solo lo que
+ * usan las acciones portadas).
+ */
 class Backlogs extends CI_Model
 {
+	/** @var int id del último backlog creado (lo que en asset se leía con insert_id()). */
+	public $ultimo_id = 0;
+
 	function __construct()
 	{
 		parent::__construct();
-        $this->assetDB = $this->load->database('asset_db', TRUE);
+		$this->load->helper(array('man', 'man_tools'));
 	}
-	/**
-    * Trae listado de backlogs
-    * @param 
-    * @return array listado de backlogs
-    */
+
+	/** Listado de backlogs no borrados. @return array array('data' => filas o 0) */
 	function backlog_List(){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | backlog_List()");
-        $empId = empresa();
-
-	    $this->assetDB->select('tbl_back.*,
-												equipos.descripcion AS des, 
-												equipos.marca, 
-												equipos.codigo, 
-												tareas.descripcion as de1,
-												componentes.descripcion AS componente,
-												sistema.descripcion as sistema');	 
-	    $this->assetDB->from('tbl_back'); 
-	    $this->assetDB->join('equipos', 'equipos.id_equipo = tbl_back.id_equipo');
-	    $this->assetDB->join('tareas', 'tareas.id_tarea = tbl_back.id_tarea','left');
-			$this->assetDB->join('componenteequipo', 'componenteequipo.idcomponenteequipo = tbl_back.idcomponenteequipo', 'left');
-			$this->assetDB->join('componentes', 'componentes.id_componente = componenteequipo.id_componente', 'left');
-			$this->assetDB->join('sistema', 'sistema.sistemaid = componenteequipo.sistemaid',  'left');
-			$this->assetDB->where('tbl_back.id_empresa', $empId);
-			$this->assetDB->where('tbl_back.estado !=', 'B');
-	    $query= $this->assetDB->get();
-	    if( $query->num_rows() > 0){
-			$data['data'] = $query->result_array();	
-			return  $data;
-	    } else $data['data'] = array();
-		return  $data;
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | backlog_List()");
+		$filas = man_lista(wso2(REST_MAN . '/backlogs/empresa/' . man_empresa()));
+		return array('data' => $filas ? $filas : 0);
 	}
-	// Trae equipos para llenar select vista por empresa logueada - Listo
+
+	/** Equipos no inhabilitados de la empresa (todas las columnas). @return array|false */
 	function getequipo(){
-			
-		$userdata = $this->session->userdata('user_data');
-			$empId = $userdata[0]['id_empresa']; 
-			
-		$this->assetDB->select('equipos.*');
-		$this->assetDB->from('equipos');
-		$this->assetDB->where('equipos.estado !=', 'IN');
-		$this->assetDB->where('equipos.id_empresa', $empId);    	
-		$query= $this->assetDB->get();   
-
-		if ($query->num_rows()!=0)
-		{
-			return $query->result_array();
-		}
-		else
-		{
-			return false;
-		}	
-	}	
-	/**
-    * Obtiene listado de compronentes por ID de equipo 
-    * @param integer $idEquipo id del equipo
-    * @return array listado de componentes
-    */
-	public function getComponentes(){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getComponentes()");
-		$empresaId = empresa();
-		$this->assetDB->select('componenteequipo.idcomponenteequipo AS idce, 
-											componenteequipo.codigo, 
-											componentes.descripcion, 
-											sistema.descripcion AS sistema');
-		$this->assetDB->from('componenteequipo');
-		$this->assetDB->join('componentes', 'componentes.id_componente = componenteequipo.id_componente');
-		$this->assetDB->join('sistema', 'sistema.sistemaid = componenteequipo.sistemaid');
-		if($idEquipo!="") {
-			$this->assetDB->where('componenteequipo.id_equipo', $idEquipo);	
-		}
-		$this->assetDB->where('componenteequipo.id_empresa', $empresaId);
-		$this->assetDB->where('componenteequipo.estado !=', 'AN');
-		$this->assetDB->order_by('componenteequipo.codigo');
-		$query = $this->assetDB->get();
-		if($query->num_rows()>0){
-			return $query->result();
-		}else{
-			return false;
-		}
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getequipo()");
+		$filas = man_lista(wso2(REST_MAN . '/equipos/no-inhabilitados/empresa/' . man_empresa()));
+		return $filas ? $filas : false;
 	}
+
+	/** Componentes de un equipo (o de todos, si no viene) para el autocompletar. @return array|false objetos */
+	function getComponentes($idEquipo){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getComponentes(" . json_encode($idEquipo) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/backlogs/componentes/empresa/' . man_empresa() . '?id_equipo=' . rawurlencode((string) $idEquipo)));
+		return $filas ? json_decode(json_encode($filas)) : false;
+	}
+
 	/**
-    * Trae info de equipo por id
-    * @param integer $id_equipo id del equipo seleccionado
-    * @return array data del equipo
-    */
+	 * Equipo con su marca (E.*, M.*): las columnas de la marca pisan estado e id_empresa del equipo, y quedan en
+	 * null si el equipo no tiene marca, como en asset.
+	 * @return object|false
+	 */
 	function getInfoEquipos($data = null){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getComponentes()");
-		if($data == null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getInfoEquipos(" . json_encode($data) . ")");
+		if ($data == null) {
 			return false;
-		}else{			
-			$id_equipo = $data['id_equipo'];
-			//Datos del 
-			$this->assetDB->select('E.*, M.*');
-			$this->assetDB->from('equipos E');
-			$this->assetDB->join('marcasequipos M', 'E.marca = M.marcaid', 'left');
-			$this->assetDB->where('id_equipo',$id_equipo);
-			$query = $this->assetDB->get();
-			if($query->num_rows()>0){
-				return $query->result()[0];
-			}else{
-				return false;
-			}			
 		}
-	}
-	// Trae tareas por empresa logueada - Listo
-	function gettareas(){
-
-		$userdata = $this->session->userdata('user_data');
-    $empId = $userdata[0]['id_empresa']; 
-
-		$query= $this->assetDB->get_where('tareas', array('id_empresa' => $empId));
-		
-		if($query->num_rows()>0){
-				return $query->result();
+		$filas = man_lista(wso2(REST_MAN . '/equipo/' . (int) $data['id_equipo'] . '/con-marca/empresa/' . man_empresa()));
+		if (!$filas) {
+			return false;
 		}
-		else{
-				return false;
-		}			
+		$fila = $filas[0];
+		$fila['estado'] = $fila['marca_estado'];
+		$fila['id_empresa'] = $fila['marca_empresa'];
+		unset($fila['marca_estado'], $fila['marca_empresa']);
+		return (object) $fila;
 	}
-	// Anula backlog por ID - Listo
-	function update_back($data,$id){
-		$this->assetDB->where('backId', $id);
-		$query = $this->assetDB->update("tbl_back",$data);
-		return $query;
+
+	/** Cambia el estado del backlog. @return bool */
+	function update_back($data, $id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | update_back(" . json_encode($data) . ", $id)");
+		$rsp = man_escribir('PUT', 'backlog/estado', array(
+			'estado'     => (string) $data['estado'],
+			'backId'     => (string) $id,
+			'id_empresa' => man_empresa(),
+		));
+		return (bool) $rsp['status'];
 	}
+
 	/**
-    * Inserta Backlog nuevo
-    * @param array $data array con datos de backlog
-    * @return array resultado de la operacion e id de insercion
-    */
-	function insert_backlog($data){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | insert_backlog()");
-		$query['status'] = $this->assetDB->insert("tbl_back",$data);
-		$query['id'] = $this->assetDB->insert_id();
-		return $query;
-	}  	
-	// Guarda el nombre de adjunto
-	function updateAdjunto($adjunto,$ultimoId){
-		$this->assetDB->where('backId', $ultimoId);
-		$query = $this->assetDB->update("tbl_back",$adjunto);
+	 * Alta de backlog con herramientas e insumos (toolsMANAPI). El id queda en $this->ultimo_id.
+	 * @return bool
+	 */
+	function insert_backlog($data, $herramientas = array(), $insumos = array()){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | insert_backlog(" . json_encode($data) . ")");
+		$id = man_alta_con_detalle('backlog', array(
+			'id_equipo'          => (string) $data['id_equipo'],
+			'id_tarea'           => man_numero($data['id_tarea']),
+			'fecha'              => man_fecha($data['fecha'], true),
+			'horash'             => man_numero($data['horash']),
+			'back_duracion'      => man_numero($data['back_duracion']),
+			'id_unidad'          => man_numero($data['id_unidad']),
+			'back_canth'         => man_numero($data['back_canth']),
+			'id_empresa'         => man_empresa(),
+			'idcomponenteequipo' => man_numero($data['idcomponenteequipo']),
+			'tarea_opcional'     => $data['tarea_opcional'] === null ? null : (string) $data['tarea_opcional'],
+		), $herramientas, $insumos);
+		$this->ultimo_id = $id ? (int) $id : 0;
+		return $id !== false;
+	}
+
+	/** Guarda el nombre del adjunto. @return array el mismo $adjunto, como en asset */
+	function updateAdjunto($adjunto, $ultimoId){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | updateAdjunto(" . json_encode($adjunto) . ", $ultimoId)");
+		man_escribir('PUT', 'backlog/adjunto', array(
+			'back_adjunto' => (string) $adjunto['back_adjunto'],
+			'backId'       => (string) $ultimoId,
+			'id_empresa'   => man_empresa(),
+		));
 		return $adjunto;
 	}
-	// Trae datos de backlog para editar
+
+	/** Borra el nombre del adjunto (el archivo queda en disco, como en asset). @return bool */
+	function eliminarAdjunto($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | eliminarAdjunto($id)");
+		$rsp = man_escribir('PUT', 'backlog/adjunto', array('back_adjunto' => '', 'backId' => (string) $id, 'id_empresa' => man_empresa()));
+		return (bool) $rsp['status'];
+	}
+
+	/** Backlog a editar. @return array|int filas o 0 */
 	function geteditar($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | geteditar(" . json_encode($id) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/backlog/' . (int) $id . '/datos/empresa/' . man_empresa()));
+		return $filas ? $filas : 0;
+	}
 
-		$this->assetDB->select('tbl_back.*, tareas.descripcion AS tareadescrip');	
-		$this->assetDB->from('tbl_back');
-		$this->assetDB->join('tareas', 'tareas.id_tarea = tbl_back.id_tarea', 'left');
-		$this->assetDB->where('tbl_back.backId',$id);	    
-		$query= $this->assetDB->get();
-		
-		if( $query->num_rows() > 0)
-		{
-			return $query->result_array();	
-		} 
-		else {
-			return 0;
-		}
+	/** Equipo, marca y componente del backlog. @return array|int filas o 0 */
+	function traerequiposBack($ide, $id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | traerequiposBack(" . json_encode($ide) . ", " . json_encode($id) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/backlog/' . (int) $id . '/equipo/' . (int) $ide . '/empresa/' . man_empresa()));
+		return $filas ? $filas : 0;
 	}
-	// trae info de equipos para edicion
-	function traerequiposBack($ide,$id){
-		
-		$this->assetDB->select('equipos.descripcion AS des,
-											equipos.codigo, 
-											equipos.ubicacion, 
-											equipos.fecha_ingreso,
-											marcasequipos.marcadescrip AS marca,
-											componenteequipo.codigo as codcompeq,
-											componentes.descripcion as componente,
-											sistema.descripcion as sistema');
-		$this->assetDB->from('tbl_back');
-		$this->assetDB->join('equipos', 'equipos.id_equipo = tbl_back.id_equipo');	
-		$this->assetDB->join('marcasequipos', 'equipos.marca = marcasequipos.marcaid');
-		$this->assetDB->join('componenteequipo', 'componenteequipo.idcomponenteequipo = tbl_back.idcomponenteequipo','left');
-		$this->assetDB->join('componentes', 'componentes.id_componente = componenteequipo.id_componente','left');
-		$this->assetDB->join('sistema', 'sistema.sistemaid = componenteequipo.sistemaid','left');
-		$this->assetDB->where('tbl_back.backId', $id);
-		$this->assetDB->where('tbl_back.id_equipo', $ide);
-		$query = $this->assetDB->get();
-		
-		if( $query->num_rows() > 0)
-		{
-			return $query->result_array();	
-		} 
-		else {
-			return 0;
-		}
-	}
-	// Trae herramientas ppor id de preventivo para Editar
+
+	/** Herramientas del backlog, completadas con el pañol de tools. @return array */
 	function getBacklogHerramientas($id){
-        
-		$userdata = $this->session->userdata('user_data');
-		$empId = $userdata[0]['id_empresa']; 
-
-		$this->assetDB->select('tbl_backlogherramientas.cantidad,
-												herramientas.herrcodigo,
-												herramientas.herrmarca,
-												herramientas.herrdescrip,
-												herramientas.herrId');
-		$this->assetDB->from('tbl_backlogherramientas');
-		$this->assetDB->join('herramientas', 'herramientas.herrId = tbl_backlogherramientas.herrId');   
-		$this->assetDB->where('tbl_backlogherramientas.backId', $id);        
-		$this->assetDB->where('tbl_backlogherramientas.id_empresa', $empId);
-		$query= $this->assetDB->get();
-
-		if( $query->num_rows() > 0)
-		{
-			return $query->result_array();
-		}
-		else {
-			return 0;
-		}
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getBacklogHerramientas(" . json_encode($id) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/backlog/' . (int) $id . '/herramientas/empresa/' . man_empresa()));
+		return tools_merge_herramientas($filas ? $filas : array());
 	}
-	// Trae insumos por id de preventivo para Editar
+
+	/** Insumos del backlog, completados con el almacén de tools. @return array */
 	function getBacklogInsumos($id){
-			
-		$userdata = $this->session->userdata('user_data');
-		$empId = $userdata[0]['id_empresa']; 
-
-		$this->assetDB->select('tbl_backloginsumos.id,
-												tbl_backloginsumos.cantidad,
-												articles.artBarCode,
-												articles.artId,
-												articles.artDescription,
-												articles.id_empresa');                            
-		$this->assetDB->from('tbl_backloginsumos');
-		$this->assetDB->join('articles', 'articles.artId = tbl_backloginsumos.artId');   
-		$this->assetDB->where('tbl_backloginsumos.backId', $id);        
-		$this->assetDB->where('articles.id_empresa', $empId);
-		$query= $this->assetDB->get(); 
-
-		if( $query->num_rows() > 0)
-		{
-			return $query->result_array();
-		}
-		else {
-			return 0;
-		}
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | getBacklogInsumos(" . json_encode($id) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/backlog/' . (int) $id . '/insumos/empresa/' . man_empresa()));
+		return tools_merge_articulos($filas ? $filas : array());
 	}
-  // Actualiza edicion de Backlog
- 	function editar_backlogs($datos,$id_back){
- 		$this->assetDB->where('backId', $id_back);
-		$query = $this->assetDB->update("tbl_back",$datos);
-		return $query;
-	 }
 
-	// borra herramientas en edicion 
-	function deleteHerramBack($id){
-		$this->assetDB->where('backId', $id);
-		$query = $this->assetDB->delete('tbl_backlogherramientas');
-		return $query;
-	}
 	/**
-    * Guarda las herramientas
-    * @param array $herram data de herramientas cargadas en formulario
-    * @return integer/bool cantidad de inserciones del batch / false si no se inserto
-    */
-	function insertBackHerram($herram){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | insertBackHerram(".json_encode($herram).")");
-		$query = $this->assetDB->insert_batch("tbl_backlogherramientas",$herram);
-		return $query;
+	 * Edita el backlog y reemplaza herramientas e insumos. La cabecera y el borrado del detalle van en un
+	 * request_box; cada lista nueva, en un pedido por lotes.
+	 * @return array editado, respHerram, respInsumo
+	 */
+	function editar_backlogs($datos, $id_back, $herramientas = array(), $insumos = array()){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | editar_backlogs(" . json_encode($datos) . ", $id_back)");
+		$emp = man_empresa();
+		$clave = array('backId' => (string) $id_back, 'id_empresa' => $emp);
+		$rsp = requestBox(REST_MAN . '/', array(
+			array('_put_backlog' => array(
+				'backId'         => (string) $id_back,
+				'id_tarea'       => man_numero($datos['id_tarea']),
+				'fecha'          => man_fecha($datos['fecha'], true),
+				'horash'         => man_numero($datos['horash']),
+				'back_duracion'  => man_numero($datos['back_duracion']),
+				'back_canth'     => man_numero($datos['back_canth']),
+				'id_unidad'      => man_numero($datos['id_unidad']),
+				'tarea_opcional' => (string) $datos['tarea_opcional'],
+				'id_empresa'     => $emp,
+			)),
+			array('_put_backlog_herramientas_borrar' => $clave),
+			array('_put_backlog_insumos_borrar' => $clave),
+		));
+		$out = array('editado' => (bool) $rsp['status']);
+		if (!$out['editado']) {
+			return $out;
+		}
+		$out['respHerram'] = man_lote_detalle('backlog', 'herramienta', $this->conClave($herramientas, $clave));
+		$out['respInsumo'] = man_lote_detalle('backlog', 'insumo', $this->conClave($insumos, $clave));
+		return $out;
 	}
-	// borra insumos en edicion
-	function deleteInsumBack($id){
-		$this->assetDB->where('backId', $id);
-		$query = $this->assetDB->delete('tbl_backloginsumos');
-		return $query;
+
+	/** Agrega la clave de la cabecera a cada fila de detalle. */
+	private function conClave($filas, $clave){
+		$out = array();
+		foreach ((array) $filas as $f) {
+			$out[] = array_merge($f, $clave);
+		}
+		return $out;
 	}
-	/**
-    * Guarda los insumos
-    * @param array $insumo data de insumos cargadas en formulario
-    * @return integer/bool cantidad de inserciones del batch / false si no se inserto
-    */
-	function insertBackInsum($insumo){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Backlogs | insert_bainsertBackInsumcklog(".json_encode($insumo).")");
-		$query = $this->assetDB->insert_batch("tbl_backloginsumos",$insumo);
-		return $query;
-	}
-}	
+}

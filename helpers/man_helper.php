@@ -84,6 +84,76 @@ if (!function_exists('man_escribir')) {
     }
 }
 
+/*
+ * Cabecera con detalle de herramientas e insumos (Preventivo, Predictivo, Backlog).
+ *
+ * El alta es una operación encadenada (el detalle necesita el id de la cabecera), así que va por toolsMANAPI
+ * (ADR-014, regla 3), que compensa si falla. En la edición el detalle se borra y se vuelve a grabar; cada lista
+ * va en un pedido por lotes del DataService (una transacción): request_box no admite repetir una operación.
+ */
+if (!function_exists('man_alta_con_detalle')) {
+    /**
+     * @param string $entidad      preventivo | predictivo | backlog
+     * @param array  $cabecera     parámetros de POST /<entidad> de MANDataService (con id_empresa de asset)
+     * @param array  $herramientas lista de array(herrId, cantidad)
+     * @param array  $insumos      lista de array(artId, cantidad)
+     * @return string|false id de la cabecera creada
+     */
+    function man_alta_con_detalle($entidad, $cabecera, $herramientas, $insumos)
+    {
+        $ci =& get_instance();
+        $rsp = $ci->rest->callAPI('POST', HOST . '/tools/man/' . $entidad, array(
+            'cabecera'     => $cabecera,
+            'herramientas' => array_values($herramientas),
+            'insumos'      => array_values($insumos),
+        ));
+        $aux = $rsp['status'] ? json_decode($rsp['data'], true) : null;
+        if (empty($aux['status']) || empty($aux['id'])) {
+            log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | man_helper | man_alta_con_detalle(' . $entidad . ') >> ' . json_encode($rsp['data']));
+            return false;
+        }
+        return (string) $aux['id'];
+    }
+}
+
+if (!function_exists('man_lote_detalle')) {
+    /**
+     * Graba una lista de detalle en un solo pedido por lotes. Una lista vacía no hace nada y devuelve true.
+     * @param string $entidad preventivo | predictivo | backlog
+     * @param string $tipo    herramienta | insumo
+     * @param array  $filas   filas con los parámetros de POST /<entidad>/<tipo>
+     * @return int|bool cantidad de filas (lo que devolvía insert_batch() en asset), true si la lista está vacía, false si falla
+     */
+    function man_lote_detalle($entidad, $tipo, $filas)
+    {
+        if (empty($filas)) {
+            return true;
+        }
+        $op = '_post_' . $entidad . '_' . $tipo;
+        $rsp = wso2(REST_MAN . '/' . $entidad . '/' . $tipo . '_batch_req', 'POST', array($op . '_batch_req' => array($op => array_values($filas))));
+        return $rsp['status'] ? count($filas) : false;
+    }
+}
+
+if (!function_exists('man_detalle')) {
+    /**
+     * Arma la lista de detalle con los arrays paralelos que mandan las vistas de asset (ids y cantidades).
+     * @return array lista de array($campoId => id, 'cantidad' => cantidad)
+     */
+    function man_detalle($ids, $cantidades, $campoId)
+    {
+        $out = array();
+        if (empty($ids) || !is_array($ids)) {
+            return $out;
+        }
+        $cantidades = is_array($cantidades) ? array_values($cantidades) : array();
+        foreach (array_values($ids) as $i => $id) {
+            $out[] = array($campoId => (string) $id, 'cantidad' => isset($cantidades[$i]) ? man_numero($cantidades[$i]) : null);
+        }
+        return $out;
+    }
+}
+
 if (!function_exists('man_usuario')) {
     /**
      * Devuelve el usrId de asset (sisusers) del usuario de la sesión de tools, como string.

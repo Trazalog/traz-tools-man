@@ -117,8 +117,12 @@ def comparar(nombre, a, m, nota=''):
     ok = a == m
     print(('OK   ' if ok else 'FALLA') + ' | ' + nombre + (' — ' + nota if nota else ''))
     if not ok:
-        print('       asset: ' + json.dumps(a, ensure_ascii=False)[:400])
-        print('       MAN  : ' + json.dumps(m, ensure_ascii=False)[:400])
+        import difflib
+        la = json.dumps(a, ensure_ascii=False, indent=1, sort_keys=True).split('\n')
+        lm = json.dumps(m, ensure_ascii=False, indent=1, sort_keys=True).split('\n')
+        dif = [l for l in difflib.unified_diff(la, lm, 'asset', 'MAN', n=0, lineterm='') if not l.startswith('@@')]
+        for l in dif[:16]:
+            print('       ' + l[:300])
         fallas.append(nombre)
 
 
@@ -592,12 +596,228 @@ def limpiar_equipo(carpeta):
         sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (tabla, col, PREFIJO))
 
 
+def paridad_planes(asset, man, emp_asset):
+    """Preventivo, Predictivo y Backlog: cabecera con herramientas e insumos (MIG-ASSET-2)."""
+    base = '/mnt/win/dev/git/traz-prod-assetplanner/assets/'
+    norm = lambda t: re.sub(r'\d+_\d*_\d{4}-\d\d-\d\d-\d\d-\d\d-\d\d', 'ID_EMP_FECHA', t) if isinstance(t, str) else t
+    njson = lambda d: json.loads(norm(json.dumps(d, sort_keys=True)))
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    tarea = sql("SELECT id_tarea FROM tareas WHERE id_empresa=%d AND estado='AC' ORDER BY id_tarea LIMIT 1" % emp_asset)[0][0]
+    comp = sql("SELECT id_componente FROM componentes WHERE id_empresa=%d AND estado='AC' ORDER BY id_componente LIMIT 1" % emp_asset)[0][0]
+    idce = sql("SELECT idcomponenteequipo FROM componenteequipo WHERE id_empresa=%d AND estado='AC' ORDER BY 1 LIMIT 1" % emp_asset)[0][0]
+    herr = [h['value'] for h in jload(man.get(MAN + 'Preventivo/getHerramientasB'))][:2]
+    arts = [a['value'] for a in jload(man.get(MAN + 'Preventivo/getinsumo'))][:2]
+    if len(herr) < 2:
+        herr = (herr * 2)[:2]
+    ajeno = sql("SELECT id_equipo FROM equipos WHERE id_empresa<>%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+
+    for accion, datos in (('Preventivo/getUnidTiempo', None), ('Preventivo/gettarea', None), ('Preventivo/getHerramientasB', None),
+                          ('Preventivo/getinsumo', None), ('Preventivo/getherramienta', None), ('Backlog/getequipo', None),
+                          ('Predictivo/getEquipo', None), ('Predictivo/getUnidTiempo', None), ('Preventivo/getcomponente', {'id_equipo': eq}),
+                          ('Backlog/getComponente', {'idEquipo': ''}), ('Predictivo/getInfoEquipo', {'id_equipo': eq}),
+                          ('Preventivo/getEquipoNuevoPrevent', {'id_equipo': eq}), ('Backlog/getInfoEquipo', {'id_equipo': eq})):
+        ra = asset.get(ASSET + accion) if datos is None else asset.post(ASSET + accion, datos)
+        rm = man.get(MAN + accion) if datos is None else man.post(MAN + accion, datos)
+        comparar('planes · ' + accion, jload(ra), jload(rm))
+    comparar('planes · Preventivo/gettareaxPatron', jload(asset.get(ASSET + 'Preventivo/gettareaxPatron?patron=a')),
+             jload(man.get(MAN + 'Preventivo/gettareaxPatron?patron=a')))
+    comparar('planes · Preventivo/getdatos (MAN lee el pañol de tools, E18)', True,
+             isinstance(jload(man.post(MAN + 'Preventivo/getdatos', {'id_herramienta': herr[0]})), list))
+    for pantalla in ('Preventivo', 'Predictivo', 'Backlog'):
+        comparar('planes · %s (pantalla)' % pantalla, celdas_tabla(asset.get(ASSET + pantalla + '/index/Add-Edit-Del')),
+                 celdas_tabla(man.get(MAN + pantalla + '/index/Add-Edit-Del')))
+
+    def detalle(lado):
+        return {'id_her[]': herr, 'cant_herr[]': ['2', '1'], 'id_insumo[]': arts, 'cant_insumo[]': ['3', '4']}
+
+    def post_multi(s, url, campos, archivo):
+        """POST multipart con listas (campo[] repetido) y un archivo opcional."""
+        limite = '----paridad' + os.urandom(8).hex()
+        partes = []
+        for k, v in campos.items():
+            for x in (v if isinstance(v, list) else [v]):
+                partes.append(('--%s\r\nContent-Disposition: form-data; name="%s"\r\n\r\n%s\r\n' % (limite, k, x)).encode())
+        if archivo:
+            partes.append(('--%s\r\nContent-Disposition: form-data; name="inputPDF"; filename="plan.pdf"\r\nContent-Type: application/pdf\r\n\r\n'
+                           % limite).encode() + PDF_PRUEBA + b'\r\n')
+        partes.append(('--%s--\r\n' % limite).encode())
+        return s.abrir(urllib.request.Request(url, b''.join(partes), {'Content-Type': 'multipart/form-data; boundary=' + limite}))
+
+    def post_listas(s, url, campos):
+        return s.abrir(url, urllib.parse.urlencode([(k, x) for k, v in campos.items() for x in (v if isinstance(v, list) else [v])]).encode())
+
+    # ------------------------------------------------ Preventivo
+    fila_p = ("SELECT id_equipo, id_tarea, perido, cantidad, ultimo, id_componente, critico1, fechaprobable, horash, estadoprev, prev_duracion, "
+              "id_unidad, prev_canth, prev_adjunto, id_empresa, lectura_base FROM preventivo WHERE prevId=%s")
+    det = lambda tabla, pk, i: sql("SELECT %s, cantidad, id_empresa FROM %s WHERE %s=%s ORDER BY id" % (
+        'herrId' if 'herr' in tabla else 'artId', tabla, pk, i))
+    maxid = lambda tabla, pk: int(sql("SELECT IFNULL(MAX(%s),0) FROM %s" % (pk, tabla))[0][0])
+    alta = {'id_equipo': eq, 'tarea': tarea, 'id_componente': comp, 'ultimo': '2026-10-01', 'periodo': '2', 'cantidad': '30', 'cantOper': '2',
+            'duracion': '45', 'unidad': '1', 'hshombre': '3', 'alerta': '', 'lectura_base': ''}
+    antes = maxid('preventivo', 'prevId')
+    ra = jload(post_multi(asset, ASSET + 'Preventivo/guardar_preventivo', dict(alta, **detalle('A')), True))
+    pa = maxid('preventivo', 'prevId')
+    rm = jload(post_multi(man, MAN + 'Preventivo/guardar_preventivo', dict(alta, **detalle('M')), True))
+    pm = maxid('preventivo', 'prevId')
+    creados_p = [str(i) for i in (pa, pm) if i > antes]
+    comparar('planes · preventivo alta (respuesta)', njson(ra), njson(rm))
+    comparar('planes · preventivo alta (fila)', njson(sql(fila_p % pa)), njson(sql(fila_p % pm)))
+    comparar('planes · preventivo alta (herramientas e insumos)', (det('tbl_preventivoherramientas', 'prevId', pa), det('tbl_preventivoinsumos', 'prevId', pa)),
+             (det('tbl_preventivoherramientas', 'prevId', pm), det('tbl_preventivoinsumos', 'prevId', pm)))
+    ed = lambda s, u, i: njson(sin_claves(jload(s.post(u + 'Preventivo/geteditar', {'idprev': i})), ()))
+    ea, em = ed(asset, ASSET, pa), ed(man, MAN, pm)
+    for d in (ea, em):
+        if isinstance(d, dict) and isinstance(d.get('datos'), list):
+            d['datos'] = sin_claves(d['datos'], ('prevId',))
+            d['insumos'] = sin_claves(d.get('insumos'), ('id',))
+    comparar('planes · preventivo traer para editar', ea, em)
+    edit = {'id_equipo': eq, 'id_tarea': tarea, 'perido': '3', 'cantidad': '15', 'ultimo': '2026-10-15', 'id_componente': comp, 'horash': '5',
+            'prev_duracion': '30', 'cantOper': '1', 'unidad': '2', 'idsherramienta[]': herr[:1], 'cantHerram[]': ['7'], 'idsinsumo[]': [],
+            'cantInsum[]': []}
+    comparar('planes · preventivo editar (respuesta)', jload(post_listas(asset, ASSET + 'Preventivo/editar_preventivo', dict(edit, id_prevent=pa))),
+             jload(post_listas(man, MAN + 'Preventivo/editar_preventivo', dict(edit, id_prevent=pm))))
+    comparar('planes · preventivo editar (fila y detalle)', njson([sql(fila_p % pa), det('tbl_preventivoherramientas', 'prevId', pa), det('tbl_preventivoinsumos', 'prevId', pa)]),
+             njson([sql(fila_p % pm), det('tbl_preventivoherramientas', 'prevId', pm), det('tbl_preventivoinsumos', 'prevId', pm)]))
+    comparar('planes · preventivo eliminar adjunto', jload(asset.post(ASSET + 'Preventivo/eliminarAdjunto', {'idprev': pa})),
+             jload(man.post(MAN + 'Preventivo/eliminarAdjunto', {'idprev': pm})))
+    comparar('planes · preventivo agregar adjunto', njson(jload(post_multi(asset, ASSET + 'Preventivo/agregarAdjunto', {'idAgregaAdjunto': pa}, True))),
+             njson(jload(post_multi(man, MAN + 'Preventivo/agregarAdjunto', {'idAgregaAdjunto': pm}, True))))
+    comparar('planes · preventivo adjunto (fila)', njson(sql(fila_p % pa)), njson(sql(fila_p % pm)))
+    comparar('planes · preventivo baja', jload(asset.post(ASSET + 'Preventivo/baja_preventivo', {'idprev': pa})),
+             jload(man.post(MAN + 'Preventivo/baja_preventivo', {'idprev': pm})))
+    comparar('planes · preventivo baja (fila)', njson(sql(fila_p % pa)), njson(sql(fila_p % pm)))
+
+    # ------------------------------------------------ Predictivo
+    fila_r = ("SELECT id_equipo, tarea_descrip, fecha, periodo, cantidad, horash, estado, pred_duracion, id_unidad, pred_canth, id_empresa, pred_adjunto "
+              "FROM predictivo WHERE predId=%s")
+    alta = {'equipo': eq, 'id_tarea': tarea, 'vfecha': '20-10-2026', 'periodo': '2', 'cantidad': '10', 'hshombre': '1.5', 'duracion': '20',
+            'unidad': '1', 'cantOper': '2'}
+    antes = maxid('predictivo', 'predId')
+    ra = jload(post_multi(asset, ASSET + 'Predictivo/guardar_predictivo', dict(alta, **detalle('A')), True))
+    ra_id = maxid('predictivo', 'predId')
+    rm = jload(post_multi(man, MAN + 'Predictivo/guardar_predictivo', dict(alta, **detalle('M')), True))
+    rm_id = maxid('predictivo', 'predId')
+    creados_r = [str(i) for i in (ra_id, rm_id) if i > antes]
+    comparar('planes · predictivo alta (respuesta)', ra, rm)
+    comparar('planes · predictivo alta (fila y detalle)', njson([sql(fila_r % ra_id), det('tbl_predictivoherramientas', 'predId', ra_id), det('tbl_predictivoinsumos', 'predId', ra_id)]),
+             njson([sql(fila_r % rm_id), det('tbl_predictivoherramientas', 'predId', rm_id), det('tbl_predictivoinsumos', 'predId', rm_id)]))
+    ed = lambda s, u, i: njson(jload(s.post(u + 'Predictivo/getEditar', {'idpred': i, 'datos': eq})))
+    ea, em = ed(asset, ASSET, ra_id), ed(man, MAN, rm_id)
+    for d in (ea, em):
+        if isinstance(d, dict) and isinstance(d.get('datos'), list):
+            d['datos'] = sin_claves(d['datos'], ('predId',))
+            d['insumos'] = sin_claves(d.get('insumos'), ('id',))
+    comparar('planes · predictivo traer para editar', ea, em)
+    edit = {'tarea': tarea, 'fecha': '2026-10-21', 'periodo': '3', 'cantidad': '12', 'horash': '2', 'duracion': '25', 'unidad': '2', 'operarios': '3',
+            'idsherramienta[]': [], 'cantHerram[]': [], 'idsinsumo[]': arts[:1], 'cantInsum[]': ['9']}
+    comparar('planes · predictivo editar (respuesta)', jload(post_listas(asset, ASSET + 'Predictivo/updatePredictivo', dict(edit, id_Predictivo=ra_id))),
+             jload(post_listas(man, MAN + 'Predictivo/updatePredictivo', dict(edit, id_Predictivo=rm_id))))
+    comparar('planes · predictivo editar (fila y detalle)', njson([sql(fila_r % ra_id), det('tbl_predictivoherramientas', 'predId', ra_id), det('tbl_predictivoinsumos', 'predId', ra_id)]),
+             njson([sql(fila_r % rm_id), det('tbl_predictivoherramientas', 'predId', rm_id), det('tbl_predictivoinsumos', 'predId', rm_id)]))
+    comparar('planes · predictivo agregar adjunto', njson(jload(post_multi(asset, ASSET + 'Predictivo/agregarAdjunto', {'idAgregaAdjunto': ra_id}, True))),
+             njson(jload(post_multi(man, MAN + 'Predictivo/agregarAdjunto', {'idAgregaAdjunto': rm_id}, True))))
+    comparar('planes · predictivo baja', jload(asset.post(ASSET + 'Predictivo/baja_predictivo', {'idpre': ra_id})),
+             jload(man.post(MAN + 'Predictivo/baja_predictivo', {'idpre': rm_id})))
+    comparar('planes · predictivo baja (fila)', njson(sql(fila_r % ra_id)), njson(sql(fila_r % rm_id)))
+
+    # ------------------------------------------------ Backlog
+    fila_b = ("SELECT id_equipo, id_tarea, fecha, horash, estado, back_duracion, id_unidad, back_canth, id_empresa, idcomponenteequipo, back_adjunto, "
+              "sore_id FROM tbl_back WHERE backId=%s")
+    alta = {'equipo': eq, 'idcomponenteequipo': idce, 'vfecha': '22/10/2026', 'id_tarea': tarea, 'hshombre': '2', 'duracion': '30', 'unidad': '1',
+            'cantOper': '1'}
+    ra = jload(post_multi(asset, ASSET + 'Backlog/guardar_backlog', dict(alta, tareaOpcional=PREFIJO + ' A', **detalle('A')), True))
+    rm = jload(post_multi(man, MAN + 'Backlog/guardar_backlog', dict(alta, tareaOpcional=PREFIJO + ' M', **detalle('M')), True))
+    comparar('planes · backlog alta (respuesta)', ra, rm)
+    ba = sql("SELECT backId FROM tbl_back WHERE tarea_opcional='%s A'" % PREFIJO)[0][0]
+    bm = sql("SELECT backId FROM tbl_back WHERE tarea_opcional='%s M'" % PREFIJO)[0][0]
+    comparar('planes · backlog alta (fila y detalle)', njson([sql(fila_b % ba), det('tbl_backlogherramientas', 'backId', ba), det('tbl_backloginsumos', 'backId', ba)]),
+             njson([sql(fila_b % bm), det('tbl_backlogherramientas', 'backId', bm), det('tbl_backloginsumos', 'backId', bm)]))
+    ed = lambda s, u, i: njson(jload(s.get(u + 'Backlog/geteditar?idpred=%s&datos=%s' % (i, eq))))
+    ea, em = ed(asset, ASSET, ba), ed(man, MAN, bm)
+    for d in (ea, em):
+        if isinstance(d, dict) and isinstance(d.get('datos'), list):
+            d['datos'] = sin_claves(d['datos'], ('backId', 'tarea_opcional'))
+            d['insumos'] = sin_claves(d.get('insumos'), ('id',))
+    comparar('planes · backlog traer para editar', ea, em)
+    comparar('planes · backlog lista con los de prueba', len([f for f in jload(json.dumps(celdas_tabla(asset.get(ASSET + 'Backlog/index/Add-Edit-Del'))))]),
+             len(celdas_tabla(man.get(MAN + 'Backlog/index/Add-Edit-Del'))))
+    edit = {'tarea': tarea, 'fecha': '2026-10-23 10:00:00', 'duracion': '40', 'back_canth': '2', 'hshombre': '4', 'id_unidad': '2', 'tipo': 'edit',
+            'idsherramienta[]': herr, 'cantHerram[]': ['1', '1'], 'idsinsumo[]': arts, 'cantInsum[]': ['5', '6']}
+    comparar('planes · backlog editar (respuesta)', jload(post_listas(asset, ASSET + 'Backlog/editar_backlog', dict(edit, backid=ba, tareaOpcional=PREFIJO + ' A'))),
+             jload(post_listas(man, MAN + 'Backlog/editar_backlog', dict(edit, backid=bm, tareaOpcional=PREFIJO + ' M'))))
+    comparar('planes · backlog editar (fila y detalle)', njson([sql(fila_b % ba), det('tbl_backlogherramientas', 'backId', ba), det('tbl_backloginsumos', 'backId', ba)]),
+             njson([sql(fila_b % bm), det('tbl_backlogherramientas', 'backId', bm), det('tbl_backloginsumos', 'backId', bm)]))
+    comparar('planes · backlog agregar adjunto', njson(jload(post_multi(asset, ASSET + 'Backlog/agregarAdjunto', {'idAgregaAdjunto': ba}, True))),
+             njson(jload(post_multi(man, MAN + 'Backlog/agregarAdjunto', {'idAgregaAdjunto': bm}, True))))
+    comparar('planes · backlog borrar', jload(asset.post(ASSET + 'Backlog/baja_backlog_estado_Borrado', {'gloid': ba})),
+             jload(man.post(MAN + 'Backlog/baja_backlog_estado_Borrado', {'gloid': bm})))
+    comparar('planes · backlog borrar (fila)', njson(sql(fila_b % ba)), njson(sql(fila_b % bm)))
+
+    prev_mismo_id = sql("SELECT prevId, prev_adjunto FROM preventivo WHERE prevId=%s" % bm)
+    comparar('planes · backlog eliminar adjunto (MAN borra el del backlog, T20)', True, jload(man.post(MAN + 'Backlog/eliminarAdjunto', {'idprev': bm})))
+    comparar('planes · backlog eliminar adjunto (queda vacío y no toca el preventivo con el mismo número)', ([['x']], prev_mismo_id),
+             (sql("SELECT CONCAT('x', IFNULL(back_adjunto, 'NULL')) FROM tbl_back WHERE backId=%s" % bm), sql("SELECT prevId, prev_adjunto FROM preventivo WHERE prevId=%s" % bm)))
+    comparar('planes · predictivo eliminar adjunto (MAN borra el del predictivo, T20)', True,
+             jload(man.post(MAN + 'Predictivo/eliminarAdjunto', {'idprev': rm_id})))
+    comparar('planes · predictivo eliminar adjunto (fila)', [['x']], sql("SELECT CONCAT('x', IFNULL(pred_adjunto, 'NULL')) FROM predictivo WHERE predId=%s" % rm_id))
+
+    # ------------------------------------------------ Aislamiento
+    pv = sql("SELECT prevId FROM preventivo WHERE id_empresa<>%d AND estadoprev<>'AN' ORDER BY prevId LIMIT 1" % emp_asset)[0][0]
+    pr = sql("SELECT predId FROM predictivo WHERE id_empresa<>%d AND estado<>'AN' ORDER BY predId LIMIT 1" % emp_asset)
+    bk = sql("SELECT backId, id_equipo FROM tbl_back WHERE id_empresa<>%d AND estado<>'B' ORDER BY backId LIMIT 1" % emp_asset)[0]
+    foto = lambda: (sql(fila_p % pv), det('tbl_preventivoherramientas', 'prevId', pv), sql(fila_b % bk[0]), det('tbl_backlogherramientas', 'backId', bk[0]),
+                    sql(fila_r % pr[0][0]) if pr else [])
+    antes_f = foto()
+    comparar('planes · aislamiento: MAN no trae preventivos ajenos', 'nada', man.post(MAN + 'Preventivo/geteditar', {'idprev': pv}).strip())
+    comparar('planes · aislamiento: MAN no trae backlogs ajenos', {'datos': 0}, jload(man.get(MAN + 'Backlog/geteditar?idpred=%s&datos=%s' % (bk[0], bk[1]))))
+    post_listas(man, MAN + 'Preventivo/editar_preventivo', dict(edit, id_prevent=pv, id_equipo=ajeno, id_tarea=tarea, perido='1', cantidad='1', ultimo='2026-01-01',
+                                                                id_componente=comp, horash='1', prev_duracion='1', cantOper='1', unidad='1'))
+    man.post(MAN + 'Preventivo/baja_preventivo', {'idprev': pv})
+    man.post(MAN + 'Preventivo/eliminarAdjunto', {'idprev': pv})
+    post_listas(man, MAN + 'Backlog/editar_backlog', dict(edit, backid=bk[0], tareaOpcional='HACK'))
+    man.post(MAN + 'Backlog/baja_backlog_estado_Borrado', {'gloid': bk[0]})
+    if pr:
+        post_listas(man, MAN + 'Predictivo/updatePredictivo', dict(edit, id_Predictivo=pr[0][0], periodo='1', cantidad='1', horash='1', duracion='1',
+                                                                    unidad='1', operarios='1'))
+        man.post(MAN + 'Predictivo/baja_predictivo', {'idpre': pr[0][0]})
+    comparar('planes · aislamiento: MAN no modifica planes ajenos ni su detalle', antes_f, foto())
+    n = maxid('preventivo', 'prevId')
+    post_multi(man, MAN + 'Preventivo/guardar_preventivo', dict({'id_equipo': ajeno, 'tarea': tarea, 'id_componente': comp, 'ultimo': '2026-10-01',
+                                                                 'periodo': '2', 'cantidad': '1', 'cantOper': '1', 'duracion': '1', 'unidad': '1',
+                                                                 'hshombre': '1', 'alerta': '', 'lectura_base': ''}, **detalle('M')), False)
+    comparar('planes · aislamiento: MAN no crea planes sobre equipos ajenos', n, maxid('preventivo', 'prevId'))
+
+    limpiar_planes(base, creados_p, creados_r)
+
+
+def limpiar_planes(base, prevs=(), preds=()):
+    """Borra los planes de prueba, su detalle y sus archivos."""
+    def borrar(tabla, pk, ids, th, ti, col, carpeta):
+        if not ids:
+            return
+        lista = ','.join(ids)
+        # Los archivos se llaman [preventivo]<id>_<empresa>_<fecha>: se borran todos los de los ids de prueba
+        # (incluidos los que quedaron sin referencia al reemplazar el adjunto).
+        patron = re.compile(r'^(preventivo)?(%s)_\d*_\d{4}-' % '|'.join(ids))
+        for nombre in os.listdir(base + carpeta):
+            if patron.match(nombre):
+                os.remove(base + carpeta + '/' + nombre)
+        sql("DELETE FROM %s WHERE %s IN (%s)" % (th, pk, lista))
+        sql("DELETE FROM %s WHERE %s IN (%s)" % (ti, pk, lista))
+        sql("DELETE FROM %s WHERE %s IN (%s)" % (tabla, pk, lista))
+    borrar('preventivo', 'prevId', list(prevs), 'tbl_preventivoherramientas', 'tbl_preventivoinsumos', 'prev_adjunto', 'filespreventivos')
+    borrar('predictivo', 'predId', list(preds), 'tbl_predictivoherramientas', 'tbl_predictivoinsumos', 'pred_adjunto', 'filespredictivos')
+    backs = [r[0] for r in sql("SELECT backId FROM tbl_back WHERE tarea_opcional LIKE '%s%%'" % PREFIJO)]
+    borrar('tbl_back', 'backId', backs, 'tbl_backlogherramientas', 'tbl_backloginsumos', 'back_adjunto', 'filesbacklog')
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
     'parametro': paridad_parametro,
     'componente': paridad_componente,
     'equipo': paridad_equipo,
+    'planes': paridad_planes,
 }
 
 if __name__ == '__main__':

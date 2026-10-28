@@ -20,3 +20,16 @@ controllers/Equipo.php
 models/Equipos.php
 views/Equipo/list.php
 views/Equipo/view_.php
+helpers/man_tools_helper.php
+controllers/Preventivo.php
+models/Preventivos.php
+views/preventivo/list.php
+views/preventivo/view_.php
+controllers/Predictivo.php
+models/Predictivos.php
+views/predictivo/list.php
+views/predictivo/view_.php
+controllers/Backlog.php
+models/Backlogs.php
+views/backlog/list.php
+views/backlog/view_.php

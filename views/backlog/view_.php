@@ -11,7 +11,7 @@
     <div class="box-header with-border">
         <h3 class="box-title">Programación Backlog</h3>
     </div><!-- /.box-header -->
-    <form id="formBacklog" role="form" action="<?php echo MAN;?>Backlog/guardar_backlog" method="POST" onKeypress="if (event.keyCode == 13) event.returnValue = false;" >
+    <form id="formBacklog" role="form" action="<?php echo base_url(MAN); ?>Backlog/guardar_backlog" method="POST" onKeypress="if (event.keyCode == 13) event.returnValue = false;" >
         <div class="box-body">
             <?php
                 if (strpos($permission,'Add') !== false) {
@@ -258,7 +258,7 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getSector",
+      'url': "<?php echo base_url(MAN); ?>Sservicio/getSector",
       'success': function (data) {
         tmp = data;
       }
@@ -341,7 +341,7 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getEquipSector",
+      'url': "<?php echo base_url(MAN); ?>Sservicio/getEquipSector",
       'success': function (data) {
         if(data !== null){
           // Asigna opciones al select Equipo en modal
@@ -369,7 +369,7 @@ var preglob     = "";
 $('#listado').click( function cargarVista(){
     wo();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Backlog/index/<?php echo $permission; ?>", function() {
+    linkTo("<?php echo base_url(MAN); ?>Backlog/index/<?php echo $permission; ?>", function() {
       wc();
     });
 });
@@ -386,7 +386,7 @@ $('#equipo').change(function(){
     data: { id_equipo:id_equipo },
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Backlog/getInfoEquipo',
+    url: '<?php echo base_url(MAN); ?>Backlog/getInfoEquipo',
     success: function(data){
       //console.table(data);
      limpiarInfoEquipos();
@@ -433,7 +433,7 @@ function traer_equipo(){
     $.ajax({
       type: 'POST',
       data: { },
-      url: 'index.php/Backlog/getequipo', //index.php/
+      url: '<?php echo base_url(MAN); ?>Backlog/getequipo',
       success: function(data){
              
                var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -462,7 +462,7 @@ var dataTarea = function() {
     'async': false,
     'type': "POST",
     'dataType': 'json',
-    'url': '<?php echo MAN; ?>Preventivo/gettarea',
+    'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
     success: (data) => { tmp = data },
     error: () => error('Error',"Error al traer tareas"),
   })
@@ -496,7 +496,7 @@ function dataC() {
     'dataType': 'json',
     'global': false,
     'type': "POST",
-    'url': "<?php echo MAN; ?>Backlog/getComponente",
+    'url': "<?php echo base_url(MAN); ?>Backlog/getComponente",
     success: function(data) {
       //console.info("trae componentes para autocomplete");
       console.log(data);
@@ -552,7 +552,7 @@ function refrescarAutocompletar(){
 function cargarVista(){
     wo();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Backlog/index/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Backlog/index/<?php echo $permission; ?>");
     wc();
 }
 
@@ -612,7 +612,7 @@ $(function(){
   $.ajax({
     type: 'POST',
     data: { },
-    url: '<?php echo MAN;?>Preventivo/getUnidTiempo', 
+    url: '<?php echo base_url(MAN); ?>Preventivo/getUnidTiempo', 
     success: function(data){
            
             var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -685,7 +685,7 @@ function ordenaArregloDeObjetosPor(propiedad) {
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN; ?>Preventivo/getHerramientasB',
+      'url': '<?php echo base_url(MAN); ?>Preventivo/getHerramientasB',
       success: function(data) { tmp = data },
       error: function() { error("Error","Error al traer Herramientas") },
     })
@@ -864,7 +864,7 @@ function ordenaArregloDeObjetosPor(propiedad) {
       'async': false,
       'type': "POST",
       'dataType': 'json',
-      'url': '<?php echo MAN; ?>Preventivo/getinsumo',
+      'url': '<?php echo base_url(MAN); ?>Preventivo/getinsumo',
       success: function(data) { tmp = data },
       error: function(result) { error("Error","Error al traer Herramientas") },
     })

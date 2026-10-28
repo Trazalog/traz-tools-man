@@ -1,300 +1,168 @@
 <?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
+/**
+ * Predictivos: ABM de planes predictivos con herramientas e insumos.
+ *
+ * MIG-ASSET-2: portado desde el asset actual (diverge del fork). Datos por MANDataService (ADR-014), limitado a
+ * la empresa de la sesión; herramientas e insumos del pañol y del almacén de tools (man_tools_helper). El alta con
+ * detalle va por toolsMANAPI (regla 3). Se conservan firmas y formato de salida del model de asset (E9: solo lo que
+ * usan las acciones portadas).
+ */
 class Predictivos extends CI_Model
 {
+	/** @var int id del último predictivo creado (lo que en asset se leía con insert_id()). */
+	public $ultimo_id = 0;
+
 	function __construct()
 	{
 		parent::__construct();
-        $this->assetDB = $this->load->database('asset_db', TRUE);
+		$this->load->helper(array('man', 'man_tools'));
 	}
-	/**
-    * Lista Predictivos con estado 'C' por Empresa Logueada
-    * @param 
-    * @return array listado de Predictivos
-    */
+
+	/** Listado de predictivos no anulados. @return array array('data' => filas o 0) */
 	function predictivo_List(){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivos | predictivo_List()");
-        $empId = empresa(); 
-        
-		$this->assetDB->select('predictivo.predId, 
-								predictivo.id_equipo,
-								predictivo.tarea_descrip, 
-								predictivo.fecha,  												 
-								predictivo.cantidad,
-								predictivo.estado, 
-								predictivo.horash,
-								predictivo.pred_adjunto, 
-								equipos.descripcion AS des, 
-								equipos.marca, 
-								equipos.codigo, 
-								equipos.ubicacion, 
-								equipos.fecha_ingreso, 
-								tareas.descripcion as de1,
-								periodo.descripcion AS periodo');
-    	$this->assetDB->from('predictivo');
-    	$this->assetDB->join('equipos','equipos.id_equipo = predictivo.id_equipo');
-		$this->assetDB->join('tareas', 'tareas.id_tarea = predictivo.tarea_descrip');
-		$this->assetDB->join('periodo', 'periodo.idperiodo = predictivo.periodo');    	
-    	$this->assetDB->where('predictivo.estado !=', 'AN');
-    	$this->assetDB->where('predictivo.id_empresa', $empId);    	    	
-    	$query= $this->assetDB->get(); 		
-	    
-	    if( $query->num_rows() > 0){
-	      $data['data'] = $query->result_array();	
-	      return  $data;
-	    } else $data['data'] = array();
-		return  $data; 
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | predictivo_List()");
+		$filas = man_lista(wso2(REST_MAN . '/predictivos/empresa/' . man_empresa()));
+		return array('data' => $filas ? $filas : 0);
 	}
 
-	// Trae equipos por empresa logueada - Listo
+	/** Equipos no anulados (id y código). @return array|false */
 	function getEquipos(){
-		$userdata = $this->session->userdata('user_data');
-        $empId = $userdata[0]['id_empresa']; 
-        
-    	$this->assetDB->select('equipos.id_equipo,equipos.codigo');
-    	$this->assetDB->from('equipos');
-    	$this->assetDB->where('equipos.estado!=', 'AN');
-    	$this->assetDB->where('equipos.id_empresa', $empId);    	
-    	$query= $this->assetDB->get();		
-		
-	 	if ($query->num_rows()!=0)
-	 	{
-	 		return $query->result_array();	
-	 	}
-	 	else
-	 	{	
-	 		return false;
-	 	}	
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | getEquipos()");
+		$filas = man_lista(wso2(REST_MAN . '/equipos/no-anulados/codigos/empresa/' . man_empresa()));
+		return $filas ? $filas : false;
 	}
-	/**
-    * Trae info de equipos por ID y por empresa logueada
-    * @param integer $id_equipo id del equipo
-    * @return array data del equipo
-    */
+
+	/** Equipo con su marca (solo si tiene marca, como en asset). @return array|false filas */
 	function getInfoEquipos($id){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Preventivos | getInfoEquipos($id)");
-        $empId = empresa(); 
-        
-    	$this->assetDB->select('equipos.*,marcasequipos.marcadescrip,marcasequipos.marcaid');
-		$this->assetDB->from('equipos');
-		$this->assetDB->join('marcasequipos', 'equipos.marca = marcasequipos.marcaid');
-    //	$this->assetDB->where('equipos.estado', 'AC');
-    	$this->assetDB->where('equipos.id_empresa', $empId);
-    	$this->assetDB->where('equipos.id_equipo', $id);      	
-    	$query= $this->assetDB->get();   
-
-		if ($query->num_rows()!=0){
-			return $query->result_array();
-		}else{
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | getInfoEquipos(" . json_encode($id) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/equipo/' . (int) $id . '/con-marca/empresa/' . man_empresa()));
+		if (!$filas || $filas[0]['marcaid'] === null) {
 			return false;
 		}
+		unset($filas[0]['marca_estado'], $filas[0]['marca_empresa']);
+		return $filas;
 	}
 
-	// Trae tareas por empresa logueada - Listo
-	function gettarea(){
-
-		$userdata = $this->session->userdata('user_data');
-    $empId = $userdata[0]['id_empresa']; 
-		$this->assetDB->select('tareas.id_tarea AS value, tareas.descripcion AS label');
-		$this->assetDB->from('tareas');    	
-		$this->assetDB->where('tareas.id_empresa', $empId);
-		$this->assetDB->where('estado', 'AC');
-		$this->assetDB->order_by('label', 'ASC');
-		$query= $this->assetDB->get();
-
-		if($query->num_rows()>0){
-			return $query->result_array();
-		}
-		else{
-			return false;
-		}
-	}
-
-	// Trae unidades de tiempo  - Listo
+	/** Unidades de tiempo. @return array|false objetos */
 	function getUnidTiempos(){
-
-		$this->assetDB->select('unidad_tiempo.*');
-    	$this->assetDB->from('unidad_tiempo');    	
-    	$query= $this->assetDB->get();
-
-		if($query->num_rows()>0){
-            return $query->result();
-        }
-        else{
-            return false;
-        }
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | getUnidTiempos()");
+		$filas = man_lista(wso2(REST_MAN . '/unidades-tiempo'));
+		return $filas ? json_decode(json_encode($filas)) : false;
 	}
 
-	//Insertar  predictivo  - Listo
-	function insert_predictivo($data){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivos | insert_predictivo()");
-		$query['status'] = $this->assetDB->insert("predictivo",$data);
-		$query['id'] = $this->assetDB->insert_id();
-		return $query;
+	/**
+	 * Alta de predictivo con herramientas e insumos (toolsMANAPI). El id queda en $this->ultimo_id.
+	 * @return bool
+	 */
+	function insert_predictivo($data, $herramientas = array(), $insumos = array()){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | insert_predictivo(" . json_encode($data) . ")");
+		$id = man_alta_con_detalle('predictivo', array(
+			'id_equipo'     => (string) $data['id_equipo'],
+			'tarea_descrip' => $data['tarea_descrip'] === null ? null : (string) $data['tarea_descrip'],
+			'fecha'         => man_fecha($data['fecha']),
+			'periodo'       => $data['periodo'] === null ? null : (string) $data['periodo'],
+			'cantidad'      => man_numero($data['cantidad']),
+			'horash'        => man_numero($data['horash']),
+			'pred_duracion' => man_numero($data['pred_duracion']),
+			'pred_canth'    => man_numero($data['pred_canth']),
+			'id_empresa'    => man_empresa(),
+			'id_unidad'     => man_numero($data['id_unidad']),
+		), $herramientas, $insumos);
+		$this->ultimo_id = $id ? (int) $id : 0;
+		return $id !== false;
 	}
 
-	// Guarda el bacht de datos de herramientas de Preventivo - Listo
-	function insertPredHerram($herramPred){
-
-		$query = $this->assetDB->insert_batch("tbl_predictivoherramientas",$herramPred);
-		return $query;
+	/** Guarda el nombre del adjunto. @return array el mismo $adjunto, como en asset */
+	function updateAdjunto($adjunto, $ultimoId){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | updateAdjunto(" . json_encode($adjunto) . ", $ultimoId)");
+		man_escribir('PUT', 'predictivo/adjunto', array(
+			'pred_adjunto' => (string) $adjunto['pred_adjunto'],
+			'predId'       => (string) $ultimoId,
+			'id_empresa'   => man_empresa(),
+		));
+		return $adjunto;
 	}
 
-	// Guarda insumos del Preventivo - Listo 
-	function insertPredInsum($insumoPred){
-
-		$query = $this->assetDB->insert_batch("tbl_predictivoinsumos",$insumoPred);
-		return $query;
+	/** Borra el nombre del adjunto (el archivo queda en disco, como en asset). @return bool */
+	function eliminarAdjunto($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | eliminarAdjunto($id)");
+		$rsp = man_escribir('PUT', 'predictivo/adjunto', array('pred_adjunto' => '', 'predId' => (string) $id, 'id_empresa' => man_empresa()));
+		return (bool) $rsp['status'];
 	}
-/**
- * Guarda el nombre de adjunto
- * @param String $adjunto nombre codificado del adjunto.
- * @return Bool true/false segun resultado de la operacion.
-*/
-function updateAdjunto($adjunto,$ultimoId){
-	log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Predictivos | updateAdjunto(Adjunto: $adjunto | ID: $ultimoId)");
-	$this->assetDB->where('predId', $ultimoId);
-	$query = $this->assetDB->update("predictivo",$adjunto);
-	return $adjunto;
+
+	/** Predictivo a editar. @return array|false objetos */
+	function getInfopred($ide, $id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | getInfopred(" . json_encode($ide) . ", " . json_encode($id) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/predictivo/' . (int) $id . '/equipo/' . (int) $ide . '/empresa/' . man_empresa()));
+		return $filas ? json_decode(json_encode($filas)) : false;
+	}
+
+	/** Herramientas del predictivo, completadas con el pañol de tools. @return array */
+	function getPredictivoHerramientas($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | getPredictivoHerramientas(" . json_encode($id) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/predictivo/' . (int) $id . '/herramientas/empresa/' . man_empresa()));
+		return tools_merge_herramientas($filas ? $filas : array());
+	}
+
+	/** Insumos del predictivo, completados con el almacén de tools. @return array */
+	function getPredictivoInsumos($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | getPredictivoInsumos(" . json_encode($id) . ")");
+		$filas = man_lista(wso2(REST_MAN . '/predictivo/' . (int) $id . '/insumos/empresa/' . man_empresa()));
+		return tools_merge_articulos($filas ? $filas : array());
+	}
+
+	/**
+	 * Edita el predictivo y reemplaza herramientas e insumos. La cabecera y el borrado del detalle van en un
+	 * request_box; cada lista nueva, en un pedido por lotes.
+	 * @return array updatedatos, respHerram, respInsumo
+	 */
+	function updatePredictivos($datos, $id, $herramientas = array(), $insumos = array()){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | updatePredictivos(" . json_encode($datos) . ", $id)");
+		$emp = man_empresa();
+		$clave = array('predId' => (string) $id, 'id_empresa' => $emp);
+		$rsp = requestBox(REST_MAN . '/', array(
+			array('_put_predictivo' => array(
+				'predId'        => (string) $id,
+				'tarea_descrip' => (string) $datos['tarea_descrip'],
+				'fecha'         => man_fecha($datos['fecha']),
+				'periodo'       => (string) $datos['periodo'],
+				'cantidad'      => man_numero($datos['cantidad']),
+				'horash'        => man_numero($datos['horash']),
+				'pred_duracion' => man_numero($datos['pred_duracion']),
+				'id_unidad'     => man_numero($datos['id_unidad']),
+				'pred_canth'    => man_numero($datos['pred_canth']),
+				'id_empresa'    => $emp,
+			)),
+			array('_put_predictivo_herramientas_borrar' => $clave),
+			array('_put_predictivo_insumos_borrar' => $clave),
+		));
+		$out = array('updatedatos' => (bool) $rsp['status']);
+		if (!$out['updatedatos']) {
+			return $out;
+		}
+		$out['respHerram'] = man_lote_detalle('predictivo', 'herramienta', $this->conClave($herramientas, $clave));
+		$out['respInsumo'] = man_lote_detalle('predictivo', 'insumo', $this->conClave($insumos, $clave));
+		return $out;
+	}
+
+	/** Cambia el estado del predictivo. @return bool */
+	function baja_predictivos($datos, $id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Predictivos | baja_predictivos(" . json_encode($datos) . ", $id)");
+		$rsp = man_escribir('PUT', 'predictivo/estado', array(
+			'estado'     => (string) $datos['estado'],
+			'predId'     => (string) $id,
+			'id_empresa' => man_empresa(),
+		));
+		return (bool) $rsp['status'];
+	}
+
+	/** Agrega la clave de la cabecera a cada fila de detalle. */
+	private function conClave($filas, $clave){
+		$out = array();
+		foreach ((array) $filas as $f) {
+			$out[] = array_merge($f, $clave);
+		}
+		return $out;
+	}
 }
-
-	// Trae info para edicion de preventivo por id - Listo
-    function getInfopred($ide,$id){
-		
-	    $userdata = $this->session->userdata('user_data');
-        $empId = $userdata[0]['id_empresa']; 
-        
-    	$this->assetDB->select('predictivo.id_equipo,
-												predictivo.predId, 												
-												predictivo.fecha, 
-												predictivo.estado as es, 
-												predictivo.cantidad, 
-												predictivo.periodo,
-												predictivo.pred_duracion as duracion,
-												predictivo.id_unidad as unidtiempo, 
-												predictivo.pred_canth as operarios,
-												predictivo.horash as hh,
-												predictivo.pred_adjunto,
-												equipos.codigo, 
-												equipos.ubicacion, 
-												equipos.marca, 
-												equipos.fecha_ingreso, 
-												equipos.descripcion,
-												tareas.id_tarea, 
-                        tareas.descripcion AS tarea_descrip');    	
-    	$this->assetDB->from('predictivo'); 
-			$this->assetDB->join('equipos', 'equipos.id_equipo=predictivo.id_equipo');   
-			$this->assetDB->join('tareas', 'tareas.id_tarea=predictivo.tarea_descrip');	
-    	$this->assetDB->where('predictivo.predId', $id);
-    	$this->assetDB->where('predictivo.id_equipo', $ide);
-    	$this->assetDB->where('predictivo.id_empresa', $empId);
-    	$query= $this->assetDB->get();
-
-			if($query->num_rows()>0){
-							return $query->result();
-					}
-					else{
-							return false;
-					}	
-		}	
-
-	// Trae herramientas ppor id de preventivo para Editar
-    function getPredictivoHerramientas($id){
-        
-			$userdata = $this->session->userdata('user_data');
-			$empId = $userdata[0]['id_empresa']; 
-
-			$this->assetDB->select('tbl_predictivoherramientas.cantidad,
-													herramientas.herrcodigo,
-													herramientas.herrmarca,
-													herramientas.herrdescrip,
-													herramientas.herrId');
-			$this->assetDB->from('tbl_predictivoherramientas');
-			$this->assetDB->join('herramientas', 'herramientas.herrId = tbl_predictivoherramientas.herrId');   
-			$this->assetDB->where('tbl_predictivoherramientas.predId', $id);        
-			$this->assetDB->where('tbl_predictivoherramientas.id_empresa', $empId);
-			$query= $this->assetDB->get();
-
-			if( $query->num_rows() > 0)
-			{
-				return $query->result_array();
-			}
-			else {
-				return 0;
-			}
-    }
-
-    // Trae insumos por id de preventivo para Editar
-    function getPredictivoInsumos($id){
-        
-        $userdata = $this->session->userdata('user_data');
-        $empId = $userdata[0]['id_empresa']; 
-
-        $this->assetDB->select('tbl_predictivoinsumos.id,
-                            tbl_predictivoinsumos.cantidad,
-                            articles.artBarCode,
-                            articles.artId,
-                            articles.artDescription,
-                            articles.id_empresa');                            
-        $this->assetDB->from('tbl_predictivoinsumos');
-        $this->assetDB->join('articles', 'articles.artId = tbl_predictivoinsumos.artId');   
-        $this->assetDB->where('tbl_predictivoinsumos.predId', $id);        
-        $this->assetDB->where('articles.id_empresa', $empId);
-        $query= $this->assetDB->get(); 
-
-        if( $query->num_rows() > 0)
-        {
-          return $query->result_array();
-        }
-        else {
-          return 0;
-        }
-    }
-
-	
-	// Devuelve info de Predictivo por ID
-	function getInfoPredId($id){	 
-
-	    $this->assetDB->select('predictivo.*');
-    	$this->assetDB->from('predictivo');    	
-    	$this->assetDB->where('predictivo.predId', $id);
-    	$query= $this->assetDB->get();
-	    
-	    if( $query->num_rows() > 0)
-	    {
-	      return $query->result_array();	
-	    } 
-	    else {
-	      return 0;
-	    }
-	}
-	
-	// Guarda Preventivo editado
-	function updatePredictivos($datos,$id){
-	    $this->assetDB->where('predId', $id);
-	    $query = $this->assetDB->update("predictivo",$datos);
-	    return $query;
-	}
-
-	// Update herramientas preventivo
-	function deleteHerramPred($id_predictivo){        
-		$this->assetDB->where('predId', $id_predictivo);
-		$query = $this->assetDB->delete('tbl_predictivoherramientas');
-		return $query;
-}
-
-function deleteInsumPred($id_predictivo){
-		$this->assetDB->where('predId', $id_predictivo);
-		$query = $this->assetDB->delete('tbl_predictivoinsumos');
-		return $query;
-}
-
-	// Cambia predictivo a aestado AN
-	function baja_predictivos($datos,$id){
-	    $this->assetDB->where('predId', $id);
-	    $query = $this->assetDB->update("predictivo",$datos);
-	    return $query;
-	}
-}	
-
-?>
