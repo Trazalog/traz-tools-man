@@ -576,6 +576,12 @@ def paridad_equipo(asset, man, emp_asset):
         man.post_archivo(pm + 'agregarAdjunto', {'idAgregaAdjunto': eq}, 'inputPDF[]', 'hack.pdf', PDF_PRUEBA)
         man.post(pm + 'baja_equipo', {'idEquipo': eq})
         comparar('equipo · aislamiento: MAN no modifica equipos ajenos ni sus lecturas, adjuntos o contratistas', antes, foto())
+    sector_ajeno = sql("SELECT id_sector FROM sector WHERE id_empresa<>%d ORDER BY id_sector LIMIT 1" % emp_asset)[0][0]
+    propio = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    fila_propio = "SELECT * FROM equipos WHERE id_equipo=%s" % propio
+    antes_p = sql(fila_propio)
+    man.post(pm + 'editar_equipo', {'idEquipo': propio, 'data[id_sector]': sector_ajeno, 'data[descripcion]': 'HACK'})
+    comparar('equipo · aislamiento: MAN no acepta sectores de otra empresa (T22)', antes_p, sql(fila_propio))
 
     limpiar_equipo(carpeta)
 
@@ -791,6 +797,11 @@ def paridad_planes(asset, man, emp_asset):
                                                                  'periodo': '2', 'cantidad': '1', 'cantOper': '1', 'duracion': '1', 'unidad': '1',
                                                                  'hshombre': '1', 'alerta': '', 'lectura_base': ''}, **detalle('M')), False)
     comparar('planes · aislamiento: MAN no crea planes sobre equipos ajenos', n, maxid('preventivo', 'prevId'))
+    tarea_ajena = sql("SELECT id_tarea FROM tareas WHERE id_empresa<>%d ORDER BY id_tarea LIMIT 1" % emp_asset)[0][0]
+    post_multi(man, MAN + 'Preventivo/guardar_preventivo', dict({'id_equipo': eq, 'tarea': tarea_ajena, 'id_componente': comp, 'ultimo': '2026-10-01',
+                                                                 'periodo': '2', 'cantidad': '1', 'cantOper': '1', 'duracion': '1', 'unidad': '1',
+                                                                 'hshombre': '1', 'alerta': '', 'lectura_base': ''}, **detalle('M')), False)
+    comparar('planes · aislamiento: MAN no acepta tareas de otra empresa (T22)', n, maxid('preventivo', 'prevId'))
 
     limpiar_planes(base, creados_p, creados_r)
 
