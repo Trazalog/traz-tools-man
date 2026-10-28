@@ -216,6 +216,123 @@ class Otrabajo extends CI_Controller {
 		echo json_encode($this->Otrabajos->filtrarListado($data, 2));
 	}
 
+	/**
+	* Guarda la edición de la OT y reemplaza herramientas e insumos (asset no responde nada)
+	*/
+	public function guardar_editar(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | guardar_editar()");
+		$datos = $this->input->post('parametros');
+		$this->Otrabajos->update_edita($this->input->post('idOT'), is_array($datos) ? $datos : array(),
+			man_detalle($this->input->post('idsherramienta'), $this->input->post('cantHerram'), 'herrId'),
+			man_detalle($this->input->post('idsinsumo'), $this->input->post('cantInsum'), 'artId'));
+	}
+
+	/**
+	* Agrega un adjunto (inputPDF) a la OT; se verifica que la OT sea de la empresa antes de subir
+	* @return json ot_adjunto e id, o false
+	*/
+	public function agregarAdjunto(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | agregarAdjunto()");
+		$id = $this->input->post('idAgregaAdjunto');
+		if (!$this->Otrabajos->getasigna($id)) {
+			echo json_encode(false);
+			return;
+		}
+		$nomcodif = $this->codifNombre($id, man_empresa());
+		$this->load->library("upload", array(
+			"upload_path"   => man_asset_path() . "assets/filesOTrabajos",
+			'allowed_types' => "png|jpg|pdf|xlsx",
+			'file_name'     => $nomcodif
+		));
+		$result = false;
+		if ($this->upload->do_upload('inputPDF')) {
+			$ruta = "assets/filesOTrabajos/" . $nomcodif . $this->upload->data('file_ext');
+			$idAdj = $this->Otrabajos->setAdjunto(array('ot_adjunto' => $ruta, 'otId' => $id));
+			if ($idAdj) {
+				$result = array('ot_adjunto' => $ruta, 'id' => $idAdj);
+			}
+		}
+		echo json_encode($result);
+	}
+
+	public function eliminarAdjunto(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | eliminarAdjunto()");
+		echo json_encode($this->Otrabajos->eliminarAdjunto($this->input->post('id_adjunto')));
+	}
+
+	/**
+	* El botón "Total" dispara también este alta/edición del ABM viejo de OT, cuyo formulario (otrabajos/view_) no
+	* existe: llega sin acción y asset no hace nada. Acá tampoco (E9).
+	*/
+	public function setotrabajo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | setotrabajo() >> sin acción, no hace nada");
+		echo json_encode(true);
+	}
+
+	/** Termina la OT con la fecha de hoy */
+	public function FinalizaOt(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | FinalizaOt()");
+		print_r($this->Otrabajos->update_cambio($this->input->post('idfin'), date("Y-m-d")));
+	}
+
+	/** Anula la OT (AN). Asset no responde nada. */
+	public function baja_predictivo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | baja_predictivo()");
+		$this->Otrabajos->update_predictivo(array('estado' => "AN"), $this->input->post('gloid'));
+	}
+
+	/**
+	* Tareas de la OT (asignación)
+	*/
+	public function cargartarea($permission = '', $idglob = null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | cargartarea($permission, $idglob)");
+		$data['list']       = $this->Otrabajos->cargartareas($idglob);
+		$data['permission'] = $permission;
+		$data['id_orden']   = $idglob;
+		$this->load->view('otrabajos/asignacion', $data);
+	}
+
+	public function agregar_tarea(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | agregar_tarea()");
+		$datos = $this->input->post('parametros');
+		$id = is_array($datos) ? $this->Otrabajos->agregar_tareas($datos) : false;
+		echo $id ? $id : 0;
+	}
+
+	public function EliminarTarea(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | EliminarTarea()");
+		print_r($this->Otrabajos->cambiarTarea($this->input->post('idtarea'), 'estado', 'IN'));
+	}
+
+	/** Marca la tarea realizada (la vista manda el id de la tarea como id_orden) */
+	public function TareaRealizada(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | TareaRealizada()");
+		print_r($this->Otrabajos->cambiarTarea($this->input->get('id_orden'), 'estado', 'RE'));
+	}
+
+	public function ModificarUsuario(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | ModificarUsuario()");
+		print_r($this->Otrabajos->cambiarTarea($this->input->post('idtarea'), 'usuario', man_numero($this->input->post('idusu'))));
+	}
+
+	/** Cambia la fecha de la tarea (llega dd/mm/aaaa) */
+	public function ModificarFecha(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | ModificarFecha()");
+		$fe = (string) $this->input->post('fe');
+		$fecha = trim($fe) === '' ? '' : substr($fe, 6, 4) . "/" . substr($fe, 3, 2) . "/" . substr($fe, 0, 2);
+		print_r($this->Otrabajos->cambiarTarea($this->input->post('idtarea'), 'fecha', man_fecha($fecha)));
+	}
+
+	/**
+	* Nombre codificado del archivo: id_empresa_fecha (año-mes-dia-hora-min-seg)
+	*/
+	private function codifNombre($ultimoId, $empId){
+		$hora = date('Y-m-d H:i:s');
+		$delimiter = array(" ", ",", ".", "'", "\"", "|", "\\", "/", ";", ":");
+		$explode = explode($delimiter[0], str_replace($delimiter, $delimiter[0], $hora));
+		return $ultimoId . '_' . $empId . '_' . $explode[0] . '-' . $explode[1] . '-' . $explode[2] . '-' . $explode[3];
+	}
+
 	/** Respuesta de las vistas de OT: datos, herramientas, insumos y adjuntos (0 si no hay). */
 	private function vista($clave, $datos, $idOt){
 		$response[$clave] = $datos;

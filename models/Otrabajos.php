@@ -221,6 +221,111 @@ class Otrabajos extends CI_Model
 		return $this->filas('/ots/listado/empresa/' . man_empresa() . '?' . $q);
 	}
 
+	/**
+	 * Edita la OT con los campos del formulario (asset aceptaba cualquier columna que llegara; acá solo las del
+	 * formulario) y reemplaza herramientas e insumos. La cabecera y el borrado del detalle van en un request_box y
+	 * cada lista nueva en un pedido por lotes (E20).
+	 * @return bool
+	 */
+	function update_edita($id, $data, $herramientas = array(), $insumos = array()){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | update_edita($id, " . json_encode($data) . ")");
+		$emp = man_empresa();
+		$clave = array('id_orden' => (string) $id, 'id_empresa' => $emp);
+		$rsp = requestBox(REST_MAN . '/', array(
+			array('_put_ot_editar' => array(
+				'fecha_program' => man_fecha(isset($data['fecha_program']) ? $data['fecha_program'] : null, true),
+				'fecha_entrega' => man_fecha(isset($data['fecha_entrega']) ? $data['fecha_entrega'] : null, true),
+				'id_tarea'      => man_numero(isset($data['id_tarea']) ? $data['id_tarea'] : null),
+				'descripcion'   => isset($data['descripcion']) ? (string) $data['descripcion'] : '',
+				'id_sucursal'   => man_numero(isset($data['id_sucursal']) ? $data['id_sucursal'] : ''),
+				'id_proveedor'  => man_numero(isset($data['id_proveedor']) ? $data['id_proveedor'] : ''),
+				'id_equipo'     => (string) (isset($data['id_equipo']) ? $data['id_equipo'] : ''),
+				'id_orden'      => (string) $id,
+				'id_empresa'    => $emp,
+			)),
+			array('_put_ot_herramientas_borrar' => $clave),
+			array('_put_ot_insumos_borrar' => $clave),
+		));
+		if (!$rsp['status']) {
+			return false;
+		}
+		$h = array();
+		foreach ($herramientas as $f) {
+			$h[] = array_merge($f, $clave, array('descripcion_libre' => null));
+		}
+		$i = array();
+		foreach ($insumos as $f) {
+			$i[] = array_merge($f, $clave);
+		}
+		return man_lote_detalle('ot', 'herramienta', $h) !== false && man_lote_detalle('ot', 'insumo', $i) !== false;
+	}
+
+	/** Registra un adjunto de la OT. @return string|false id del adjunto */
+	function setAdjunto($adjunto){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | setAdjunto(" . json_encode($adjunto) . ")");
+		$rsp = man_escribir('POST', 'ot/adjunto', array(
+			'ot_adjunto' => (string) $adjunto['ot_adjunto'],
+			'id_orden'   => (string) $adjunto['otId'],
+			'id_empresa' => man_empresa(),
+		));
+		return ($rsp['status'] && is_scalar($rsp['data']) && (int) $rsp['data'] > 0) ? (string) $rsp['data'] : false;
+	}
+
+	/** Borra un adjunto de la OT. @return bool */
+	function eliminarAdjunto($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | eliminarAdjunto($id)");
+		$rsp = man_escribir('PUT', 'ot/adjunto/borrar', array('id' => (string) $id, 'id_empresa' => man_empresa()));
+		return (bool) $rsp['status'];
+	}
+
+	/** Cambia el estado de la OT. @return bool */
+	function update_predictivo($data, $id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | update_predictivo(" . json_encode($data) . ", $id)");
+		$rsp = man_escribir('PUT', 'ot/estado', array('estado' => (string) $data['estado'], 'id_orden' => (string) $id, 'id_empresa' => man_empresa()));
+		return (bool) $rsp['status'];
+	}
+
+	/** Termina la OT (T) con la fecha indicada. @return bool */
+	function update_cambio($ido, $fecha){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | update_cambio($ido, $fecha)");
+		$rsp = man_escribir('PUT', 'ot/finalizar', array('fecha' => (string) $fecha, 'id_orden' => (string) $ido, 'id_empresa' => man_empresa()));
+		return (bool) $rsp['status'];
+	}
+
+	/**
+	 * Tareas de la OT con el nombre del usuario. Asset devolvía todas las columnas de sisusers, incluida la
+	 * contraseña cifrada; acá solo usrId, usrName y usrLastName, que es lo que usa la vista (E25).
+	 * @return array|false
+	 */
+	function cargartareas($idglob){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | cargartareas(" . json_encode($idglob) . ")");
+		return $this->filas('/ot/' . (int) $idglob . '/tareas/empresa/' . man_empresa());
+	}
+
+	/** Agrega una tarea a la OT. @return string|false id */
+	function agregar_tareas($data){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | agregar_tareas(" . json_encode($data) . ")");
+		$rsp = man_escribir('POST', 'ot/tarea', array(
+			'id_orden'     => (string) $data['id_orden'],
+			'tareadescrip' => isset($data['tareadescrip']) ? (string) $data['tareadescrip'] : null,
+			'estado'       => isset($data['estado']) ? (string) $data['estado'] : null,
+			'id_empresa'   => man_empresa(),
+		));
+		return ($rsp['status'] && is_scalar($rsp['data']) && (int) $rsp['data'] > 0) ? (string) $rsp['data'] : false;
+	}
+
+	/** Cambia un campo de una tarea de la OT (estado, usuario o fecha). @return bool */
+	function cambiarTarea($idListarea, $campo, $valor){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | cambiarTarea($idListarea, $campo, " . json_encode($valor) . ")");
+		$params = array('estado' => 'estado', 'usuario' => 'id_usuario', 'fecha' => 'fecha');
+		$rsp = man_escribir('PUT', 'ot/tarea/' . $campo, array(
+			$params[$campo] => $valor === null ? null : (string) $valor,
+			'id_listarea'   => (string) $idListarea,
+			'id_empresa'    => man_empresa(),
+		));
+		return (bool) $rsp['status'];
+	}
+
 	/** Filas de un recurso de MANDataService (result_array()), o false si no hay. */
 	private function filas($recurso){
 		$filas = man_lista(wso2(REST_MAN . $recurso));

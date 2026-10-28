@@ -945,6 +945,92 @@ def paridad_ot(asset, man, emp_asset):
     comparar('ot · aislamiento: MAN no trae pedidos de OTs ajenas', 'nada', man.get(pm + 'getpedidos?fechai=%s' % ajena[0]).strip())
 
 
+def paridad_ot_escrituras(asset, man, emp_asset):
+    """Órdenes de trabajo, escrituras sin Bonita (MIG-ASSET-2)."""
+    pa, pm = ASSET + 'Otrabajo/', MAN + 'Otrabajo/'
+    carpeta = '/mnt/win/dev/git/traz-prod-assetplanner/assets/filesOTrabajos/'
+    base = sql("SELECT id_orden FROM orden_trabajo WHERE id_empresa=%d ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0][0]
+    ots = {}
+    for lado in ('A', 'M'):
+        sql("INSERT INTO orden_trabajo (id_tarea, nro, fecha, fecha_program, fecha_inicio, fecha_entrega, fecha_terminada, fecha_aviso, fecha_entregada, descripcion, "
+            "cliId, estado, id_usuario, id_usuario_a, id_usuario_e, id_sucursal, id_proveedor, id_solicitud, tipo, id_equipo, id_empresa) SELECT id_tarea, nro, fecha, "
+            "fecha_program, fecha_inicio, fecha_entrega, fecha_terminada, fecha_aviso, fecha_entregada, '%s %s', cliId, 'PL', id_usuario, id_usuario_a, id_usuario_e, "
+            "id_sucursal, id_proveedor, id_solicitud, tipo, id_equipo, id_empresa FROM orden_trabajo WHERE id_orden=%s" % (PREFIJO, lado, base))
+        ots[lado] = sql("SELECT id_orden FROM orden_trabajo WHERE descripcion='%s %s'" % (PREFIJO, lado))[0][0]
+    oa, om = ots['A'], ots['M']
+    # Las OT de DEV apuntan a equipos de otras empresas (T29): la edición usa un equipo de la empresa.
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    herr = [h['value'] for h in jload(man.get(MAN + 'Preventivo/getHerramientasB'))][:1]
+    arts = [a['value'] for a in jload(man.get(MAN + 'Preventivo/getinsumo'))][:2]
+    fila = ("SELECT id_tarea, fecha_program, fecha_entrega, fecha_terminada, descripcion, estado, id_sucursal, id_proveedor, id_equipo FROM orden_trabajo "
+            "WHERE id_orden=%s")
+    det = lambda o: (sql("SELECT herrId, cantidad, id_empresa, descripcion_libre FROM tbl_otherramientas WHERE otId=%s ORDER BY id" % o),
+                     sql("SELECT artId, cantidad, id_empresa FROM tbl_otinsumos WHERE otId=%s ORDER BY id" % o))
+    def post_listas(s, url, campos):
+        return s.abrir(url, urllib.parse.urlencode([(k, x) for k, v in campos.items() for x in (v if isinstance(v, list) else [v])]).encode())
+    def editar(s, url, o, lado):
+        datos = {'idOT': o, 'parametros[fecha_program]': '2026-11-01 08:00:00', 'parametros[fecha_entrega]': '2026-11-05 18:00:00', 'parametros[id_tarea]': '0',
+                 'parametros[descripcion]': '%s %s' % (PREFIJO, lado), 'parametros[id_sucursal]': '', 'parametros[id_proveedor]': '', 'parametros[id_equipo]': eq,
+                 'idsherramienta[]': herr, 'cantHerram[]': ['2'], 'idsinsumo[]': arts, 'cantInsum[]': ['1', '3']}
+        return post_listas(s, url + 'guardar_editar', datos).strip()
+    comparar('ot · editar (respuesta)', editar(asset, pa, oa, 'A'), editar(man, pm, om, 'M'))
+    comparar('ot · editar (fila)', [r[:4] + r[5:] for r in sql(fila % oa)], [r[:4] + r[5:] for r in sql(fila % om)])
+    comparar('ot · editar (herramientas e insumos)', det(oa), det(om))
+    norm = lambda d: json.loads(re.sub(r'"\d+_%d_\d{4}-\d\d-\d\d-\d\d-\d\d-\d\d' % emp_asset, '"N', re.sub(r'(_)\d+(_)', r'\1N\2', json.dumps(d))))
+    def adjuntar(s, url, o):
+        return jload(s.post_archivo(url + 'agregarAdjunto', {'idAgregaAdjunto': o}, 'inputPDF', 'ot.pdf', PDF_PRUEBA))
+    ra, rm = adjuntar(asset, pa, oa), adjuntar(man, pm, om)
+    comparar('ot · agregar adjunto (respuesta, sin id ni nombre)', sorted(ra.keys()) if isinstance(ra, dict) else ra, sorted(rm.keys()) if isinstance(rm, dict) else rm)
+    comparar('ot · agregar adjunto (archivo en la carpeta de asset)', True, isinstance(rm, dict) and os.path.exists(carpeta.replace('assets/filesOTrabajos/', '') + rm['ot_adjunto']))
+    comparar('ot · eliminar adjunto', jload(asset.post(pa + 'eliminarAdjunto', {'id_adjunto': ra.get('id') if isinstance(ra, dict) else 0})),
+             jload(man.post(pm + 'eliminarAdjunto', {'id_adjunto': rm.get('id') if isinstance(rm, dict) else 0})))
+    comparar('ot · eliminar adjunto (filas)', sql("SELECT COUNT(*) FROM tbl_otadjuntos WHERE otId=%s" % oa), sql("SELECT COUNT(*) FROM tbl_otadjuntos WHERE otId=%s" % om))
+    usr = sql("SELECT usrId FROM sisusers WHERE usrNick='%s'" % os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test'))[0][0]
+    ta = asset.post(pa + 'agregar_tarea', {'parametros[id_orden]': oa, 'parametros[tareadescrip]': PREFIJO + ' tarea', 'parametros[estado]': 'C'}).strip()
+    tm = man.post(pm + 'agregar_tarea', {'parametros[id_orden]': om, 'parametros[tareadescrip]': PREFIJO + ' tarea', 'parametros[estado]': 'C'}).strip()
+    comparar('ot · agregar tarea (devuelve un id)', ta.isdigit() and int(ta) > 0, tm.isdigit() and int(tm) > 0)
+    tarea = "SELECT tareadescrip, id_usuario, fecha, estado FROM tbl_listarea WHERE id_listarea=%s"
+    for nombre, url, datos_a, datos_m in (
+            ('usuario', 'ModificarUsuario', {'idtarea': ta, 'idusu': usr}, {'idtarea': tm, 'idusu': usr}),
+            ('fecha', 'ModificarFecha', {'idtarea': ta, 'idusu': usr, 'fe': '15/11/2026'}, {'idtarea': tm, 'idusu': usr, 'fe': '15/11/2026'})):
+        comparar('ot · tarea %s (respuesta)' % nombre, asset.post(pa + url, datos_a).strip(), man.post(pm + url, datos_m).strip())
+        comparar('ot · tarea %s (fila)' % nombre, sql(tarea % ta), sql(tarea % tm))
+    comparar('ot · tareas (pantalla)', celdas_tabla(asset.get(pa + 'cargartarea/Add-Edit-Del-OP/%s' % oa)), celdas_tabla(man.get(pm + 'cargartarea/Add-Edit-Del-OP/%s' % om)))
+    comparar('ot · tarea realizada', asset.get(pa + 'TareaRealizada?id_orden=%s' % ta).strip(), man.get(pm + 'TareaRealizada?id_orden=%s' % tm).strip())
+    comparar('ot · tarea eliminada', asset.post(pa + 'EliminarTarea', {'idtarea': ta}).strip(), man.post(pm + 'EliminarTarea', {'idtarea': tm}).strip())
+    comparar('ot · tareas (filas)', sql(tarea % ta), sql(tarea % tm))
+    n = sql("SELECT COUNT(*) FROM orden_trabajo")
+    comparar('ot · total sin acción (setotrabajo)', jload(asset.post(pa + 'setotrabajo', {'nro': '', 'fech': ''})), jload(man.post(pm + 'setotrabajo', {'nro': '', 'fech': ''})))
+    comparar('ot · total sin acción no crea OTs', n, sql("SELECT COUNT(*) FROM orden_trabajo"))
+    comparar('ot · finalizar', asset.post(pa + 'FinalizaOt', {'idfin': oa}).strip(), man.post(pm + 'FinalizaOt', {'idfin': om}).strip())
+    comparar('ot · finalizar (fila)', [[r[3], r[5]] for r in sql(fila % oa)], [[r[3], r[5]] for r in sql(fila % om)])
+    comparar('ot · anular', asset.post(pa + 'baja_predictivo', {'gloid': oa}).strip(), man.post(pm + 'baja_predictivo', {'gloid': om}).strip())
+    comparar('ot · anular (estado)', sql("SELECT estado FROM orden_trabajo WHERE id_orden=%s" % oa), sql("SELECT estado FROM orden_trabajo WHERE id_orden=%s" % om))
+
+    ajena = sql("SELECT id_orden FROM orden_trabajo WHERE id_empresa<>%d ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0][0]
+    foto = lambda: (sql("SELECT * FROM orden_trabajo WHERE id_orden=%s" % ajena), det(ajena), sql("SELECT * FROM tbl_otadjuntos WHERE otId=%s" % ajena),
+                    sql("SELECT * FROM tbl_listarea WHERE id_orden=%s" % ajena))
+    antes = foto()
+    editar(man, pm, ajena, 'HACK')
+    comparar('ot · aislamiento: MAN no adjunta a OTs ajenas', False, adjuntar(man, pm, ajena))
+    man.post(pm + 'agregar_tarea', {'parametros[id_orden]': ajena, 'parametros[tareadescrip]': 'HACK', 'parametros[estado]': 'C'})
+    man.post(pm + 'FinalizaOt', {'idfin': ajena})
+    man.post(pm + 'baja_predictivo', {'gloid': ajena})
+    lt = sql("SELECT id_listarea FROM tbl_listarea WHERE id_orden=%s LIMIT 1" % ajena)
+    if lt:
+        man.post(pm + 'EliminarTarea', {'idtarea': lt[0][0]})
+    comparar('ot · aislamiento: MAN no modifica OTs ajenas, su detalle, adjuntos ni tareas', antes, foto())
+
+    for o in (oa, om):
+        for nombre in os.listdir(carpeta):
+            if re.match(r'^%s_%d_%s-' % (o, emp_asset, time.strftime('%Y-%m-%d')), nombre):
+                os.remove(carpeta + nombre)
+        for tbl in ('tbl_otherramientas', 'tbl_otinsumos', 'tbl_otadjuntos'):
+            sql("DELETE FROM %s WHERE otId=%s" % (tbl, o))
+        sql("DELETE FROM tbl_listarea WHERE id_orden=%s" % o)
+        sql("DELETE FROM orden_trabajo WHERE id_orden=%s AND descripcion LIKE '%s%%'" % (o, PREFIJO))
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
@@ -954,6 +1040,7 @@ PANTALLAS = {
     'planes': paridad_planes,
     'solicitud': paridad_solicitud,
     'ot': paridad_ot,
+    'ot_escrituras': paridad_ot_escrituras,
 }
 
 if __name__ == '__main__':
