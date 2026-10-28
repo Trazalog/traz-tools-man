@@ -827,6 +827,68 @@ def limpiar_planes(base, prevs=(), preds=()):
     borrar('tbl_back', 'backId', backs, 'tbl_backlogherramientas', 'tbl_backloginsumos', 'back_adjunto', 'filesbacklog')
 
 
+def paridad_solicitud(asset, man, emp_asset):
+    """Solicitudes de servicio, sin lo que toca Bonita (A5)."""
+    pa, pm = ASSET + 'Sservicio/', MAN + 'Sservicio/'
+    def pagina(s, url, **kw):
+        datos = {'draw': 2, 'start': kw.get('start', 0), 'length': kw.get('length', 10), 'search[value]': kw.get('buscar', ''),
+                 'order[0][column]': kw.get('col', 1), 'order[0][dir]': kw.get('dir', 'desc'), 'showConformes': kw.get('conf', 'false')}
+        return jload(s.post(url + 'paginado', datos))
+    for nombre, kw in (('por id', {}), ('segunda página', {'start': 10}), ('con conformes', {'conf': 'true'}), ('búsqueda', {'buscar': 'rns'}),
+                       ('orden por solicitante', {'col': 5, 'dir': 'asc', 'length': 100})):
+        a, m = pagina(asset, pa, **kw), pagina(man, pm, **kw)
+        if nombre == 'orden por solicitante':
+            # Los empates no tienen orden definido ni en MariaDB ni en PHP: se compara la secuencia de solicitantes.
+            a = [r['solicitante'] for r in a.get('data', [])] if isinstance(a, dict) else a
+            m = [r['solicitante'] for r in m.get('data', [])] if isinstance(m, dict) else m
+        comparar('solicitud · listado ' + nombre, a, m)
+    comparar('solicitud · sectores', jload(asset.post(pa + 'getSector', {})), jload(man.post(pm + 'getSector', {})))
+    sector = sql("SELECT id_sector FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    comparar('solicitud · equipos del sector', jload(asset.post(pa + 'getEquipSector', {'id_sector': sector})),
+             jload(man.post(pm + 'getEquipSector', {'id_sector': sector})))
+    for f1, f2 in (('Administrador', ''), ('Solicitante', ''), ('Supervisor de Taller', 'Administrador')):
+        datos = {'filtro1': f1} if not f2 else {'filtro1': f1, 'filtro2': f2}
+        comparar('solicitud · validar usuario %s' % f1, jload(asset.post(pa + 'validaUsuario', datos)), jload(man.post(pm + 'validaUsuario', datos)))
+    ids = [r[0] for r in sql("SELECT id_solicitud FROM solicitud_reparacion WHERE id_empresa=%d ORDER BY id_solicitud DESC LIMIT 3" % emp_asset)]
+    for i in ids:
+        comparar('solicitud · ver %s' % i, jload(asset.post(pa + 'getSS', {'idSS': i})), jload(man.post(pm + 'getSS', {'idSS': i})))
+        comparar('solicitud · imprimir %s' % i, jload(asset.post(pa + 'getsolImp', {'idservicio': i})), jload(man.post(pm + 'getsolImp', {'idservicio': i})))
+    # Terminadas: asset muestra las de todas las empresas (T27); se compara la de MAN contra la base más abajo.
+
+    # Escrituras sobre solicitudes de prueba creadas en la base (lanzarlas espera A5).
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    for lado in ('A', 'M'):
+        sql("INSERT INTO solicitud_reparacion (solicitante, f_solicitado, f_sugerido, hora_sug, id_equipo, causa, estado, usrId, fecha_conformidad, "
+            "observ_conformidad, foto, id_empresa) VALUES ('%s %s', NOW(), '2026-10-28', '00:00:00', %s, 'prueba', 'S', 0, '2026-10-28', '', '', %d)"
+            % (PREFIJO, lado, eq, emp_asset))
+    sa = sql("SELECT id_solicitud FROM solicitud_reparacion WHERE solicitante='%s A'" % PREFIJO)[0][0]
+    sm = sql("SELECT id_solicitud FROM solicitud_reparacion WHERE solicitante='%s M'" % PREFIJO)[0][0]
+    fila = "SELECT estado, fecha_conformidad, observ_conformidad FROM solicitud_reparacion WHERE id_solicitud=%s"
+    comparar('solicitud · conformidad (respuesta)',
+             jload(asset.post(pa + 'confSolicitud', {'id_sol': sa, 'fecha_conformidad': '2026-10-30', 'observ_conformidad': 'ok'})),
+             jload(man.post(pm + 'confSolicitud', {'id_sol': sm, 'fecha_conformidad': '2026-10-30', 'observ_conformidad': 'ok'})))
+    comparar('solicitud · conformidad (fila)', sql(fila % sa), sql(fila % sm))
+    asset.post(pa + 'activSolicitud', {'id_solicitud': sa})
+    comparar('solicitud · reactivar (MAN responde JSON, E12)', True, jload(man.post(pm + 'activSolicitud', {'id_solicitud': sm})))
+    comparar('solicitud · reactivar (fila)', sql(fila % sa), sql(fila % sm))
+    comparar('solicitud · anular (respuesta)', jload(asset.post(pa + 'elimSolicitud', {'id_solic': sa})), jload(man.post(pm + 'elimSolicitud', {'id_solic': sm})))
+    comparar('solicitud · anular (fila)', sql(fila % sa), sql(fila % sm))
+    comparar('solicitud · lanzar espera A5 (MAN no crea nada)', False, jload(man.post(pm + 'lanzarProcesoBPM', {'equipo': eq, 'falla': 'x'})).get('status'))
+
+    ajena = sql("SELECT id_solicitud FROM solicitud_reparacion WHERE id_empresa<>%d ORDER BY id_solicitud DESC LIMIT 1" % emp_asset)[0][0]
+    antes = sql(fila % ajena)
+    comparar('solicitud · aislamiento: MAN no trae solicitudes ajenas', [], jload(man.post(pm + 'getSS', {'idSS': ajena})).get('SS'))
+    comparar('solicitud · aislamiento: MAN no imprime solicitudes ajenas', 'nada', man.post(pm + 'getsolImp', {'idservicio': ajena}).strip())
+    man.post(pm + 'confSolicitud', {'id_sol': ajena, 'fecha_conformidad': '2026-10-30', 'observ_conformidad': 'HACK'})
+    man.post(pm + 'activSolicitud', {'id_solicitud': ajena})
+    man.post(pm + 'elimSolicitud', {'id_solic': ajena})
+    comparar('solicitud · aislamiento: MAN no modifica solicitudes ajenas', antes, sql(fila % ajena))
+    terminadas = celdas_tabla(man.get(pm + 'get_SolicTerminada/Add-Edit-Del'))
+    propias = int(sql("SELECT COUNT(*) FROM solicitud_reparacion WHERE estado='T' AND id_empresa=%d" % emp_asset)[0][0])
+    comparar('solicitud · terminadas: MAN muestra solo las de la empresa', propias, len([r for r in terminadas if len(r) > 3]))
+    sql("DELETE FROM solicitud_reparacion WHERE solicitante LIKE '%s%%'" % PREFIJO)
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
@@ -834,6 +896,7 @@ PANTALLAS = {
     'componente': paridad_componente,
     'equipo': paridad_equipo,
     'planes': paridad_planes,
+    'solicitud': paridad_solicitud,
 }
 
 if __name__ == '__main__':

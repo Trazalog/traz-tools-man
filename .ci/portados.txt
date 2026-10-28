@@ -33,3 +33,8 @@ controllers/Backlog.php
 models/Backlogs.php
 views/backlog/list.php
 views/backlog/view_.php
+controllers/Sservicio.php
+models/Sservicios.php
+views/Sservicios/list_bpm.php
+views/Sservicios/view_.php
+views/Sservicios/list_term.php

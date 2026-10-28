@@ -7,7 +7,6 @@
       </div>
   </div>
 </div>
-<section class="content">
   <div class="row">
     <div class="col-xs-12">
       <div class="box">
@@ -101,7 +100,6 @@
       </div> <!-- box -->    
     </div> <!-- col-xs-12 -->  
   </div>  <!-- row -->        
-</section>
 
 <script>
 
@@ -113,7 +111,7 @@ function traer_equipo(){
     $.ajax({
       type: 'POST',
       data: { },
-      url: 'index.php/Backlog/getequipo', //index.php/
+      url: '<?php echo base_url(MAN); ?>Backlog/getequipo',
       success: function(data){
              
                var opcion  = "<option value='-1'>Seleccione...</option>" ; 
@@ -143,7 +141,7 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getSector",
+      'url': "<?php echo base_url(MAN); ?>Sservicio/getSector",
       'success': function (data) {
         tmp = data;
         var $select = $("#sector");
@@ -178,7 +176,7 @@ var dataF = function () {
       'type': "POST",
       'global': false,
       'dataType': 'json',
-      'url': "<?php echo MAN; ?>Sservicio/getEquipSector",
+      'url': "<?php echo base_url(MAN); ?>Sservicio/getEquipSector",
       'success': function (data) {
         console.table(data);
         // Asigna opciones al select Equipo en modal
@@ -203,7 +201,7 @@ var dataF = function () {
 $('#listado').click( function cargarVista(){
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo MAN; ?>Sservicio/index/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Sservicio/index/<?php echo $permission; ?>");
     WaitingClose();
 });
 
@@ -236,14 +234,14 @@ $("#btnSave").click(function(){
           cache: false,
           contentType: false,
           processData: false,
-          url: '<?php echo MAN; ?>Sservicio/lanzarProcesoBPM',
+          url: '<?php echo base_url(MAN); ?>Sservicio/lanzarProcesoBPM',
           success: function(data){
                   WaitingClose();
                   console.log(data);
                   if (data.status == true){
                     //alert("Solicitud generada exitosamente");
                   
-                    cargarView('Sservicio', 'index', permisos) ;           
+                    linkTo('<?php echo base_url(MAN); ?>Sservicio/index/' + permisos) ;           
                   } else{             
                       alert("Falla: "+data.msj);
                   }                   
@@ -266,7 +264,7 @@ $('#ultimo').datetimepicker({
 // $.ajax({
 //   data: { },
 //   dataType: 'json',
-//   url: 'index.php/Predictivo/getEquipo', 
+//   url: '<?php echo base_url(MAN); ?>Predictivo/getEquipo', 
 //   type: 'POST',
 // })
 // .done( (data) => {
@@ -288,7 +286,7 @@ $('#equipo').change(function(){
     type: 'POST',
     data: { id_equipo: id_equipo},
     dataType: 'json',
-    url: '<?php echo MAN;?>Preventivo/getEquipoNuevoPrevent', 
+    url: '<?php echo base_url(MAN); ?>Preventivo/getEquipoNuevoPrevent', 
   })
   .done( (data) => {
     console.log(data);
@@ -317,7 +315,7 @@ function getArea($id_area){
     type: 'POST',
     data: { id_area: $id_area},
     dataType: 'json',
-    url: '<?php echo MAN; ?>Area/Obtener_area'
+    url: '<?php echo base_url(MAN); ?>Area/Obtener_area'
   }).done( (data) => {
 
     $("#area").val(data[0].descripcion);
@@ -332,7 +330,7 @@ function getProceso($id_proceso){
     type: 'POST',
     data: { id_proceso: $id_proceso},
     dataType: 'json',
-    url: '<?php echo MAN; ?>Proceso/Obtener_proceso', 
+    url: '<?php echo base_url(MAN); ?>Proceso/Obtener_proceso', 
   }).done( (data) => {
     
     $("#proceso").val(data[0].descripcion);
@@ -348,7 +346,7 @@ var dataTarea = function() {
     'async': false,
     'type': "POST",
     'dataType': 'json',
-    'url': '<?php echo MAN; ?>Preventivo/gettarea',
+    'url': '<?php echo base_url(MAN); ?>Preventivo/gettarea',
   })
   .done( (data) => { tmp = data } )
   .fail( () => alert("Error al traer tareas") );
@@ -383,7 +381,7 @@ function traer_periodo(periodoId){
     data: {periodoId:periodoId },
     dataType: 'json',
     type: 'POST',
-    url: '<?php echo MAN; ?>Calendario/getperiodo',
+    url: '<?php echo base_url(MAN); ?>Calendario/getperiodo',
     success: function(data){
       var opcion = "<option value='-1'>Seleccione...</option>" ;
       $('#periodo').append(opcion); 
@@ -419,7 +417,7 @@ $('#unidad').html("");
 $.ajax({
   type: 'POST',
   data: { },
-  url: '<?php echo MAN; ?>Predictivo/getUnidTiempo', 
+  url: '<?php echo base_url(MAN); ?>Predictivo/getUnidTiempo', 
   success: function(data){
     var opcion  = "<option value='-1'>Seleccione...</option>" ; 
     $('#unidad').append(opcion); 
@@ -472,7 +470,7 @@ $('#duracion, #unidad, #cantOper').change(function(){
 function cargarVista(){
     WaitingOpen();
     $('#content').empty();
-    $("#content").load("<?php echo base_url(); ?>index.php/Preventivo/index/<?php echo $permission; ?>");
+    linkTo("<?php echo base_url(MAN); ?>Preventivo/index/<?php echo $permission; ?>");
     WaitingClose();
 }
 
