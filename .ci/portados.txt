@@ -49,3 +49,7 @@ views/otrabajos/printotprev.php
 views/otrabajos/printotsolserv.php
 views/otrabajos/tabla_opciones.php
 views/otrabajos/view_agregarOT.php
+controllers/Ordenservicio.php
+models/Ordenservicios.php
+views/ordenservicios/list.php
+views/tareas/view_presta_presta_conf_modal.php

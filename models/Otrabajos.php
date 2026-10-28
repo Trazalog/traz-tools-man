@@ -320,6 +320,12 @@ class Otrabajos extends CI_Model
 		return isset($aux['msj']) ? $aux['msj'] : 'error al insertar';
 	}
 
+	/** Fechas de inicio y terminación de la OT (ventana de ver informe). @return array|false */
+	function getLecturasOrden($id_ot){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getLecturasOrden(" . json_encode($id_ot) . ")");
+		return $this->filas('/ot/' . (int) $id_ot . '/fechas/empresa/' . man_empresa());
+	}
+
 	/** Registra un adjunto de la OT. @return string|false id del adjunto */
 	function setAdjunto($adjunto){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | setAdjunto(" . json_encode($adjunto) . ")");

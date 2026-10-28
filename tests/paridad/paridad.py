@@ -1033,7 +1033,7 @@ def paridad_ot_escrituras(asset, man, emp_asset):
 
 def bonita_admin():
     """Sesión de administrador en la Bonita de DEV, con los datos de constants.php de tools (no se imprimen).
-    Devuelve (consultar, modificar con PUT)."""
+    Devuelve (consultar, modificar con PUT, enviar con POST)."""
     cons = open(os.path.join(os.path.dirname(__file__), '../../../../config/constants.php'), encoding='utf-8').read()
     valor = lambda n: re.search(r"define\('%s',\s*'([^']*)'" % n, cons).group(1)
     base = valor('BONITA_URL').rstrip('/')
@@ -1045,7 +1045,8 @@ def bonita_admin():
                   if c.name == 'X-Bonita-API-Token'), '')
     cab = {'X-Bonita-API-Token': token, 'Content-Type': 'application/json'}
     return (lambda ruta, metodo='GET': jload(s.abrir(urllib.request.Request(base + ruta, method=metodo, headers=cab))),
-            lambda ruta, cuerpo: s.abrir(urllib.request.Request(base + ruta, json.dumps(cuerpo).encode(), cab, method='PUT')))
+            lambda ruta, cuerpo: s.abrir(urllib.request.Request(base + ruta, json.dumps(cuerpo).encode(), cab, method='PUT')),
+            lambda ruta, cuerpo: s.abrir(urllib.request.Request(base + ruta, json.dumps(cuerpo).encode(), cab, method='POST')))
 
 
 def paridad_ot_bonita(asset, man, emp_asset):
@@ -1082,7 +1083,7 @@ def paridad_ot_bonita(asset, man, emp_asset):
     adj = sql("SELECT ot_adjunto FROM tbl_otadjuntos WHERE otId=%s" % o)
     comparar('ot · alta con caso de Bonita (adjunto en la carpeta de asset)', True,
              bool(adj) and os.path.exists(carpeta.replace('assets/filesOTrabajos/', '') + adj[0][0]))
-    bonita, bonita_put = bonita_admin()
+    bonita, bonita_put, _ = bonita_admin()
     tareas = bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % caso)
     usr, nick = sql("SELECT usrId, usrNick FROM sisusers WHERE usrNick='%s'" % os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test'))[0]
     if tareas:
@@ -1114,6 +1115,135 @@ def paridad_ot_bonita(asset, man, emp_asset):
     sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)
 
 
+def texto_vista(pagina):
+    """Lo que ve el usuario en una vista: textos y valores de campos, sin los scripts (que tienen las URLs de cada lado)."""
+    pagina = re.sub(r'<script.*?</script>', '', pagina, flags=re.S)
+    valores = re.findall(r'value="([^"]*)"', pagina)
+    texto = [t for t in (html.unescape(x).strip() for x in re.sub(r'<[^>]+>', '\n', pagina).split('\n')) if t]
+    return {'valores': valores, 'texto': texto}
+
+
+def informe_prueba(o, eq, emp_asset, horometro):
+    """Informe de servicio de prueba para la OT o (las tablas del informe solo las escribe la bandeja, que va en MIG-3)."""
+    sql("INSERT INTO orden_servicio (lectura, fecha, comprobante, id_equipo, id_contratista, id_solicitudreparacion, valesid, estado, id_ordenherraminetas, "
+        "id_orden_insumo, id_ot, id_empresa, fechahorainicio, fechahorafin, horometroinicio, horometrofin) VALUES (0, '2026-10-28', '%s', %s, 0, 0, 0, 'C', 0, 0, "
+        "%s, %d, '2026-10-28 08:00:00', '2026-10-28 10:30:00', 100, %s)" % (PREFIJO, eq, o, emp_asset, horometro))
+    return sql("SELECT MAX(id_orden) FROM orden_servicio WHERE id_ot=%s" % o)[0][0]
+
+
+def paridad_informe(asset, man, emp_asset):
+    """Informes de servicio, lectura: listado, ventana de ver informe y su detalle (MIG-ASSET-2)."""
+    pa, pm = ASSET + 'Ordenservicio/', MAN + 'Ordenservicio/'
+    usr = sql("SELECT usrId FROM sisusers WHERE usrNick='%s'" % os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test'))[0][0]
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    tarea = sql("SELECT id_tarea FROM tareas WHERE id_empresa=%d ORDER BY id_tarea LIMIT 1" % emp_asset)[0][0]
+    ots = []
+    for desc, id_tarea in ((PREFIJO + ' informe estándar', tarea), (PREFIJO + ' informe libre', '0')):
+        sql("INSERT INTO orden_trabajo (id_tarea, fecha, fecha_program, fecha_inicio, fecha_entrega, fecha_terminada, fecha_aviso, fecha_entregada, descripcion, "
+            "estado, id_usuario, id_usuario_a, id_usuario_e, id_sucursal, id_proveedor, id_solicitud, tipo, id_equipo, id_empresa) VALUES (%s, '2026-10-20', "
+            "'2026-10-21', '2026-10-27 08:00:00', '2026-10-30', '2026-10-28 11:00:00', '2026-10-20', '2026-10-28', '%s', 'T', %s, %s, 0, 0, 0, 0, 1, %s, %d)"
+            % (id_tarea, desc, usr, usr, eq, emp_asset))
+        ots.append(sql("SELECT MAX(id_orden) FROM orden_trabajo WHERE descripcion='%s'" % desc)[0][0])
+    try:
+        os1 = informe_prueba(ots[0], eq, emp_asset, '112.5')
+        informe_prueba(ots[1], eq, emp_asset, '90')
+        sql("INSERT INTO asignausuario (usrId, id_orden, fechahora) VALUES (%s, %s, NOW())" % (usr, os1))
+        sql("INSERT INTO deta_ordenservicio (id_ordenservicio, id_tarea, tiempo, observacion, monto, id_componente, rh) VALUES (%s, '%s tarea', '1', '%s', 0, 0, 0)"
+            % (os1, PREFIJO, PREFIJO))
+        sql("INSERT INTO orden_servicio_adjuntos (id_orden, valor_base64, nombre) VALUES (%s, 'data:text/plain;base64,TUlHIHBhcmlkYWQ=', '%s.txt')" % (os1, PREFIJO))
+        sql("INSERT INTO tbl_otvales (otId, sapa_id, origen, usrId, fecha, id_empresa) VALUES (%s, 999999, 'SUPERVISOR', %s, NOW(), %d)" % (ots[0], usr, emp_asset))
+        sql("INSERT INTO tbl_otherramientasusadas (otId, herrId, sapa_id, activa, id_empresa) VALUES (%s, 999999, 999999, 1, %d)" % (ots[0], emp_asset))
+        comparar('informe · listado (pantalla)', celdas_tabla(asset.get(pa + 'index/Add-Edit-Del')), celdas_tabla(man.get(pm + 'index/Add-Edit-Del')))
+        for o in ots:
+            comparar('informe OT %s · ver informe' % o, texto_vista(asset.get(pa + 'verInforme/%s/%s/' % (o, eq))), texto_vista(man.get(pm + 'verInforme/%s/%s/' % (o, eq))))
+            for accion in ('getInsumosPorOT', 'getEntregasPorOT', 'getHerramientasUsadas'):
+                comparar('informe OT %s · %s' % (o, accion), jload(asset.post(pa + accion, {'id_ot': o})), jload(man.post(pm + accion, {'id_ot': o})))
+        # Una OT con pedidos de materiales en el almacén de tools, si hay
+        con_pedido = sql("SELECT id_orden FROM orden_trabajo WHERE id_empresa=%d ORDER BY id_orden DESC LIMIT 3" % emp_asset)
+        for (o,) in con_pedido:
+            for accion in ('getInsumosPorOT', 'getEntregasPorOT'):
+                comparar('informe OT %s · %s' % (o, accion), jload(asset.post(pa + accion, {'id_ot': o})), jload(man.post(pm + accion, {'id_ot': o})))
+        ajena = sql("SELECT os.id_ot, ot.id_equipo FROM orden_servicio os JOIN orden_trabajo ot ON ot.id_orden=os.id_ot WHERE os.id_empresa<>%d "
+                    "ORDER BY os.id_orden DESC LIMIT 1" % emp_asset)[0]
+        vista = man.get(pm + 'verInforme/%s/%s/' % tuple(ajena))
+        campo = lambda nombre: (re.findall(r'id="%s"[^>]*value="([^"]*)"' % nombre, vista) or ['(sin campo)'])[0]
+        comparar('informe · aislamiento: MAN no muestra la OT ni el equipo de otra empresa', ['', ''], [campo('causa'), campo('nomEquipo')])
+        comparar('informe · aislamiento: MAN no lista informes de otra empresa', [],
+                 [f for f in celdas_tabla(man.get(pm + 'index/Add-Edit-Del')) if len(f) > 2 and f[2] == ajena[0]])
+    finally:
+        for o in ots:
+            ids = [f[0] for f in sql("SELECT id_orden FROM orden_servicio WHERE id_ot=%s" % o)]
+            for i in ids:
+                for tbl, col in (('asignausuario', 'id_orden'), ('deta_ordenservicio', 'id_ordenservicio'), ('orden_servicio_adjuntos', 'id_orden')):
+                    sql("DELETE FROM %s WHERE %s=%s" % (tbl, col, i))
+            for tbl in ('tbl_otherramientasusadas', 'tbl_otvales'):
+                sql("DELETE FROM %s WHERE otId=%s AND sapa_id=999999" % (tbl, o))
+            sql("DELETE FROM orden_servicio WHERE id_ot=%s AND comprobante='%s'" % (o, PREFIJO))
+            sql("DELETE FROM orden_trabajo WHERE id_orden=%s AND descripcion LIKE '%s%%'" % (o, PREFIJO))
+
+
+def paridad_informe_bonita(asset, man, emp_asset):
+    """Verificación de informes con casos reales en la Bonita de DEV: una OT la verifica asset y otra MAN, y se compara lo que
+    queda (A5). Solo con MAN_PARIDAD_BONITA=1. Las OTs se crean con el alta de MAN (asset no puede lanzar casos con el usuario
+    de prueba, T28) y se hacen avanzar hasta "Verifica Informe de Servicio" como lo haría la bandeja (tomar y cerrar)."""
+    if os.environ.get('MAN_PARIDAD_BONITA') != '1':
+        print('     | informe · verificación con Bonita: no se corre (MAN_PARIDAD_BONITA=1 para correrlo)')
+        return
+    bonita, bonita_put, bonita_post = bonita_admin()
+    nick = os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test')
+    usr = sql("SELECT usrId FROM sisusers WHERE usrNick='%s'" % nick)[0][0]
+    uid = bonita('/API/identity/user?p=0&c=1&f=userName%%3D%s' % urllib.parse.quote(nick))[0]['id']
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    lectura_antes = sql("SELECT CAST(ultima_lectura AS CHAR) FROM equipos WHERE id_equipo=%s" % eq)[0][0]
+    antes = int(sql("SELECT IFNULL(MAX(id_orden), 0) FROM orden_trabajo")[0][0])
+    casos = {}
+    try:
+        for lado, horometro in (('asset', '77'), ('MAN', '88')):
+            man.post_archivo(MAN + 'Otrabajo/guardar_agregar', {'equipo': eq, 'id_tarea': '', 'tareacustom': PREFIJO + ' verificar ' + lado,
+                                                                'fechaInicio': '01/11/2026', 'fechaEntrega': '05/11/2026', 'suci': '', 'prov': ''},
+                             'inputPDF', '', b'')
+            fila = sql("SELECT id_orden, case_id FROM orden_trabajo WHERE id_orden>%d AND descripcion='%s verificar %s'" % (antes, PREFIJO, lado))
+            if not fila or fila[0][1] in ('NULL', '0', ''):
+                comparar('informe · OT con caso para %s' % lado, 'una OT con caso', fila)
+                return
+            o, caso = fila[0]
+            casos[o] = caso
+            for _ in range(6):
+                ts = bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % caso)
+                if not ts or any(t['name'] == 'Verifica Informe de Servicio' for t in ts):
+                    break
+                bonita_put('/API/bpm/humanTask/%s' % ts[0]['id'], {'assigned_id': uid})
+                bonita_post('/API/bpm/userTask/%s/execution' % ts[0]['id'], {})
+            os_id = informe_prueba(o, eq, emp_asset, horometro)
+            sel = {'selected[0][id_orden]': os_id, 'selected[0][id_ot]': o, 'selected[0][case_id]': caso, 'selected[0][id_equipo]': eq}
+            s, base = (asset, ASSET) if lado == 'asset' else (man, MAN)
+            r = jload(s.post(base + 'Ordenservicio/cierreMasivoVerificaInforme', sel))
+            comparar('informe · verificar por %s (respuesta)' % lado, [{'id_orden': os_id, 'status': 'OK'}], r)
+            comparar('informe · verificar por %s (informe y OT cerrados)' % lado, [['CE'], ['CE']],
+                     sql("SELECT estado FROM orden_servicio WHERE id_ot=%s" % o) + sql("SELECT estado FROM orden_trabajo WHERE id_orden=%s" % o))
+            comparar('informe · verificar por %s (lectura de cierre)' % lado, [[str(eq), horometro, str(usr), '-', '-', 'AC']],
+                     sql("SELECT id_equipo, lectura, usrId, operario_nom, turno, estado FROM historial_lecturas WHERE observacion LIKE '%%| OT: %s'" % o))
+            hecha = [t for t in bonita('/API/bpm/archivedHumanTask?p=0&c=20&f=caseId%%3D%s' % caso) if t['name'] == 'Verifica Informe de Servicio']
+            comparar('informe · verificar por %s (tarea cerrada en Bonita por el usuario)' % lado, [uid], [t['assigned_id'] for t in hecha])
+        # Aislamiento: una OT de otra empresa con su caso; MAN no toca nada
+        ajena = sql("SELECT os.id_orden, os.id_ot, ot.case_id, os.estado, ot.estado FROM orden_servicio os JOIN orden_trabajo ot ON ot.id_orden=os.id_ot "
+                    "WHERE os.id_empresa<>%d AND ot.case_id IS NOT NULL ORDER BY os.id_orden DESC LIMIT 1" % emp_asset)[0]
+        r = jload(man.post(MAN + 'Ordenservicio/cierreMasivoVerificaInforme', {'selected[0][id_orden]': ajena[0], 'selected[0][id_ot]': ajena[1],
+                                                                                'selected[0][case_id]': ajena[2]}))
+        comparar('informe · aislamiento: MAN no verifica informes de otra empresa', ['ERROR_BPM', ajena[3], ajena[4]],
+                 [r[0].get('status') if isinstance(r, list) and r else r] + sql("SELECT estado FROM orden_servicio WHERE id_orden=%s" % ajena[0])[0]
+                 + sql("SELECT estado FROM orden_trabajo WHERE id_orden=%s" % ajena[1])[0])
+    finally:
+        for o, caso in casos.items():
+            sql("DELETE FROM historial_lecturas WHERE observacion LIKE '%%| OT: %s' AND usrId=%s" % (o, usr))
+            sql("DELETE FROM orden_servicio WHERE id_ot=%s AND comprobante='%s'" % (o, PREFIJO))
+            sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)
+            sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)
+            bonita('/API/bpm/case/%s' % caso, 'DELETE')
+            print('     | informe · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
+        sql("UPDATE equipos SET ultima_lectura=%s WHERE id_equipo=%s" % (lectura_antes, eq))
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
@@ -1125,6 +1255,8 @@ PANTALLAS = {
     'ot': paridad_ot,
     'ot_escrituras': paridad_ot_escrituras,
     'ot_bonita': paridad_ot_bonita,
+    'informe': paridad_informe,
+    'informe_bonita': paridad_informe_bonita,
 }
 
 if __name__ == '__main__':
