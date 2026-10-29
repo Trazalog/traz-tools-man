@@ -1244,6 +1244,64 @@ def paridad_informe_bonita(asset, man, emp_asset):
         sql("UPDATE equipos SET ultima_lectura=%s WHERE id_equipo=%s" % (lectura_antes, eq))
 
 
+# ------------------------------------------------------------------------- lecturas de parámetros
+def paridad_lectura(asset, man, emp_asset):
+    """Carga de lecturas de parámetros (parametroequipo): pantalla, listas, alta, lecturas del día, baja y
+    aislamiento entre empresas. Cada lado graba la suya con un valor propio; se borran al final."""
+    pa, pm = ASSET + 'Lectura/', MAN + 'Lectura/'
+    orden = lambda l: sorted(l, key=lambda f: json.dumps(f, sort_keys=True)) if isinstance(l, list) else l
+    comparar('lectura · pantalla', texto_vista(asset.get(pa + 'index/Add-Edit-Del')), texto_vista(man.get(pm + 'index/Add-Edit-Del')))
+    # Sin equipos con parámetros asset responde null (variable sin definir, con aviso de PHP) y MAN una lista vacía,
+    # que es lo que espera el autocompletar: se comparan como iguales.
+    vacio = lambda r: [] if r is None else r
+    comparar('lectura · equipos con parámetros (sin datos de prueba)', vacio(orden(jload(asset.get(pa + 'getEquipo?term=a')))),
+             orden(jload(man.get(pm + 'getEquipo?term=a'))))
+    # Parámetro de prueba asociado a un equipo activo de la empresa
+    eq = sql("SELECT id_equipo FROM equipos WHERE estado='AC' AND id_empresa=%d ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    sql("INSERT INTO parametros (paramdescrip, min, estado, id_empresa) VALUES ('%s', '0', 'AC', %d)" % (PREFIJO + ' L', emp_asset))
+    prm = sql("SELECT paramId FROM parametros WHERE paramdescrip='%s'" % (PREFIJO + ' L'))[0][0]
+    sql("INSERT INTO setupparam (id_equipo, id_parametro, maximo, minimo, id_empresa) VALUES (%s, %s, 10, 1, %d)" % (eq, prm, emp_asset))
+    comparar('lectura · parámetros del equipo', orden(jload(asset.post(pa + 'getParametrosAsoc', {'equipoId': eq}))),
+             orden(jload(man.post(pm + 'getParametrosAsoc', {'equipoId': eq}))))
+    fecha = '2026/10/29 3:05:00'
+    try:
+        comparar('lectura · equipos con parámetros', orden(jload(asset.get(pa + 'getEquipo?term=a'))), orden(jload(man.get(pm + 'getEquipo?term=a'))))
+        ra = jload(asset.post(pa + 'guardar_lectura', {'id_equipo': eq, 'id_parametro': prm, 'fecha': fecha, 'valor': PREFIJO + ' A'}))
+        rm = jload(man.post(pm + 'guardar_lectura', {'id_equipo': eq, 'id_parametro': prm, 'fecha': fecha, 'valor': PREFIJO + ' M'}))
+        comparar('lectura · alta (respuesta)', ra, rm)
+        fila = "SELECT paramId, id_equipo, CAST(fechahora AS CHAR), id_empresa FROM parametroequipo WHERE valor='%s'"
+        comparar('lectura · alta (fila en la base)', sql(fila % (PREFIJO + ' A')), sql(fila % (PREFIJO + ' M')))
+        dia = {'fecha': fecha, 'idequipo': eq}
+        la = orden(jload(asset.post(pa + 'getLecturasCargadas', dia)))
+        comparar('lectura · lecturas del día (trae las dos de prueba)', 2, len(la) if isinstance(la, list) else la)
+        comparar('lectura · lecturas del día', la,
+                 orden(jload(man.post(pm + 'getLecturasCargadas', dia))))
+        ida = sql("SELECT id FROM parametroequipo WHERE valor='%s'" % (PREFIJO + ' A'))[0][0]
+        idm = sql("SELECT id FROM parametroequipo WHERE valor='%s'" % (PREFIJO + ' M'))[0][0]
+        comparar('lectura · baja (respuesta)', jload(asset.post(pa + 'deleteLectura', {'id': ida})), jload(man.post(pm + 'deleteLectura', {'id': idm})))
+        comparar('lectura · baja (fila en la base)', sql(fila % (PREFIJO + ' A')), sql(fila % (PREFIJO + ' M')))
+        # Aislamiento: una lectura de otra empresa. MAN no la lista ni la borra, y no graba sobre equipos ajenos.
+        ajeno = sql("SELECT s.id_equipo, s.id_parametro, e.id_empresa FROM setupparam s JOIN equipos e ON e.id_equipo=s.id_equipo "
+                    "WHERE e.id_empresa<>%d LIMIT 1" % emp_asset)
+        if ajeno:
+            aeq, aprm, aemp = ajeno[0]
+            sql("INSERT INTO parametroequipo (paramId, id_equipo, valor, fechahora, id_empresa) VALUES (%s, %s, '%s', '2026-10-29 03:05:00', %s)"
+                % (aprm, aeq, PREFIJO + ' AJENA', aemp))
+            idaj = sql("SELECT id FROM parametroequipo WHERE valor='%s'" % (PREFIJO + ' AJENA'))[0][0]
+            comparar('lectura · aislamiento: MAN no lista lecturas de otra empresa', [],
+                     jload(man.post(pm + 'getLecturasCargadas', {'fecha': fecha, 'idequipo': aeq})))
+            man.post(pm + 'deleteLectura', {'id': idaj})
+            comparar('lectura · aislamiento: MAN no borra lecturas de otra empresa', [[idaj]],
+                     sql("SELECT id FROM parametroequipo WHERE id=%s" % idaj))
+            man.post(pm + 'guardar_lectura', {'id_equipo': aeq, 'id_parametro': aprm, 'fecha': fecha, 'valor': PREFIJO + ' HACK'})
+            comparar('lectura · aislamiento: MAN no graba lecturas en equipos de otra empresa', [],
+                     sql("SELECT id FROM parametroequipo WHERE valor='%s'" % (PREFIJO + ' HACK')))
+    finally:
+        sql("DELETE FROM parametroequipo WHERE valor LIKE '%s%%'" % PREFIJO)
+        sql("DELETE FROM setupparam WHERE id_parametro=%s" % prm)
+        sql("DELETE FROM parametros WHERE paramId=%s" % prm)
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
@@ -1257,6 +1315,7 @@ PANTALLAS = {
     'ot_bonita': paridad_ot_bonita,
     'informe': paridad_informe,
     'informe_bonita': paridad_informe_bonita,
+    'lectura': paridad_lectura,
 }
 
 if __name__ == '__main__':

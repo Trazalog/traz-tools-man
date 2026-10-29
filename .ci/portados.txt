@@ -53,3 +53,6 @@ controllers/Ordenservicio.php
 models/Ordenservicios.php
 views/ordenservicios/list.php
 views/tareas/view_presta_presta_conf_modal.php
+controllers/Lectura.php
+models/Lecturas.php
+views/lectura/lect.php
