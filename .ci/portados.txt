@@ -56,3 +56,6 @@ views/tareas/view_presta_presta_conf_modal.php
 controllers/Lectura.php
 models/Lecturas.php
 views/lectura/lect.php
+controllers/Tarea.php
+models/Tareas.php
+views/tareas/list.php

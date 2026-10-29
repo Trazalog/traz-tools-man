@@ -1302,6 +1302,69 @@ def paridad_lectura(asset, man, emp_asset):
         sql("DELETE FROM parametros WHERE paramId=%s" % prm)
 
 
+# ------------------------------------------------------------------------------------- bandeja
+def paginado(sesion, base, search='', orden=None, largo=50):
+    """Una página de la bandeja (Tarea/paginado) como la pide DataTables."""
+    datos = {'draw': '1', 'start': '0', 'length': str(largo), 'search[value]': search}
+    if orden:
+        datos['order[0][column]'], datos['order[0][dir]'] = orden
+    return jload(sesion.post(base + 'Tarea/paginado', datos))
+
+
+def paridad_bandeja(asset, man, emp_asset):
+    """Bandeja (lista de tareas del usuario). La pantalla se compara siempre; la lista con casos reales en la Bonita de DEV solo con
+    MAN_PARIDAD_BONITA=1: se crean dos OT con el alta de MAN (una con su tarea asignada al usuario de prueba y otra sin asignar, que no
+    aparece en la bandeja) y se comparan filas, búsqueda y orden de asset y MAN."""
+    comparar('bandeja · pantalla', texto_vista(asset.get(ASSET + 'Tarea/index/Add-Edit-Del')), texto_vista(man.get(MAN + 'Tarea/index/Add-Edit-Del')))
+    if os.environ.get('MAN_PARIDAD_BONITA') != '1':
+        print('     | bandeja · lista con Bonita: no se corre (MAN_PARIDAD_BONITA=1 para correrlo)')
+        return
+    bonita, bonita_put, _ = bonita_admin()
+    nick = os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test')
+    uid = bonita('/API/identity/user?p=0&c=1&f=userName%%3D%s' % urllib.parse.quote(nick))[0]['id']
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    antes = int(sql("SELECT IFNULL(MAX(id_orden), 0) FROM orden_trabajo")[0][0])
+    casos = {}
+    sin_datos = lambda r: [{k: v for k, v in f.items()} for f in r['data']] if isinstance(r, dict) and 'data' in r else r
+    try:
+        for n in (1, 2):
+            man.post_archivo(MAN + 'Otrabajo/guardar_agregar', {'equipo': eq, 'id_tarea': '', 'tareacustom': PREFIJO + ' bandeja %d' % n,
+                                                                'fechaInicio': '01/11/2026', 'fechaEntrega': '05/11/2026', 'suci': '', 'prov': ''},
+                             'inputPDF', '', b'')
+            fila = sql("SELECT id_orden, case_id FROM orden_trabajo WHERE id_orden>%d AND descripcion='%s bandeja %d'" % (antes, PREFIJO, n))
+            if not fila or fila[0][1] in ('NULL', '0', ''):
+                comparar('bandeja · OT con caso %d' % n, 'una OT con caso', fila)
+                return
+            casos[fila[0][0]] = fila[0][1]
+        primera = sorted(casos)[0]
+        for t in bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % casos[primera]):
+            bonita_put('/API/bpm/humanTask/%s' % t['id'], {'assigned_id': uid})
+        ra, rm = paginado(asset, ASSET), paginado(man, MAN)
+        propias = lambda r: sorted([f for f in r['data'] if f.get('caseId') in casos.values()], key=lambda f: f['id']) if isinstance(r, dict) else r
+        # La tarea sin asignar del usuario no aparece en su bandeja: solo la de la OT asignada
+        comparar('bandeja · la OT asignada está en la lista (asset)', 1, len(propias(ra)) if isinstance(ra, dict) else ra)
+        comparar('bandeja · filas de las OT de prueba', propias(ra), propias(rm))
+        comparar('bandeja · total de filas', ra.get('recordsTotal') if isinstance(ra, dict) else ra, rm.get('recordsTotal') if isinstance(rm, dict) else rm)
+        comparar('bandeja · todas las filas, en el mismo orden', [f['id'] for f in ra['data']], [f['id'] for f in rm['data']])
+        o = str(primera)
+        comparar('bandeja · búsqueda por número de OT', sin_datos(paginado(asset, ASSET, o)), sin_datos(paginado(man, MAN, o)))
+        comparar('bandeja · búsqueda sin resultados', sin_datos(paginado(asset, ASSET, 'zzzz-no-existe')), sin_datos(paginado(man, MAN, 'zzzz-no-existe')))
+        for col in ('10', '4', '3'):
+            for dir_ in ('asc', 'desc'):
+                comparar('bandeja · orden columna %s %s' % (col, dir_), [f['id'] for f in paginado(asset, ASSET, '', (col, dir_))['data']],
+                         [f['id'] for f in paginado(man, MAN, '', (col, dir_))['data']])
+        # Aislamiento: MAN no muestra tareas de casos de otra empresa
+        ajenos = [r[0] for r in sql("SELECT case_id FROM case_empresa WHERE empr_id<>%d" % emp_asset)]
+        vistos = [f['caseId'] for f in rm['data']]
+        comparar('bandeja · aislamiento: MAN no lista casos de otra empresa', [], [c for c in vistos if c in ajenos])
+    finally:
+        for o, caso in casos.items():
+            sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)
+            sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)
+            bonita('/API/bpm/case/%s' % caso, 'DELETE')
+            print('     | bandeja · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
@@ -1316,6 +1379,7 @@ PANTALLAS = {
     'informe': paridad_informe,
     'informe_bonita': paridad_informe_bonita,
     'lectura': paridad_lectura,
+    'bandeja': paridad_bandeja,
 }
 
 if __name__ == '__main__':

@@ -253,3 +253,23 @@ if (!function_exists('man_asset_url')) {
         return substr($base, 0, strrpos($base, '/')) . '/tools/traz-prod-assetplanner/';
     }
 }
+
+/*
+ * Bandeja: dispositivo y tiempo de recarga. Asset usaba la librería Mobile_Detect y la constante TIEMPO_RECARGA, que tools no tiene.
+ */
+if (!function_exists('man_dispositivo')) {
+    /** "android" si el navegador es de un celular o tablet, "pc" si no (la vista oculta columnas en el celular). */
+    function man_dispositivo()
+    {
+        $agente = isset($_SERVER['HTTP_USER_AGENT']) ? $_SERVER['HTTP_USER_AGENT'] : '';
+        return preg_match('/Mobile|Android|iPhone|iPad|iPod|Tablet|Silk|Kindle/i', $agente) ? 'android' : 'pc';
+    }
+}
+
+if (!function_exists('man_tiempo_recarga')) {
+    /** Milisegundos entre actualizaciones automáticas de la bandeja. Asset: 1000000 (unos 17 minutos). */
+    function man_tiempo_recarga()
+    {
+        return defined('MAN_TIEMPO_RECARGA') ? MAN_TIEMPO_RECARGA : 1000000;
+    }
+}
