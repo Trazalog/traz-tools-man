@@ -205,6 +205,107 @@ class Tareas extends CI_Model
         $_SESSION['man_band_search'] = '';
     }
 
+    /**
+     * Acción sobre una tarea de Bonita por toolsMANAPI (ADR-014, regla 3: Bonita y base en una sola operación). El API comprueba que el
+     * caso de la tarea sea de la empresa y saca de ahí la OT y su origen, así que acá solo viajan la tarea y la decisión del usuario.
+     * @param string $ruta recurso de /tools/man/bandeja
+     * @param array $datos datos propios de la acción
+     * @return array status (true|false) y msj si falla
+     */
+    private function accion($ruta, $datos)
+    {
+        $rsp = $this->rest->callAPI('POST', HOST . '/tools/man/bandeja/' . $ruta, array_merge(array(
+            'usrNick'    => (string) userNick(),
+            'id_empresa' => man_empresa(),
+            'session'    => $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '',
+        ), $datos));
+        $aux = json_decode($rsp['data'], true);
+        if (!$rsp['status'] || empty($aux['status'])) {
+            log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Tareas | accion(' . $ruta . ') >> ' . json_encode($rsp['data']));
+            return array('status' => false, 'msj' => (is_array($aux) && !empty($aux['msj'])) ? $aux['msj'] : 'Error en la operación');
+        }
+        if (!empty($aux['session'])) {
+            $this->session->set_userdata('bpm_token', $aux['session']);
+        }
+        return array('status' => true, 'msj' => 'OK');
+    }
+
+    /** El usuario toma la tarea (queda asignada a él en Bonita). */
+    public function tomarTarea($idTarea)
+    {
+        return $this->accion('tarea/asignar', array('id_tarea' => (string) (int) $idTarea, 'accion' => 'tomar'));
+    }
+
+    /** El usuario suelta la tarea (queda sin asignar en Bonita). */
+    public function soltarTarea($idTarea)
+    {
+        return $this->accion('tarea/asignar', array('id_tarea' => (string) (int) $idTarea, 'accion' => 'soltar'));
+    }
+
+    /** Termina el análisis de la solicitud de servicio con la decisión de urgencia ('true' o 'false'). */
+    public function decidirUrgencia($idTarea, $opcion)
+    {
+        return $this->accion('tarea/urgencia', array('id_tarea' => (string) (int) $idTarea, 'opcion' => $this->logico($opcion)));
+    }
+
+    /** Termina "Ejecutar OT": la OT queda terminada y el informe de servicio, a nombre de quien la ejecutó. */
+    public function ejecutarOT($idTarea)
+    {
+        return $this->accion('tarea/ejecutar', array(
+            'id_tarea' => (string) (int) $idTarea,
+            'fecha'    => date('Y-m-d H:i:s'),
+            'usr_id'   => man_usuario(),
+        ));
+    }
+
+    /** Verifica el informe de servicio: conforme ('true') cierra todo; no conforme lo devuelve a quien lo hizo, con la justificación. */
+    public function verificarInforme($idTarea, $opcion, $justificacion)
+    {
+        return $this->accion('tarea/verificar', array(
+            'id_tarea'      => (string) (int) $idTarea,
+            'opcion'        => $this->logico($opcion),
+            'justificacion' => (string) $justificacion,
+        ));
+    }
+
+    /** El solicitante presta (o no) conformidad con el trabajo. */
+    public function prestarConformidad($idTarea, $opcion)
+    {
+        return $this->accion('tarea/conformidad', array('id_tarea' => (string) (int) $idTarea, 'opcion' => $this->logico($opcion)));
+    }
+
+    /** Marca el inicio de la OT: fecha, posición y estado En curso (de la OT y de su origen). */
+    public function inicioTarea($idOt, $lat, $lon)
+    {
+        $rsp = $this->rest->callAPI('POST', HOST . '/tools/man/bandeja/ot/inicio', array(
+            'id_empresa' => man_empresa(),
+            'id_ot'      => (string) (int) $idOt,
+            'lat'        => (string) $lat,
+            'lon'        => (string) $lon,
+            'fecha'      => date('Y-m-d H:i:s'),
+        ));
+        $aux = json_decode($rsp['data'], true);
+        if (!$rsp['status'] || empty($aux['status'])) {
+            log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Tareas | inicioTarea() >> ' . json_encode($rsp['data']));
+            return false;
+        }
+        return true;
+    }
+
+    /** ¿La OT ya tiene fecha de inicio? (asset la guarda con ceros cuando no la tiene) */
+    public function inicioConfirmado($idOt)
+    {
+        $filas = man_lista(wso2(REST_MAN . '/ot/' . (int) $idOt . '/inicio/empresa/' . man_empresa()));
+        $fecha = $filas ? $filas[0]['fecha_inicio'] : '';
+        return !empty($fecha) && strpos($fecha, '0000-00-00') !== 0;
+    }
+
+    /** 'true' o 'false' como texto, como lo reciben las variables de Bonita (en asset llegaba tal cual el texto del navegador). */
+    private function logico($valor)
+    {
+        return ($valor === true || $valor === 'true' || $valor === '1' || $valor === 1) ? 'true' : 'false';
+    }
+
     /** Ordena por la columna de la tabla (las columnas 0, 1 y mayores a 11 no ordenan). */
     private function sortTareasBy($data, $ordering)
     {
