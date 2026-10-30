@@ -362,10 +362,13 @@ class Otrabajos extends CI_Model
 	function updateResponsablePlan($idOt, $responsable){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | updateResponsablePlan($idOt, $responsable)");
 		$e = man_empresa();
+		// La base no informa cuántas filas tocó: se mira antes que la orden y el usuario sean de la empresa
+		if (!$this->filas('/plan/ot/' . (int) $idOt . '/empresa/' . $e) || !$this->filas('/usuario/' . (int) $responsable . '/nick/empresa/' . $e)) {
+			return false;
+		}
 		$rsp = man_escribir('PUT', 'plan/ot/responsable', array('id_usuario_a' => (string) (int) $responsable, 'id_orden' => (string) (int) $idOt,
 			'id_empresa' => $e, 'id_usuario_a2' => (string) (int) $responsable, 'id_empresa2' => $e));
-		$d = $rsp['status'] ? json_decode(json_encode($rsp['data']), true) : null;
-		return is_array($d) && isset($d['filas']) && (int) $d['filas'] > 0;
+		return (bool) $rsp['status'];
 	}
 
 	/** Pedido a un recurso de toolsMANAPI del Plan con los datos de la sesión. @return array respuesta ({status, msj, ...}) */

@@ -1449,6 +1449,125 @@ def paridad_bandeja_detalle(asset, man, emp_asset):
             print('     | detalle · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
 
 
+# ------------------------------------------------------------------------------------- calendario (Plan de Mantenimiento)
+def tabla_visible(pagina, id_tabla):
+    """Filas de una tabla del calendario como listas de textos de las celdas visibles (sin las ocultas); None si no está la tabla."""
+    m = re.search(r'<table id="%s".*?</table>' % id_tabla, pagina, re.S)
+    if not m:
+        return None
+    filas = []
+    for tr in re.findall(r'<tr[^>]*>(.*?)</tr>', m.group(0), re.S):
+        tds = re.findall(r'<td([^>]*)>(.*?)</td>', tr, re.S)
+        if tds:
+            filas.append([html.unescape(re.sub(r'<[^>]+>', '', t)).strip() for a, t in tds if 'hidden' not in a])
+    return sorted(filas)
+
+
+def opciones_filtro(pagina, formato):
+    """Opciones de cada lista del panel del filtro: {clave: [textos]}. formato 'asset' (<option>x</option>) o 'man' (<option value="x">)."""
+    out = {}
+    for clave, cuerpo in re.findall(r'<datalist id="(?:lst-)?(\w+)">(.*?)</datalist>', pagina, re.S):
+        out[clave] = sorted(html.unescape(o) for o in (re.findall(r'<option>(.*?)</option>', cuerpo) if formato == 'asset'
+                                                         else re.findall(r'<option value="(.*?)">', cuerpo)))
+    return out
+
+
+def paridad_calendario(asset, man, emp_asset):
+    """Plan de Mantenimiento (lecturas): períodos, órdenes del calendario, opciones del filtro y las cuatro tablas de lo que falta
+    programar (preventivo por tiempo, por contador, backlog y predictivo), con planes y órdenes de prueba en la empresa. Las tablas de
+    solicitudes urgentes dependen de la bandeja de Bonita de cada usuario y se prueban en e2e_calendario.py. La programación
+    (escrituras) no se compara con asset: asset lanza los casos como el usuario y el de prueba no tiene la contraseña de Bonita (T28)."""
+    pa, pm = ASSET + 'Calendario/', MAN + 'Calendario/'
+    # Períodos
+    comparar('calendario · períodos (sin datos: nada)', asset.post(pa + 'getperiodo', {}).strip(), man.post(pm + 'getperiodo', {}).strip())
+    comparar('calendario · períodos', jload(asset.post(pa + 'getperiodo', {'periodoE': ''})), jload(man.post(pm + 'getperiodo', {'periodoE': ''})))
+    # Filtro
+    comparar('calendario · opciones del filtro', opciones_filtro(asset.get(pa + 'panelFiltro'), 'asset'), opciones_filtro(man.get(pm + 'panelFiltro'), 'man'))
+    eq = sql("SELECT e.id_equipo FROM equipos e JOIN sector s ON s.id_sector=e.id_sector WHERE e.estado='AC' AND e.id_empresa=%d ORDER BY e.id_equipo LIMIT 1" % emp_asset)[0][0]
+    tarea = sql("SELECT id_tarea FROM tareas WHERE id_empresa=%d AND estado='AC' ORDER BY id_tarea LIMIT 1" % emp_asset)[0][0]
+    per = dict((d, i) for i, d in sql("SELECT idperiodo, descripcion FROM periodo WHERE id_empresa=%d" % emp_asset))
+    otra_emp = sql("SELECT id_empresa FROM equipos WHERE id_empresa<>%d LIMIT 1" % emp_asset)[0][0]
+    otro_eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%s LIMIT 1" % otra_emp)[0][0]
+    ids = {}
+    try:
+        ins = lambda q: sql(q + "; SELECT LAST_INSERT_ID()")[0][0]
+        ids['prev'] = ins("INSERT INTO preventivo (id_equipo,id_tarea,perido,cantidad,ultimo,id_componente,critico1,horash,estadoprev,prev_duracion,id_unidad,prev_canth,id_empresa,lectura_base) "
+                          "VALUES (%s,%s,'%s',3,'2026-11-02',0,NULL,1,'C',60,1,1,%d,NULL)" % (eq, tarea, per['Diario'], emp_asset))
+        ids['cont'] = ins("INSERT INTO preventivo (id_equipo,id_tarea,perido,cantidad,ultimo,id_componente,critico1,horash,estadoprev,prev_duracion,id_unidad,prev_canth,id_empresa,lectura_base) "
+                          "VALUES (%s,%s,'%s',20,'2026-11-02',0,0,1,'C',30,1,1,%d,0)" % (eq, tarea, per.get('Ciclos', per.get('Horas')), emp_asset))
+        ids['back'] = ins("INSERT INTO tbl_back (id_equipo,id_tarea,fecha,horash,estado,back_duracion,id_unidad,back_canth,id_empresa,sore_id,tarea_opcional) "
+                          "VALUES (%s,%s,'2026-11-10',1,'C',45,1,1,%d,NULL,'%s tarea')" % (eq, tarea, emp_asset, PREFIJO))
+        ids['pred'] = ins("INSERT INTO predictivo (id_equipo,tarea_descrip,fecha,periodo,cantidad,horash,estado,pred_duracion,id_unidad,pred_canth,id_empresa) "
+                          "VALUES (%s,'%s','2026-11-12','%s',2,1,'C',90,1,1,%d)" % (eq, tarea, per['Mensual'], emp_asset))
+        # Órdenes del calendario: de distinto tipo, con y sin responsable, terminada, anulada, de otro mes y de otra empresa
+        ots = []
+        for tipo, dia, usr, est, emp, e in (('3', '2026-11-03 08:00:00', 'NULL', 'PL', emp_asset, eq), ('2', '2026-11-15 10:30:00', '213', 'AS', emp_asset, eq),
+                                           ('5', '2026-11-30 23:00:00', 'NULL', 'PL', emp_asset, eq), ('4', '2026-11-20 09:00:00', 'NULL', 'T', emp_asset, eq),
+                                           ('1', '2026-11-21 09:00:00', 'NULL', 'AN', emp_asset, eq), ('3', '2026-12-01 00:00:00', 'NULL', 'PL', emp_asset, eq),
+                                           ('3', '2026-11-04 08:00:00', 'NULL', 'PL', otra_emp, otro_eq)):
+            ots.append(ins("INSERT INTO orden_trabajo (tipo,id_solicitud,id_empresa,estado,id_equipo,descripcion,fecha_program,duracion,id_usuario_a,nro) "
+                           "VALUES ('%s',0,%s,'%s',%s,'%s ot',  '%s',45,%s,'1')" % (tipo, emp, est, e, PREFIJO, dia, usr)))
+        ids['ots'] = ots
+        # Órdenes del mes: misma lista en los dos (asset pide mes 0-based y año; MAN, el rango)
+        norm = lambda f: sorted([[str(x[k]) if x.get(k) is not None else None for k in ('id_orden', 'fecha_program', 'tipo', 'descripcion', 'duracion', 'id_usuario_a',
+                                                                                          'codigo', 'area', 'grupo', 'sector', 'origen')] for x in (f or [])])
+        a = jload(asset.post(pa + 'getcalendarot', {'month': 10, 'year': 2026}))
+        m = jload(man.post(pm + 'getcalendarot', {'desde': '2026-11-01', 'hasta': '2026-12-01'}))
+        comparar('calendario · órdenes de noviembre 2026 (con una terminada, una anulada, una de otra empresa y una de otro mes)', norm(a), norm(m))
+        comparar('calendario · órdenes: las de prueba del mes son las 3 vigentes de la empresa', 3, len([x for x in (m or []) if x['descripcion'] == PREFIJO + ' ot']))
+        comparar('calendario · órdenes: rango vacío', jload(asset.post(pa + 'getcalendarot', {'month': 0, 'year': 2001})), jload(man.post(pm + 'getcalendarot', {'desde': '2001-01-01', 'hasta': '2001-02-01'})))
+        comparar('calendario · órdenes: rango inválido', False, jload(man.post(pm + 'getcalendarot', {'desde': 'ayer', 'hasta': 'hoy'})))
+        # Tablas del mes
+        permiso = 'Correctivo-Preventivos-Backlog-Predictivo-'
+        ta = asset.post(pa + 'getTablas', {'mes': 11, 'year': 2026, 'permission': permiso, 'tareas[0][caseId]': '0'})
+        tm = man.post(pm + 'getTablas', {'mes': 11, 'year': 2026, 'permission': permiso})
+        for tabla in ('preventivo', 'backlog'):
+            comparar('calendario · tabla %s' % tabla, tabla_visible(ta, tabla), tabla_visible(tm, tabla))
+        # Por contador: asset rotula el período por su número (5, 6 y 7) y a una empresa con otros números siempre le pone "Horas" (T56); MAN, por su nombre
+        sin_per = lambda filas: [f[:4] + f[5:] for f in filas]
+        comparar('calendario · tabla preventivo_horas (sin la columna Período)', sin_per(tabla_visible(ta, 'preventivo_horas')), sin_per(tabla_visible(tm, 'preventivo_horas')))
+        comparar('calendario · tabla preventivo_horas: el período es el del plan', True,
+                 any(f[4] in ('Ciclos', 'Horas', 'Km') and f[1] == 'COMP-001' for f in tabla_visible(tm, 'preventivo_horas')))
+        sin_periodo = lambda filas: [f[:4] + f[5:] for f in filas]   # asset muestra el número del período; MAN su nombre
+        comparar('calendario · tabla predictivo (sin la columna Período: asset muestra el número y MAN el nombre)', sin_periodo(tabla_visible(ta, 'predictivo')),
+                 sin_periodo(tabla_visible(tm, 'predictivo')))
+        comparar('calendario · tabla preventivo trae el de prueba', True, any(f[1] == 'COMP-001' or f[2] for f in tabla_visible(tm, 'preventivo')))
+        for tit in ('Solicitud de Servicios (Noviembre 2026)', 'Preventivo (Noviembre 2026)', 'Preventivo por ciclos/horas (Noviembre 2026)', 'Backlog (Noviembre 2026)',
+                    'Predictivo (Noviembre 2026)'):
+            comparar('calendario · título "%s"' % tit, True, tit in ta and tit in tm)
+        # Solo las tablas permitidas
+        comparar('calendario · permisos: solo backlog', tabla_visible(asset.post(pa + 'getTablas', {'mes': 11, 'year': 2026, 'permission': 'Backlog-', 'tareas[0][caseId]': '0'}), 'backlog'),
+                 tabla_visible(man.post(pm + 'getTablas', {'mes': 11, 'year': 2026, 'permission': 'Backlog-'}), 'backlog'))
+        comparar('calendario · permisos: con "Backlog-" no hay tabla de preventivos', None, tabla_visible(man.post(pm + 'getTablas', {'mes': 11, 'year': 2026, 'permission': 'Backlog-'}), 'preventivo'))
+        comparar('calendario · mes inválido', '<HTTP 400>', man.post(pm + 'getTablas', {'mes': 13, 'year': 2026, 'permission': permiso}))
+        # Aislamiento: cambiar fecha y duración de una orden de otra empresa
+        ajena = ots[-1]
+        previo = sql("SELECT CAST(fecha_program AS CHAR), duracion FROM orden_trabajo WHERE id_orden=%s" % ajena)
+        comparar('calendario · mover una orden de otra empresa (T47)', False, jload(man.post(pm + 'updateDiaProg', {'id': ajena, 'prog': '2026-11-25 10:00:00'})))
+        comparar('calendario · estirar una orden de otra empresa (T47)', False, jload(man.post(pm + 'updateDuracion', {'id': ajena, 'duracion': 30})))
+        comparar('calendario · la orden de otra empresa no cambió', previo, sql("SELECT CAST(fecha_program AS CHAR), duracion FROM orden_trabajo WHERE id_orden=%s" % ajena))
+        # Mover y estirar una propia: asset y MAN dejan lo mismo
+        propia_a, propia_m = ots[0], ots[2]
+        ra = jload(asset.post(pa + 'updateDiaProg', {'id': propia_a, 'prog': '2026-11-05 11:15:00'}))
+        rm = jload(man.post(pm + 'updateDiaProg', {'id': propia_m, 'prog': '2026-11-05 11:15:00'}))
+        comparar('calendario · mover una orden propia (respuesta)', ra, rm)
+        rb = jload(asset.post(pa + 'updateDuracion', {'id': propia_a, 'duracion': 30}))
+        rn = jload(man.post(pm + 'updateDuracion', {'id': propia_m, 'duracion': 30}))
+        comparar('calendario · estirar una orden propia (respuesta)', rb, rn)
+        fila = "SELECT CAST(fecha_program AS CHAR), duracion FROM orden_trabajo WHERE id_orden=%s"
+        comparar('calendario · mover y estirar (fila)', sql(fila % propia_a), sql(fila % propia_m))
+        comparar('calendario · mover con fecha inválida', False, jload(man.post(pm + 'updateDiaProg', {'id': propia_m, 'prog': 'mañana'})))
+        # Ventana de la orden: de otra empresa no se muestra (T46); la propia trae su detalle
+        comparar('calendario · ventana de una orden de otra empresa (T46)', True, 'La orden no existe' in man.get(pm + 'verEjecutarOT/%s/' % ajena))
+        v = man.get(pm + 'verEjecutarOT/%s/' % propia_m)
+        comparar('calendario · ventana de la orden propia (detalle)', True, 'id="tblOrden"' in v and 'COMP-001' in v and 'id="ejecutar_ot"' not in v)
+    finally:
+        sql("DELETE FROM orden_trabajo WHERE descripcion='%s ot'" % PREFIJO)
+        for t, k, pk in (('preventivo', 'prev', 'prevId'), ('preventivo', 'cont', 'prevId'), ('tbl_back', 'back', 'backId'), ('predictivo', 'pred', 'predId')):
+            if k in ids:
+                sql("DELETE FROM %s WHERE %s=%s" % (t, pk, ids[k]))
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
@@ -1465,6 +1584,7 @@ PANTALLAS = {
     'lectura': paridad_lectura,
     'bandeja': paridad_bandeja,
     'bandeja_detalle': paridad_bandeja_detalle,
+    'calendario': paridad_calendario,
 }
 
 if __name__ == '__main__':

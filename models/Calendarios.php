@@ -141,30 +141,36 @@ class Calendarios extends CI_Model
 	/**
 	* Nueva fecha y hora de una orden de la empresa
 	* @param string $diaNuevo aaaa-mm-dd hh:mm:ss
-	* @return bool false si la orden no es de la empresa
+	* @return bool false si la orden no es de la empresa (se mira antes: la base no informa cuántas filas tocó)
 	*/
 	function updateDiaProgramacion($id, $diaNuevo){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendarios | updateDiaProgramacion($id, $diaNuevo)");
+		if (!$this->getDataOt($id)) {
+			return false;
+		}
 		$rsp = man_escribir('PUT', 'calendario/ot/fecha', array(
 			'fecha_program' => (string) $diaNuevo,
 			'id_orden'      => (string) (int) $id,
 			'id_empresa'    => man_empresa(),
 		));
-		return $this->afectadas($rsp);
+		return (bool) $rsp['status'];
 	}
 
 	/**
 	* Suma minutos a la duración de una orden de la empresa
-	* @return bool false si la orden no es de la empresa
+	* @return bool false si la orden no es de la empresa (se mira antes: la base no informa cuántas filas tocó)
 	*/
 	function updateDuraciones($id, $minutos){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendarios | updateDuraciones($id, $minutos)");
+		if (!$this->getDataOt($id)) {
+			return false;
+		}
 		$rsp = man_escribir('PUT', 'calendario/ot/duracion', array(
 			'minutos'    => (string) (float) $minutos,
 			'id_orden'   => (string) (int) $id,
 			'id_empresa' => man_empresa(),
 		));
-		return $this->afectadas($rsp);
+		return (bool) $rsp['status'];
 	}
 
 	/**
@@ -260,14 +266,5 @@ class Calendarios extends CI_Model
 	/** "aaaa-mm" */
 	private function ym($mes, $year){
 		return sprintf('%04d-%02d', (int) $year, (int) $mes);
-	}
-
-	/** true si el cambio tocó alguna fila */
-	private function afectadas($rsp){
-		if (!$rsp['status']) {
-			return false;
-		}
-		$d = json_decode(json_encode($rsp['data']), true);
-		return is_array($d) && isset($d['filas']) && (int) $d['filas'] > 0;
 	}
 }
