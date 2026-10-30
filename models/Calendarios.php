@@ -167,6 +167,45 @@ class Calendarios extends CI_Model
 		return $this->afectadas($rsp);
 	}
 
+	/**
+	* Programa órdenes de trabajo desde un preventivo, predictivo, backlog o solicitud urgente (toolsMANAPI POST /tools/man/plan/programar).
+	* La API lee el origen de la empresa, crea las órdenes (una o una serie), lanza o cierra lo que corresponde en Bonita y deja los
+	* estados; si algo falla, deshace lo creado. Asset hacía todo esto desde PHP y dejaba restos si fallaba (T3, T51).
+	* @param int $tipo 2 solicitud urgente, 3 preventivo, 4 backlog, 5 predictivo
+	* @param string $fechaProgr dd-mm-aaaa
+	* @param string $horaProgr hh:mm
+	* @param int $evento 1 una orden, 2 serie (solo preventivo y predictivo)
+	* @return array status (true|false) y msj si falla
+	*/
+	function programar($tipo, $idOrigen, $fechaProgr, $horaProgr, $evento, $cantMeses, $horas){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendarios | programar($tipo, $idOrigen, $fechaProgr, $horaProgr, $evento, $cantMeses, $horas)");
+		if (!preg_match('/^(\d{2})-(\d{2})-(\d{4})$/', $fechaProgr, $f) || !checkdate((int) $f[2], (int) $f[1], (int) $f[3])) {
+			return array('status' => false, 'msj' => 'La fecha no es válida');
+		}
+		if (!preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $horaProgr)) {
+			return array('status' => false, 'msj' => 'La hora no es válida');
+		}
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/plan/programar', array(
+			'id_empresa' => man_empresa(),
+			'emprId'     => (string) empresa(),
+			'usrId'      => man_usuario(),
+			'usrNick'    => (string) userNick(),
+			'session'    => $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '',
+			'tipo'       => (string) (int) $tipo,
+			'id_origen'  => (string) (int) $idOrigen,
+			'fecha'      => $f[3] . '-' . $f[2] . '-' . $f[1] . ' ' . $horaProgr . ':00',
+			'evento'     => (string) (int) $evento,
+			'cant_meses' => (string) $cantMeses,
+			'horas'      => ((int) $horas === 1) ? '1' : '0',
+		));
+		$aux = json_decode($rsp['data'], true);
+		if (!$rsp['status'] || empty($aux['status'])) {
+			log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Calendarios | programar() >> ' . json_encode($rsp['data']));
+			return array('status' => false, 'msj' => isset($aux['msj']) ? $aux['msj'] : 'No se pudo programar');
+		}
+		return array('status' => true, 'cuenta' => isset($aux['cuenta']) ? $aux['cuenta'] : 1);
+	}
+
 	/** "aaaa-mm" */
 	private function ym($mes, $year){
 		return sprintf('%04d-%02d', (int) $year, (int) $mes);

@@ -111,6 +111,19 @@ class Calendario extends CI_Controller
         echo json_encode($this->Calendarios->updateDuraciones($this->input->post('id'), $minutos));
     }
 
+    /**
+     * Programa una orden o una serie (POST tipo, id_origen, fecha_progr dd-mm-aaaa, hora_progr hh:mm, evento 1|2, cant_meses, horas 0|1).
+     * La API decide todo a partir del origen de la empresa; el navegador solo dice cuál y para cuándo.
+     * @return json status y msj si falla
+     */
+    public function programar()
+    {
+        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendario | programar()");
+        $rsp = $this->Calendarios->programar($this->input->post('tipo'), $this->input->post('id_origen'), $this->input->post('fecha_progr'),
+            $this->input->post('hora_progr'), $this->input->post('evento'), $this->input->post('cant_meses'), $this->input->post('horas'));
+        echo json_encode($rsp);
+    }
+
     /** true si es aaaa-mm-dd */
     private function esFecha($valor)
     {
