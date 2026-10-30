@@ -10,7 +10,7 @@ $mostrarFecha = $meses[$mes - 1] . ' ' . $year;
 
 /** Caja plegada de una tabla */
 $cabecera = function ($titulo) use ($mostrarFecha) {
-    echo '<div class="col-md-6"><div class="box collapsed-box"><div class="box-header">';
+    echo '<div class="col-md-6"><div class="box box-primary collapsed-box"><div class="box-header with-border">';
     echo '<h3 class="box-title">' . man_esc($titulo) . ' (' . man_esc($mostrarFecha) . ')</h3>';
     echo '<div class="box-tools pull-right"><button type="button" class="btn btn-box-tool" data-widget="collapse" data-toggle="tooltip" title="">';
     echo '<i class="fa fa-plus"></i></button></div></div><div class="box-body">';

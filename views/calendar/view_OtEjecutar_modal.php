@@ -17,7 +17,7 @@ $conComponente = isset($componente['descCompo']) && $componente['descCompo'] != 
       <input type="hidden" id="task" value="<?php echo (int) $task; ?>">
       <input type="hidden" id="id_solicitud" value="<?php echo man_esc($o['id_solicitud']); ?>">
       <input type="hidden" id="tipo" value="<?php echo man_esc($o['tipo']); ?>">
-      <div class="box-header"></div>
+      <div class="box-header with-border"></div>
       <div class="box-body">
         <div class="panel panel-default">
           <div class="panel-heading">

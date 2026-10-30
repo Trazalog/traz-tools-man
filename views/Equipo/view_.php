@@ -10,7 +10,7 @@
   <div class="row">
     <div class="col-xs-12">
       <div class="box box-primary">
-        <div class="box-header">
+        <div class="box-header with-border">
           <h3 class="box-title">Equipo/Sector</h3>
           <?php
             if (strpos($permission,'Add') !== false) {

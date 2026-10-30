@@ -9,8 +9,8 @@
 </div>
     <div class="row">
         <div class="col-xs-12">
-            <div class="box">
-                <div class="box-header">
+            <div class="box box-primary">
+                <div class="box-header with-border">
                     <h3 class="box-title">Nueva Orden de Trabajo</h3>
                     <?php
                         echo '<button class="btn btn-block btn-primary" style="width: 250px; margin-top: 10px;" id="listadoOT">Ver Listado Ordenes de Trabajo</button>';

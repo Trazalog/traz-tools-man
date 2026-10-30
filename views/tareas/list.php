@@ -44,7 +44,7 @@
     <div class="row">
         <div class="col-xs-12">
             <div class="box box-primary">
-                <div class="box-header">
+                <div class="box-header with-border">
                     <h1 class="box-title">Mis Tareas</h1>
                     <a class="btn btn-primary" style="margin-left: 5%" title="Actualizar" id="btnActualizar"><i
                             class="glyphicon glyphicon-refresh"></i></a>

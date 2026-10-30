@@ -112,7 +112,7 @@
     /* ---------- calendario ---------- */
     function iniciar() {
         calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
-            locale: 'es', initialView: 'dayGridMonth', allDaySlot: false, editable: true,
+            locale: 'es', initialView: 'dayGridMonth', allDaySlot: false, editable: true, eventDisplay: 'block', displayEventTime: false,
             headerToolbar: {left: 'prev,next today', center: 'title', right: 'dayGridMonth,timeGridWeek,timeGridDay'},
             buttonText: {today: 'Hoy', month: 'Mes', week: 'Semana', day: 'Día'},
             events: function (info, ok, fail) {

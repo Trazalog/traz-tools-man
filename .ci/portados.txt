@@ -5,6 +5,7 @@ controllers/Area.php
 controllers/Backlog.php
 controllers/Calendario.php
 controllers/Componente.php
+controllers/Envio.php
 controllers/Equipo.php
 controllers/Lectura.php
 controllers/Ordenservicio.php
@@ -22,6 +23,7 @@ models/Areas.php
 models/Backlogs.php
 models/Calendarios.php
 models/Componentes.php
+models/Envios.php
 models/Equipos.php
 models/Lecturas.php
 models/Ordenservicios.php
@@ -43,6 +45,7 @@ views/calendar/view_OtEjecutar_modal.php
 views/componente/listabm.php
 views/componente/list.php
 views/componente/view_.php
+views/envio/list.php
 views/Equipo/list.php
 views/Equipo/view_.php
 views/lectura/lect.php

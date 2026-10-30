@@ -9,8 +9,8 @@
 </div>
   <div class="row">
     <div class="col-xs-12">
-      <div class="box">
-        <div class="box-header">
+      <div class="box box-primary">
+        <div class="box-header with-border">
           <h2 class="box-title ">Carga de Lectura</h2>
         </div><!-- /.box-header -->
         <div class="box-body">
