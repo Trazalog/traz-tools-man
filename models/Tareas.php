@@ -206,6 +206,28 @@ class Tareas extends CI_Model
     }
 
     /**
+     * Todas las tareas pendientes del usuario que son de casos de la empresa (para el Calendario, que busca entre ellas las solicitudes
+     * urgentes). No usa el cache de la bandeja. Pide páginas a Bonita hasta que una venga incompleta, con un tope.
+     * @return array tareas de Bonita (id, caseId, displayName…)
+     */
+    public function todas()
+    {
+        $out = array();
+        for ($p = 0; $p < 20; $p++) {
+            $rsp = $this->pagina($p, self::POR_PAGINA);
+            $tareas = ($rsp && isset($rsp['tareas']) && is_array($rsp['tareas'])) ? $rsp['tareas'] : array();
+            if (empty($tareas)) {
+                break;
+            }
+            $out = array_merge($out, $this->completar($tareas, isset($rsp['casos']) ? $rsp['casos'] : array(), ''));
+            if (count($tareas) < self::POR_PAGINA) {
+                break;
+            }
+        }
+        return $out;
+    }
+
+    /**
      * Acción sobre una tarea de Bonita por toolsMANAPI (ADR-014, regla 3: Bonita y base en una sola operación). El API comprueba que el
      * caso de la tarea sea de la empresa y saca de ahí la OT y su origen, así que acá solo viajan la tarea y la decisión del usuario.
      * @param string $ruta recurso de /tools/man/bandeja
