@@ -320,6 +320,67 @@ class Otrabajos extends CI_Model
 		return isset($aux['msj']) ? $aux['msj'] : 'error al insertar';
 	}
 
+	/**
+	* Número de la tarea "Asignar Recursos y Tareas" que la orden tiene pendiente en Bonita, o 0 (la ventana de la orden muestra las
+	* pestañas de asignación y el botón solo si hay). toolsMANAPI POST /tools/man/plan/ot/tarea.
+	*/
+	function tareaAsignarPendiente($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | tareaAsignarPendiente($idOt)");
+		$aux = $this->planApi('plan/ot/tarea', array('id_orden' => (string) (int) $idOt));
+		return (!empty($aux['status']) && isset($aux['tarea'])) ? (int) $aux['tarea'] : 0;
+	}
+
+	/**
+	* EjecutarOT de asset: cierra "Asignar Recursos y Tareas" del caso de la orden, asigna "Ejecutar OT" al responsable y deja la orden
+	* y su origen asignados (toolsMANAPI POST /tools/man/plan/asignar). La tarea de Bonita, el tipo y el origen salen de la orden en la
+	* empresa, no del navegador. No instancia los formularios de subtareas (E34).
+	* @return array status y msj si falla
+	*/
+	function asignarPlan($idOt, $responsable, $idTarea, $tareaOpcional, $lat, $lon){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | asignarPlan($idOt, $responsable, $idTarea)");
+		return $this->planApi('plan/asignar', array(
+			'usrId'          => (string) (int) $responsable,
+			'usrNick'        => (string) userNick(),
+			'id_orden'       => (string) (int) $idOt,
+			'id_tarea'       => (string) (int) $idTarea,
+			'tarea_opcional' => (string) $tareaOpcional,
+			'latitud'        => ($lat === null || $lat === false) ? '' : (string) $lat,
+			'longitud'       => ($lon === null || $lon === false) ? '' : (string) $lon,
+		));
+	}
+
+	/** reasignaOt de asset: cambia el responsable de "Ejecutar OT" (toolsMANAPI POST /tools/man/plan/reasignar). @return array status y msj */
+	function reasignarPlan($idOt, $responsable){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | reasignarPlan($idOt, $responsable)");
+		return $this->planApi('plan/reasignar', array('usrId' => (string) (int) $responsable, 'id_orden' => (string) (int) $idOt));
+	}
+
+	/**
+	* Guarda el responsable elegido en la ventana al cerrarla (updateResponsable de asset). Solo órdenes y usuarios de la empresa (T47).
+	* @return bool
+	*/
+	function updateResponsablePlan($idOt, $responsable){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | updateResponsablePlan($idOt, $responsable)");
+		$e = man_empresa();
+		$rsp = man_escribir('PUT', 'plan/ot/responsable', array('id_usuario_a' => (string) (int) $responsable, 'id_orden' => (string) (int) $idOt,
+			'id_empresa' => $e, 'id_usuario_a2' => (string) (int) $responsable, 'id_empresa2' => $e));
+		$d = $rsp['status'] ? json_decode(json_encode($rsp['data']), true) : null;
+		return is_array($d) && isset($d['filas']) && (int) $d['filas'] > 0;
+	}
+
+	/** Pedido a un recurso de toolsMANAPI del Plan con los datos de la sesión. @return array respuesta ({status, msj, ...}) */
+	private function planApi($recurso, $datos){
+		$datos['id_empresa'] = man_empresa();
+		$datos['session'] = $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '';
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/' . $recurso, $datos);
+		$aux = json_decode($rsp['data'], true);
+		if (!$rsp['status'] || empty($aux['status'])) {
+			log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | planApi(' . $recurso . ') >> ' . json_encode($rsp['data']));
+			return array('status' => false, 'msj' => isset($aux['msj']) ? $aux['msj'] : 'ASP_101');
+		}
+		return $aux;
+	}
+
 	/** Fechas de inicio y terminación de la OT (ventana de ver informe). @return array|false */
 	function getLecturasOrden($id_ot){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getLecturasOrden(" . json_encode($id_ot) . ")");

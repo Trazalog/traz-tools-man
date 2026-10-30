@@ -39,6 +39,7 @@ views/backlog/view_.php
 views/calendar/calendar1.php
 views/calendar/filtro.php
 views/calendar/tablas.php
+views/calendar/view_OtEjecutar_modal.php
 views/componente/listabm.php
 views/componente/list.php
 views/componente/view_.php

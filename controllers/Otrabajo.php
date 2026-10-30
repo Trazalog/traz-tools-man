@@ -273,6 +273,29 @@ class Otrabajo extends CI_Controller {
 	}
 
 	/**
+	* Asigna responsable y tarea desde la ventana de la orden del Plan de Mantenimiento (EjecutarOT de asset).
+	* POST ot, responsable, tareastd, tareaOpcional, latitud, longitud. La tarea de Bonita, el tipo y el origen salen de la orden.
+	* @return json status y msj si falla
+	*/
+	public function EjecutarOT(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | EjecutarOT()");
+		echo json_encode($this->Otrabajos->asignarPlan($this->input->post('ot'), $this->input->post('responsable'), $this->input->post('tareastd'),
+			$this->input->post('tareaOpcional'), $this->input->post('latitud'), $this->input->post('longitud')));
+	}
+
+	/** Cambia el responsable de "Ejecutar OT" (POST ot, responsable). @return json status y msj si falla */
+	public function reasignaOt(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | reasignaOt()");
+		echo json_encode($this->Otrabajos->reasignarPlan($this->input->post('ot'), $this->input->post('responsable')));
+	}
+
+	/** Guarda el responsable elegido al cerrar la ventana de la orden (POST idOt, id_usuario_a). @return json bool */
+	public function updateResponsable(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | updateResponsable()");
+		echo json_encode($this->Otrabajos->updateResponsablePlan($this->input->post('idOt'), $this->input->post('id_usuario_a')));
+	}
+
+	/**
 	* Guarda la edición de la OT y reemplaza herramientas e insumos (asset no responde nada)
 	*/
 	public function guardar_editar(){

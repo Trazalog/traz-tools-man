@@ -15,6 +15,7 @@ class Calendario extends CI_Controller
         parent::__construct();
         $this->load->helper('man');
         $this->load->model('Calendarios');
+        $this->load->model('Otrabajos');
     }
 
     /**
@@ -122,6 +123,33 @@ class Calendario extends CI_Controller
         $rsp = $this->Calendarios->programar($this->input->post('tipo'), $this->input->post('id_origen'), $this->input->post('fecha_progr'),
             $this->input->post('hora_progr'), $this->input->post('evento'), $this->input->post('cant_meses'), $this->input->post('horas'));
         echo json_encode($rsp);
+    }
+
+    /**
+     * Ventana de la orden: detalle y, si el caso la tiene pendiente, asignar responsable y tarea.
+     * @param int $idOt orden
+     * @param mixed $reasignaOt si viene, la ventana es para reasignar (solo responsable)
+     */
+    public function verEjecutarOT($idOt = 0, $reasignaOt = null)
+    {
+        log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendario | verEjecutarOT($idOt)");
+        $this->output->set_header('Content-Type: text/html; charset=utf-8');
+        $detaOT = $this->Calendarios->getDataOt($idOt);
+        if (empty($detaOT)) {
+            echo '<div class="alert alert-danger">La orden no existe.</div>';
+            return;
+        }
+        $tipo = $detaOT[0]['tipo'];
+        $data['idOt'] = (int) $idOt;
+        $data['detaOT'] = $detaOT;
+        $data['tareas'] = $this->Calendarios->gettareas();
+        $data['componente'] = $this->Calendarios->getCompEquipoOT($tipo, $detaOT[0]['id_solicitud']);
+        $data['infoSolicOrigen'] = $this->Calendarios->getInfoTareaProgram($tipo, $detaOT[0]['id_solicitud']);
+        $task = $this->Otrabajos->tareaAsignarPendiente($idOt);
+        $data['task'] = $task;
+        $data['btnVisibilidad'] = $task > 0;
+        $data['reasignaOt'] = ($reasignaOt !== null);
+        $this->load->view('calendar/view_OtEjecutar_modal', $data);
     }
 
     /** true si es aaaa-mm-dd */

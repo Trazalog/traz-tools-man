@@ -206,6 +206,57 @@ class Calendarios extends CI_Model
 		return array('status' => true, 'cuenta' => isset($aux['cuenta']) ? $aux['cuenta'] : 1);
 	}
 
+	/**
+	* La orden de la ventana, solo si es de la empresa (T46: asset mostraba cualquier orden por número)
+	* @return array 0 o 1 fila (con "descrpcionSolicitud", el tipo de orden, que la vista de asset pedía y no traía)
+	*/
+	function getDataOt($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendarios | getDataOt($idOt)");
+		$filas = man_lista(wso2(REST_MAN . '/plan/ot/' . (int) $idOt . '/empresa/' . man_empresa()));
+		return $filas ? $filas : array();
+	}
+
+	/**
+	* Duración, unidad y frecuencia del plan de origen de la orden (preventivo, backlog o predictivo)
+	* @return array 0 o 1 fila (duracionTarea, unidaddescrip, frecuencia, especieFrecuencia)
+	*/
+	function getInfoTareaProgram($numtipo, $idSolicitud){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendarios | getInfoTareaProgram($numtipo, $idSolicitud)");
+		$filas = man_lista($this->consultaPorTipo('plan/ot/origen', $numtipo, $idSolicitud));
+		return $filas ? $filas : array();
+	}
+
+	/** Componente del plan de origen (preventivo o backlog). @return array fila (descCompo, codCompo) o vacío */
+	function getCompEquipoOT($numtipo, $idSolicitud){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendarios | getCompEquipoOT($numtipo, $idSolicitud)");
+		$filas = man_lista($this->consultaPorTipo('plan/ot/componente', $numtipo, $idSolicitud));
+		return $filas ? $filas[0] : array();
+	}
+
+	/** Tareas estándar de la empresa. @return array filas (id_tarea, descripcion) */
+	function gettareas(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Calendarios | gettareas()");
+		$filas = man_lista(wso2(REST_MAN . '/tareas/empresa/' . man_empresa()));
+		$out = array();
+		foreach ($filas ? $filas : array() as $f) {
+			$out[] = array('id_tarea' => $f['id_tarea'], 'descripcion' => $f['descripcion']);
+		}
+		return $out;
+	}
+
+	/** Consulta de la ventana que depende del tipo de origen (los tres tipos van en el mismo pedido, cada uno mira solo su tabla) */
+	private function consultaPorTipo($recurso, $numtipo, $id){
+		$e = man_empresa();
+		$datos = array('tipo' => (string) $numtipo, 'id' => (string) (int) $id, 'id_empresa' => $e,
+			'tipo2' => (string) $numtipo, 'id2' => (string) (int) $id, 'id_empresa2' => $e);
+		if ($recurso == 'plan/ot/origen') {
+			$datos['tipo3'] = (string) $numtipo;
+			$datos['id3'] = (string) (int) $id;
+			$datos['id_empresa3'] = $e;
+		}
+		return man_escribir('POST', $recurso, $datos);
+	}
+
 	/** "aaaa-mm" */
 	private function ym($mes, $year){
 		return sprintf('%04d-%02d', (int) $year, (int) $mes);
