@@ -173,6 +173,22 @@ class Backlogs extends CI_Model
 		return $out;
 	}
 
+	/**
+	 * Deja el backlog Solicitado (S) y con el componente elegido: lo que hace asset al editarlo desde la tarea Editar Backlog.
+	 * @return bool
+	 */
+	function reenviar($id_back, $idcomponenteequipo){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlogs | reenviar($id_back, " . json_encode($idcomponenteequipo) . ")");
+		$componente = ctype_digit((string) $idcomponenteequipo) ? (string) $idcomponenteequipo : '0';
+		$rsp = man_escribir('PUT', 'backlog/reenviar', array(
+			'backId'              => (string) (int) $id_back,
+			'idcomponenteequipo'  => $componente,
+			'idcomponenteequipo2' => $componente,
+			'id_empresa'          => man_empresa(),
+		));
+		return (bool) $rsp['status'];
+	}
+
 	/** Agrega la clave de la cabecera a cada fila de detalle. */
 	private function conClave($filas, $clave){
 		$out = array();

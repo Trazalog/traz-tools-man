@@ -30,6 +30,7 @@ try:
     print('linea', json.dumps(post('bandeja/tarea/linea', base(t)))[:400])
     print('comentar', post('bandeja/tarea/comentar', base(t, contenido='Prueba "comillas" y <b>html</b>\ncon salto \\ barra')))
     c = post('bandeja/tarea/comentarios', base(t)); print('comentarios', json.dumps(c)[:700])
+    print('cerrar-backlog en una tarea que no es Editar Backlog', post('bandeja/tarea/cerrar-backlog', base(t)), [x['name'] for x in get('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % caso)])
     print('comentar otra empresa', post('bandeja/tarea/comentar', base(t, id_empresa='2', contenido='no')))
 finally:
     p.sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)

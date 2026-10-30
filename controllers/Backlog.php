@@ -7,8 +7,8 @@ defined('BASEPATH') OR exit('No direct script access allowed');
  * Portado desde el asset actual (diverge del fork) solo con las acciones que usan las vistas (E9). Las vistas usan
  * además acciones de Preventivo y Predictivo (herramientas, insumos, tareas, unidades, adjuntos). El alta con
  * herramientas e insumos es una operación de toolsMANAPI (ADR-014, regla 3); los adjuntos van a la carpeta de asset
- * (E11). La edición que además cierra una tarea de Bonita (tipo "editNuevo", desde la bandeja) va con la bandeja en
- * MIG-3 (decisión E19).
+ * (E11). La edición que además cierra una tarea de Bonita (tipo "editNuevo", desde la bandeja) toma el backlog de la tarea,
+ * lo deja Solicitado y cierra la tarea (MIG-3, decisión E19).
  */
 class Backlog extends CI_Controller {
 
@@ -74,9 +74,18 @@ class Backlog extends CI_Controller {
 	*/
 	public function editar_backlog(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Backlog | editar_backlog()");
-		if ($this->input->post('tipo') == 'editNuevo') {
-			echo json_encode(['status' => false, 'msj' => 'La edición desde la bandeja todavía no está disponible en este módulo']);
-			return;
+		$editNuevo = $this->input->post('tipo') == 'editNuevo';
+		$idBack = $this->input->post('backid');
+		if ($editNuevo) {
+			// Desde la bandeja: el backlog sale de la tarea (no del número que manda el navegador) y la tarea debe ser "Editar Backlog"
+			$this->load->model('Tareas');
+			$det = $this->Tareas->detalle($this->input->post('idTarBonita'));
+			$info = ($det !== null && $det['tarea']['displayName'] == 'Editar Backlog') ? $this->Tareas->backlogDeTarea($det['id_ss']) : 0;
+			if (!$info) {
+				echo json_encode(['status' => false, 'msj' => 'La tarea no es de la empresa o no es Editar Backlog']);
+				return;
+			}
+			$idBack = $info[0]['backId'];
 		}
 		$datos = array(
 			'id_tarea'       => $this->input->post('tarea'),
@@ -89,7 +98,17 @@ class Backlog extends CI_Controller {
 		);
 		$herramientas = man_detalle($this->input->post('idsherramienta'), $this->input->post('cantHerram'), 'herrId');
 		$insumos      = man_detalle($this->input->post('idsinsumo'), $this->input->post('cantInsum'), 'artId');
-		$r = $this->Backlogs->editar_backlogs($datos, $this->input->post('backid'), $herramientas, $insumos);
+		$r = $this->Backlogs->editar_backlogs($datos, $idBack, $herramientas, $insumos);
+		if ($r['editado'] && $editNuevo) {
+			// Vuelve a quedar Solicitado y con el componente elegido; recién después se cierra la tarea (si Bonita falla, al reintentar se repite igual)
+			if (!$this->Backlogs->reenviar($idBack, $this->input->post('idcomponenteequipo'))) {
+				echo json_encode(['status' => false, 'msj' => 'ASP_0100 | Error en Base de Datos']);
+				return;
+			}
+			$c = $this->Tareas->cerrarEditarBacklog($this->input->post('idTarBonita'));
+			echo json_encode($c['status'] ? ['status' => true, 'msj' => 'OK'] : ['status' => false, 'msj' => 'El backlog se guardó pero no se pudo cerrar la tarea: ' . $c['msj']]);
+			return;
+		}
 		if ($r['editado']) {
 			echo json_encode(['status' => true, 'msj' => 'OK']);
 		} else {

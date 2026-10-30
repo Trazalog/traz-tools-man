@@ -73,3 +73,4 @@ views/tareas/scripts/tarea_std.php
 helpers/man_tarea_helper.php
 views/tareas/view_inf_servicio_modal.php
 views/tareas/view_edicion_inf_servicio_modal.php
+views/backlog/nuevo_edicion_view_.php

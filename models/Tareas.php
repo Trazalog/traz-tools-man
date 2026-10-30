@@ -482,6 +482,19 @@ class Tareas extends CI_Model
         ));
     }
 
+    /** Backlog que originó la solicitud de la tarea "Editar Backlog", con su equipo y componente. @return array|int filas o 0 */
+    public function backlogDeTarea($idSolicitud)
+    {
+        $f = man_lista(wso2(REST_MAN . '/backlog/solicitud/' . (int) $idSolicitud . '/editar/empresa/' . man_empresa()));
+        return $f ? $f : 0;
+    }
+
+    /** Cierra la tarea "Editar Backlog" en Bonita (el backlog ya se guardó). @return array status y msj */
+    public function cerrarEditarBacklog($idTarea)
+    {
+        return $this->accion('tarea/cerrar-backlog', array('id_tarea' => (string) (int) $idTarea));
+    }
+
     /** 'true' o 'false' como texto, como lo reciben las variables de Bonita (en asset llegaba tal cual el texto del navegador). */
     private function logico($valor)
     {

@@ -128,6 +128,14 @@ class Tarea extends CI_Controller {
 			'Presta conformidad' => 'tareas/view_presta_conformidad',
 		);
 		$nombre = $tarea['displayName'];
+		if ($nombre == 'Editar Backlog') {
+			$data['info'] = $this->Tareas->backlogDeTarea($idSs);
+			if (!$data['info']) {
+				echo '<div class="alert alert-danger">No se encontró el backlog de esta tarea.</div>';
+				return;
+			}
+			$vista['Editar Backlog'] = 'backlog/nuevo_edicion_view_';
+		}
 		$this->load->view(isset($vista[$nombre]) ? $vista[$nombre] : 'tareas/view_', $data);
 		$this->load->view('tareas/scripts/tarea_std', array('permission' => $permission));
 	}
