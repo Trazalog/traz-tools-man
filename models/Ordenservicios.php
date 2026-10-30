@@ -69,6 +69,20 @@ class Ordenservicios extends CI_Model
 		return $filas ? $filas : array();
 	}
 
+	/** Usuarios activos de la empresa para elegir los operarios del informe. @return array filas (label, value) */
+	function getOperarios(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getOperarios()");
+		$filas = $this->filas('/informe/operarios/empresa/' . man_empresa());
+		return $filas ? $filas : array();
+	}
+
+	/** Usuarios de las subtareas de la OT, propuestos como recursos humanos del informe. @return array filas (label, value) */
+	function getRRHHOrdenTrabajo($idOT){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getRRHHOrdenTrabajo(" . json_encode($idOT) . ")");
+		$filas = $this->filas('/informe/ot/' . (int) $idOT . '/rrhh/empresa/' . man_empresa());
+		return $filas ? $filas : array();
+	}
+
 	/** Evidencias (imágenes y archivos) del último informe de la OT: getIdOrdenPorOT + getEvidenciasOrden de asset. @return array */
 	function getEvidenciasPorOT($id_ot){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | getEvidenciasPorOT(" . json_encode($id_ot) . ")");

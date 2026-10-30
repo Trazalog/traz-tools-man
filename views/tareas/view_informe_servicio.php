@@ -179,7 +179,7 @@
     WaitingOpen();
     $('#modalInforme').modal('show');
     $('#modalInformeServicios').empty();   
-		$("#modalInformeServicios").load("<?php echo base_url(MAN); ?>Ordenservicio/cargarOrden/"+id_sol+"/"+id_eq+"/"+id_solicitud+"/"+idTarBonita+"/");
+		$("#modalInformeServicios").load("<?php echo base_url(MAN); ?>Ordenservicio/cargarOrden/"+id_sol+"/"+id_eq+"/"+id_solicitud+"/"+idTarBonita+"/?permission=<?php echo rawurlencode($permission); ?>");
 	 	 
 	  WaitingClose();
   }

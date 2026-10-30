@@ -423,6 +423,65 @@ class Tareas extends CI_Model
         return $f ? $f : array();
     }
 
+    /**
+     * Guarda el informe de servicio de la OT de la tarea y cierra la tarea "Confecciona informe servicio" (toolsMANAPI, ADR-014 regla 3).
+     * La OT, su equipo y la solicitud salen del caso de la tarea; el navegador solo aporta lo que el usuario cargó. Si ya había un
+     * informe (la verificación lo devolvió) se reemplaza completo. Sin herramientas ni insumos (pañol y almacenes no se migran).
+     * @param array $d fecha_inicio, fecha_fin, horometro_inicio, horometro_fin
+     * @param array $tareas tareas realizadas (texto), $operarios ids de usuario, $evidencias filas con valor_base64 y nombre
+     * @return array status y msj
+     */
+    public function guardarInforme($idTarea, $d, $tareas, $operarios, $evidencias)
+    {
+        $det = $this->detalle($idTarea);
+        if ($det === null) {
+            return array('status' => false, 'msj' => 'La tarea no es de la empresa');
+        }
+        $inicio = strtotime(isset($d['fecha_inicio']) ? $d['fecha_inicio'] : '');
+        $fin = strtotime(isset($d['fecha_fin']) ? $d['fecha_fin'] : '');
+        if (!$inicio || !$fin) {
+            return array('status' => false, 'msj' => 'Faltan las fechas de inicio y fin');
+        }
+        $numero = function ($v) {
+            return is_numeric($v) ? (string) (float) $v : '0';
+        };
+        $ss = ctype_digit((string) $det['id_ss']) ? $det['id_ss'] : (ctype_digit((string) $det['sore_id']) ? $det['sore_id'] : '0');
+        $lista = function ($filas, $campo) {
+            $out = array();
+            foreach (is_array($filas) ? $filas : array() as $f) {
+                $v = is_array($f) ? reset($f) : $f;
+                if ($v !== null && $v !== '') {
+                    $out[] = array($campo => (string) $v);
+                }
+            }
+            return $out;
+        };
+        $ops = array();
+        foreach (is_array($operarios) ? $operarios : array() as $o) {
+            $id = is_array($o) ? end($o) : $o;
+            if (ctype_digit((string) $id)) {
+                $ops[] = array('usrId' => (string) $id);
+            }
+        }
+        $evs = array();
+        foreach (is_array($evidencias) ? $evidencias : array() as $e) {
+            if (!empty($e['valor_base64'])) {
+                $evs[] = array('valor_base64' => (string) $e['valor_base64'], 'nombre' => isset($e['nombre']) ? (string) $e['nombre'] : '');
+            }
+        }
+        return $this->accion('tarea/informe', array(
+            'id_tarea'               => (string) (int) $idTarea,
+            'id_solicitudreparacion' => (string) $ss,
+            'fecha_inicio'           => date('Y-m-d H:i:s', $inicio),
+            'fecha_fin'              => date('Y-m-d H:i:s', $fin),
+            'horometro_inicio'       => $numero(isset($d['horometro_inicio']) ? $d['horometro_inicio'] : ''),
+            'horometro_fin'          => $numero(isset($d['horometro_fin']) ? $d['horometro_fin'] : ''),
+            'tareas'                 => $lista($tareas, 'tarea'),
+            'operarios'              => $ops,
+            'evidencias'             => $evs,
+        ));
+    }
+
     /** 'true' o 'false' como texto, como lo reciben las variables de Bonita (en asset llegaba tal cual el texto del navegador). */
     private function logico($valor)
     {

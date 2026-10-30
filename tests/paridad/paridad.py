@@ -1409,14 +1409,38 @@ def paridad_bandeja_detalle(asset, man, emp_asset):
                          [x for x in v['texto'] if re.search(r'A PHP Error|A Database Error|Fatal error|Warning:|Notice:|Undefined (variable|index)', x)])
                 comparar('detalle · %s · tarea y OT en los campos ocultos' % t['name'], True,
                          ('value="%s"' % t['id']) in pagina and ('value="%s"' % o) in pagina)
+            if t['name'] == 'Verifica Informe de Servicio':
+                edicion = man.get(MAN + 'Ordenservicio/cargarOrden/0/0/0/%s/?permission=Add-Edit-Del' % t['id'])
+                comparar('detalle · informe · con informe cargado se abre la edición con sus datos', True,
+                         'Prueba de informe' in edicion and 'Herramientas' not in edicion and 'Insumos' not in edicion
+                         and not re.search(r'A PHP Error|A Database Error|Fatal error|Warning:|Notice:|Undefined (variable|index)', re.sub(r'<script.*?</script>', '', edicion, flags=re.S)))
             if t['name'] == 'Confecciona informe servicio':
-                informe_prueba(o, eq, emp_asset, 100)
+                # Se carga el informe por MAN (ventana, guardado y cierre de la tarea) como lo haría el usuario
+                ventana = man.get(MAN + 'Ordenservicio/cargarOrden/0/0/0/%s/?permission=Add-Edit-Del' % t['id'])
+                vv = texto_vista(ventana)
+                comparar('detalle · informe · la ventana de carga muestra la OT y las pestañas sin herramientas ni insumos', True,
+                         any('Informe de Servicios' in x for x in vv['texto']) and ('value="%s"' % o) in ventana
+                         and 'Herramientas' not in ventana and 'Insumos' not in ventana and 'Evidencias' in ventana)
+                comparar('detalle · informe · la ventana de carga sin errores de PHP', [],
+                         [x for x in vv['texto'] if re.search(r'A PHP Error|A Database Error|Fatal error|Warning:|Notice:|Undefined (variable|index)', x)])
+                r = man.post(MAN + 'Ordenservicio/setOrdenServ', {
+                    'datosInfoServicio[idTarBonita]': t['id'], 'datosInfoServicio[fecha_inicio]': '2026-10-29 08:00:00',
+                    'datosInfoServicio[fecha_fin]': '2026-10-29 10:30:00', 'datosInfoServicio[horometro_inicio]': '100',
+                    'datosInfoServicio[horometro_fin]': '120.5', 'tarea[0][0]': 'Prueba de informe', 'operario[0][0]': 'Operario', 'operario[0][1]': '213',
+                    'func': 'guardar'})
+                comparar('detalle · informe · se guarda y cierra la tarea', True, jload(r).get('status') is True if isinstance(jload(r), dict) else False)
+                comparar('detalle · informe · queda en la base', ['Prueba de informe', '213'],
+                         [sql("SELECT d.id_tarea FROM deta_ordenservicio d JOIN orden_servicio s ON s.id_orden=d.id_ordenservicio WHERE s.id_ot=%s" % o)[0][0],
+                          sql("SELECT a.usrId FROM asignausuario a JOIN orden_servicio s ON s.id_orden=a.id_orden WHERE s.id_ot=%s" % o)[0][0]])
+                continue
             if t['name'] == 'Presta conformidad':
                 break
             bonita_post('/API/bpm/userTask/%s/execution' % t['id'], {})
         comparar('detalle · tareas recorridas (al menos 4)', True, len(vistos) >= 4)
     finally:
         if caso:
+            for tabla, col in (('orden_servicio_adjuntos', 'id_orden'), ('deta_ordenservicio', 'id_ordenservicio'), ('asignausuario', 'id_orden')):
+                sql("DELETE FROM %s WHERE %s IN (SELECT id_orden FROM orden_servicio WHERE id_ot=%s)" % (tabla, col, o))
             sql("DELETE FROM orden_servicio WHERE id_ot=%s" % o)
             sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)
             sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)

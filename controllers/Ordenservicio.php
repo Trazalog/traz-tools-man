@@ -4,9 +4,10 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 /**
  * Informes de servicio — MIG-ASSET-2.
  *
- * Portado desde el asset actual (diverge del fork) solo con las acciones que usan la pantalla de informes y la ventana de
- * ver informe (E9). Cargar, editar y guardar el informe (cargarOrden, editarInforme, setOrdenServ) y los vales de pañol
- * se usan desde la bandeja de Bonita y van con ella (MIG-3). La verificación va por toolsMANAPI y la plantilla BPM (A5).
+ * Portado desde el asset actual (diverge del fork) con las acciones de la pantalla de informes, la ventana de ver informe (E9)
+ * y, desde la bandeja de Bonita (MIG-3), cargar, editar y guardar el informe (cargarOrden, editarInforme, setOrdenServ). La OT, el
+ * equipo y la solicitud salen de la tarea de Bonita, no de la dirección. Los vales de pañol, los insumos y las herramientas del informe
+ * no se migran (almacenes y pañol). La verificación va por toolsMANAPI y la plantilla BPM (A5).
  */
 class Ordenservicio extends CI_Controller {
 
@@ -14,6 +15,7 @@ class Ordenservicio extends CI_Controller {
 		parent::__construct();
 		$this->load->model('Ordenservicios');
 		$this->load->model('Otrabajos');
+		$this->load->model('Tareas');
 		$this->load->helper('man');
 	}
 
@@ -53,6 +55,107 @@ class Ordenservicio extends CI_Controller {
 		$data['rrhh'] = $this->Ordenservicios->getOperariosOrden($id_ot);
 		$data['evidencias'] = $this->Ordenservicios->getEvidenciasPorOT($id_ot);
 		$this->load->view('tareas/view_presta_presta_conf_modal', $data);
+	}
+
+	/**
+	* Ventana para cargar el informe de servicio de la tarea; si la OT ya tiene uno (la verificación lo devolvió), abre el de edición
+	* @param int $idTarBonita id de la tarea "Confecciona informe servicio" (los otros datos de la dirección los trae asset por compatibilidad)
+	*/
+	public function cargarOrden($id_ot = null, $id_eq = null, $id_solicitud = null, $idTarBonita = null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | cargarOrden($idTarBonita)");
+		$data = $this->datosTarea($idTarBonita);
+		if ($data === null) {
+			return;
+		}
+		$this->load->view($data['tiene_informe'] ? 'tareas/view_edicion_inf_servicio_modal' : 'tareas/view_inf_servicio_modal', $data);
+	}
+
+	/** Ventana para editar el informe de servicio de la tarea. */
+	public function editarInforme($id_ot = null, $id_eq = null, $id_solicitud = null, $idTarBonita = null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | editarInforme($idTarBonita)");
+		$data = $this->datosTarea($idTarBonita);
+		if ($data !== null) {
+			$this->load->view('tareas/view_edicion_inf_servicio_modal', $data);
+		}
+	}
+
+	/**
+	* Datos de la OT y el equipo de la tarea de Bonita (solo si es de la empresa) para las ventanas del informe
+	* @return array|null datos para la vista; null (y mensaje en pantalla) si la tarea no es de la empresa
+	*/
+	private function datosTarea($idTarBonita){
+		$det = $this->Tareas->detalle($idTarBonita);
+		if ($det === null || !ctype_digit((string) $det['id_ot'])) {
+			echo '<div class="alert alert-danger">No se pudo abrir el informe: la tarea no existe o no es de tu empresa.</div>';
+			return null;
+		}
+		$idOt = (int) $det['id_ot'];
+		$cab = $this->Tareas->cabeceraOt($idOt);
+		$idEq = $cab ? $cab['id_equipo'] : 0;
+		$infoOt = $this->Ordenservicios->getorden($idOt);
+		$ot = $infoOt ? $infoOt[0] : array('id_tarea' => null, 'descripcion' => '', 'tareadescrip' => '', 'responsable' => '', 'usrId' => '');
+		$ss = ctype_digit((string) $det['id_ss']) ? $det['id_ss'] : (ctype_digit((string) $det['sore_id']) ? $det['sore_id'] : 0);
+		return array(
+			'permission'           => preg_replace('/[^A-Za-z-]/', '', (string) $this->input->get('permission')),
+			'tiene_informe'        => $cab && $cab['tiene_informe'] > 0,
+			'id_ot'                => $idOt,
+			'id_eq'                => $idEq,
+			// si la tarea es opcional (sin tarea estándar) el motivo es la descripción de la OT
+			'causa'                => (($ot['id_tarea'] < 0) || ($ot['id_tarea'] == null)) ? $ot['descripcion'] : $ot['tareadescrip'],
+			'id_solicitudServicio' => $ss,
+			'id_responsable'       => $ot['descripcion'],
+			'nom_responsable'      => $ot['responsable'],
+			'idresponsable'        => $ot['usrId'],
+			'idTarBonita'          => (int) $idTarBonita,
+			'equipos'              => $this->Ordenservicios->getEquipos(array('id_equipo' => $idEq)),
+			'lecturas'             => $this->Ordenservicios->getLecturasOrden($idOt),
+			'tareas'               => $this->Ordenservicios->getTareasOrden($idOt),
+			'rrhh'                 => $this->Ordenservicios->getOperariosOrden($idOt),
+		);
+	}
+
+	/** Datos del equipo del informe (autocompletado de la ventana) */
+	public function getEquipo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | getEquipo()");
+		echo json_encode($this->Ordenservicios->getEquipos($this->input->post()));
+	}
+
+	/** Usuarios de la empresa para elegir operarios */
+	public function getOperario(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | getOperario()");
+		echo json_encode($this->Ordenservicios->getOperarios());
+	}
+
+	/** Usuarios de las subtareas de la OT, propuestos como recursos humanos */
+	public function getRRHHOrdenTrabajo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | getRRHHOrdenTrabajo()");
+		echo json_encode(array('recursos' => $this->Ordenservicios->getRRHHOrdenTrabajo($this->input->post('idOT'))));
+	}
+
+	/**
+	* Guarda el informe de servicio y cierra la tarea. Al editar, las evidencias ya cargadas se conservan (asset las perdía: la pantalla
+	* de edición no las muestra y el guardado borraba todo).
+	* @return json status, msj y code
+	*/
+	public function setOrdenServ(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | setOrdenServ()");
+		$d = $this->input->post('datosInfoServicio');
+		$d = is_array($d) ? $d : array();
+		$idTarBonita = isset($d['idTarBonita']) ? $d['idTarBonita'] : 0;
+		$evidencias = array();
+		if ($this->input->post('func') == 'editar') {
+			$det = $this->Tareas->detalle($idTarBonita);
+			foreach ($det !== null && ctype_digit((string) $det['id_ot']) ? $this->Ordenservicios->getEvidenciasPorOT($det['id_ot']) : array() as $e) {
+				$evidencias[] = array('valor_base64' => $e['valor_base64'], 'nombre' => $e['nombre']);
+			}
+		} elseif (!empty($d['evidencias']) && is_array($d['evidencias'])) {
+			foreach ($d['evidencias'] as $e) {
+				$evidencias[] = array('valor_base64' => isset($e['valor_base64']) ? $e['valor_base64'] : '',
+					'nombre' => isset($e['nombre_archivo']) ? $e['nombre_archivo'] : '');
+			}
+		}
+		$r = $this->Tareas->guardarInforme($idTarBonita, $d, $this->input->post('tarea'), $this->input->post('operario'), $evidencias);
+		echo json_encode(array('status' => $r['status'], 'msj' => $r['status'] ? 'OK' : $r['msj'], 'code' => $r['status'] ? 'Exito' : $r['msj']));
 	}
 
 	/**

@@ -71,3 +71,5 @@ views/tareas/view_verifica_informe.php
 views/tareas/componentes/comentarios.php
 views/tareas/scripts/tarea_std.php
 helpers/man_tarea_helper.php
+views/tareas/view_inf_servicio_modal.php
+views/tareas/view_edicion_inf_servicio_modal.php
