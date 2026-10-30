@@ -59,3 +59,15 @@ views/lectura/lect.php
 controllers/Tarea.php
 models/Tareas.php
 views/tareas/list.php
+views/tareas/view_.php
+views/tareas/view_analisisSServicios.php
+views/tareas/view_asignar.php
+views/tareas/view_cambio_estado.php
+views/tareas/view_ejecutarOT.php
+views/tareas/view_informe_servicio.php
+views/tareas/view_planificar.php
+views/tareas/view_presta_conformidad.php
+views/tareas/view_verifica_informe.php
+views/tareas/componentes/comentarios.php
+views/tareas/scripts/tarea_std.php
+helpers/man_tarea_helper.php

@@ -214,6 +214,16 @@ class Tareas extends CI_Model
      */
     private function accion($ruta, $datos)
     {
+        $aux = $this->llamar($ruta, $datos);
+        return $aux['status'] ? array('status' => true, 'msj' => 'OK') : array('status' => false, 'msj' => $aux['msj']);
+    }
+
+    /**
+     * Llama a un recurso de /tools/man/bandeja con el usuario, la empresa y la sesión de Bonita; guarda la sesión que devuelve.
+     * @return array la respuesta del API con status (true|false) y msj si falla
+     */
+    private function llamar($ruta, $datos)
+    {
         $rsp = $this->rest->callAPI('POST', HOST . '/tools/man/bandeja/' . $ruta, array_merge(array(
             'usrNick'    => (string) userNick(),
             'id_empresa' => man_empresa(),
@@ -221,13 +231,13 @@ class Tareas extends CI_Model
         ), $datos));
         $aux = json_decode($rsp['data'], true);
         if (!$rsp['status'] || empty($aux['status'])) {
-            log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Tareas | accion(' . $ruta . ') >> ' . json_encode($rsp['data']));
+            log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Tareas | llamar(' . $ruta . ') >> ' . json_encode($rsp['data']));
             return array('status' => false, 'msj' => (is_array($aux) && !empty($aux['msj'])) ? $aux['msj'] : 'Error en la operación');
         }
         if (!empty($aux['session'])) {
             $this->session->set_userdata('bpm_token', $aux['session']);
         }
-        return array('status' => true, 'msj' => 'OK');
+        return $aux;
     }
 
     /** El usuario toma la tarea (queda asignada a él en Bonita). */
@@ -298,6 +308,119 @@ class Tareas extends CI_Model
         $filas = man_lista(wso2(REST_MAN . '/ot/' . (int) $idOt . '/inicio/empresa/' . man_empresa()));
         $fecha = $filas ? $filas[0]['fecha_inicio'] : '';
         return !empty($fecha) && strpos($fecha, '0000-00-00') !== 0;
+    }
+
+    /**
+     * Tarea de Bonita y datos de su caso en asset (OT, origen y solicitud), solo si el caso es de la empresa.
+     * @return array|null tarea (nombre, estado, asignada a, fechas), caso, id_ot, tipo, id_solicitud, id_ss y sore_id; null si no se pudo
+     */
+    public function detalle($idTarea)
+    {
+        $r = $this->llamar('tarea/detalle', array('id_tarea' => (string) (int) $idTarea));
+        return $r['status'] ? $r : null;
+    }
+
+    /** Línea de tiempo del caso: actividades pendientes (listAct) y terminadas (listArch), de la más nueva a la más vieja. */
+    public function lineaTiempo($idTarea)
+    {
+        $r = $this->llamar('tarea/linea', array('id_tarea' => (string) (int) $idTarea));
+        if (!$r['status']) {
+            return array('listAct' => array(), 'listArch' => array());
+        }
+        return array('listAct' => $this->actividades($r['activas'], 'last_update_date'),
+            'listArch' => $this->actividades($r['archivadas'], 'last_update_date'));
+    }
+
+    /** Saca las actividades de varias instancias y ordena de la más nueva a la más vieja por el campo dado. */
+    private function actividades($filas, $campo)
+    {
+        $out = array();
+        foreach (is_array($filas) ? $filas : array() as $f) {
+            if (isset($f['type']) && $f['type'] == 'MULTI_INSTANCE_ACTIVITY') {
+                continue;
+            }
+            $out[] = $f;
+        }
+        usort($out, function ($a, $b) use ($campo) {
+            return strtotime(isset($b[$campo]) ? $b[$campo] : '') - strtotime(isset($a[$campo]) ? $a[$campo] : '');
+        });
+        return $out;
+    }
+
+    /** Comentarios del caso de la tarea, del más nuevo al más viejo. @return array filas de Bonita (con el usuario) */
+    public function comentarios($idTarea)
+    {
+        $r = $this->llamar('tarea/comentarios', array('id_tarea' => (string) (int) $idTarea));
+        return ($r['status'] && is_array($r['comentarios'])) ? $r['comentarios'] : array();
+    }
+
+    /** Agrega un comentario al caso de la tarea, a nombre del usuario. @return array status y msj */
+    public function comentar($idTarea, $contenido)
+    {
+        return $this->accion('tarea/comentar', array('id_tarea' => (string) (int) $idTarea, 'contenido' => (string) $contenido));
+    }
+
+    /** Datos del equipo para la cabecera de la tarea. @return array|null */
+    public function cabeceraEquipo($idEquipo)
+    {
+        $f = man_lista(wso2(REST_MAN . '/tarea/cabecera/equipo/' . (int) $idEquipo . '/empresa/' . man_empresa()));
+        return $f ? $f[0] : null;
+    }
+
+    /** Datos de la solicitud de servicio para la cabecera de la tarea, con sus adjuntos. @return array|null */
+    public function cabeceraSolicitud($idSolicitud)
+    {
+        $f = man_lista(wso2(REST_MAN . '/tarea/cabecera/solicitud/' . (int) $idSolicitud . '/empresa/' . man_empresa()));
+        if (!$f) {
+            return null;
+        }
+        $this->load->model('Sservicios');
+        $adj = $this->Sservicios->getAdjuntosSolServicio($idSolicitud);
+        $f[0]['adjuntos'] = $adj ? $adj : array();
+        return $f[0];
+    }
+
+    /** Datos de la OT para la cabecera de la tarea, con el motivo del último rechazo y si ya tiene informe. @return array|null */
+    public function cabeceraOt($idOt)
+    {
+        $f = man_lista(wso2(REST_MAN . '/tarea/cabecera/ot/' . (int) $idOt . '/empresa/' . man_empresa()));
+        return $f ? $f[0] : null;
+    }
+
+    /** Subtareas (tareas estándar) de la OT con su formulario asociado. @return array filas */
+    public function getSubtareas($idOt)
+    {
+        $f = man_lista(wso2(REST_MAN . '/tarea/subtareas/ot/' . (int) $idOt . '/empresa/' . man_empresa()));
+        return $f ? $f : array();
+    }
+
+    /**
+     * Cambia el estado de una subtarea de la OT de la tarea. Asset cambiaba cualquier subtarea por su número; acá tiene que ser de la
+     * OT del caso de la tarea, que a su vez tiene que ser de la empresa.
+     * @return bool
+     */
+    public function cambiarEstadoSubtask($idTarea, $idListarea, $estado)
+    {
+        $det = $this->detalle($idTarea);
+        if ($det === null || !ctype_digit((string) $det['id_ot']) || !in_array($estado, array('T', 'C'), true)) {
+            return false;
+        }
+        $propias = array();
+        foreach ($this->getSubtareas($det['id_ot']) as $s) {
+            $propias[] = (string) $s['id_listarea'];
+        }
+        if (!in_array((string) (int) $idListarea, $propias, true)) {
+            return false;
+        }
+        $this->load->model('Otrabajos');
+        return $this->Otrabajos->cambiarTarea((int) $idListarea, 'estado', $estado);
+    }
+
+    /** Adjunto del preventivo del que viene la OT (procedimiento de la tarea). @return array filas con prev_adjunto */
+    public function procedimiento($idOt)
+    {
+        $f = man_lista(wso2(REST_MAN . '/ot/' . (int) $idOt . '/procedimiento/empresa/' . man_empresa()));
+        return $f ? $f : array();
     }
 
     /** 'true' o 'false' como texto, como lo reciben las variables de Bonita (en asset llegaba tal cual el texto del navegador). */

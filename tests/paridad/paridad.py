@@ -1365,6 +1365,66 @@ def paridad_bandeja(asset, man, emp_asset):
             print('     | bandeja · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
 
 
+def paridad_bandeja_detalle(asset, man, emp_asset):
+    """Pantalla de cada tarea de una OT real (solo con MAN_PARIDAD_BONITA=1): se crea una OT con el alta de MAN y se la hace avanzar por Bonita.
+    En cada tarea se comprueba que la pantalla de MAN muestre lo que corresponde (tarea, OT, equipo, comentarios, línea de tiempo) y no tenga
+    errores de PHP. No se compara con asset: su pantalla de tarea entra a Bonita con la contraseña del usuario y con el usuario de prueba falla
+    (muestra la primera OT sin caso), así que no hay una pantalla de asset equivalente para ese caso."""
+    if os.environ.get('MAN_PARIDAD_BONITA') != '1':
+        print('     | bandeja · detalle de tareas: no se corre (MAN_PARIDAD_BONITA=1 para correrlo)')
+        return
+    bonita, bonita_put, bonita_post = bonita_admin()
+    nick = os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test')
+    uid = bonita('/API/identity/user?p=0&c=1&f=userName%%3D%s' % urllib.parse.quote(nick))[0]['id']
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    codigo = sql("SELECT codigo FROM equipos WHERE id_equipo=%s" % eq)[0][0]
+    antes = int(sql("SELECT IFNULL(MAX(id_orden), 0) FROM orden_trabajo")[0][0])
+    o = caso = None
+    try:
+        man.post_archivo(MAN + 'Otrabajo/guardar_agregar', {'equipo': eq, 'id_tarea': '', 'tareacustom': PREFIJO + ' detalle',
+                                                            'fechaInicio': '01/11/2026', 'fechaEntrega': '05/11/2026', 'suci': '', 'prov': ''},
+                         'inputPDF', '', b'')
+        fila = sql("SELECT id_orden, case_id FROM orden_trabajo WHERE id_orden>%d AND descripcion='%s detalle'" % (antes, PREFIJO))
+        if not fila or fila[0][1] in ('NULL', '0', ''):
+            comparar('detalle · OT con caso', 'una OT con caso', fila)
+            return
+        o, caso = fila[0]
+        vistos = set()
+        for paso in range(8):
+            ts = bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % caso)
+            if not ts:
+                break
+            t = ts[0]
+            bonita_put('/API/bpm/humanTask/%s' % t['id'], {'assigned_id': uid})
+            if t['name'] not in vistos:
+                vistos.add(t['name'])
+                pagina = man.get(MAN + 'Tarea/detaTarea/Add-Edit-Del/%s' % t['id'])
+                if os.environ.get('MAN_PARIDAD_VOLCAR'):
+                    open(os.path.join(os.environ['MAN_PARIDAD_VOLCAR'], 'detalle_%s.html' % t['name'].replace(' ', '_')), 'w', encoding='utf-8').write(pagina)
+                v = texto_vista(pagina)
+                esperado = [t['name'], 'Orden de Trabajo N°: %s / Mas Detalles' % o, 'Equipo: %s' % codigo, 'Línea de Tiempo', 'Comentarios']
+                comparar('detalle · %s · muestra tarea, OT, equipo, comentarios y línea de tiempo' % t['name'],
+                         [True] * len(esperado), [any(e in x for x in v['texto']) for e in esperado])
+                comparar('detalle · %s · sin errores de PHP' % t['name'], [],
+                         [x for x in v['texto'] if re.search(r'A PHP Error|A Database Error|Fatal error|Warning:|Notice:|Undefined (variable|index)', x)])
+                comparar('detalle · %s · tarea y OT en los campos ocultos' % t['name'], True,
+                         ('value="%s"' % t['id']) in pagina and ('value="%s"' % o) in pagina)
+            if t['name'] == 'Confecciona informe servicio':
+                informe_prueba(o, eq, emp_asset, 100)
+            if t['name'] == 'Presta conformidad':
+                break
+            bonita_post('/API/bpm/userTask/%s/execution' % t['id'], {})
+        comparar('detalle · tareas recorridas (al menos 4)', True, len(vistos) >= 4)
+    finally:
+        if caso:
+            sql("DELETE FROM orden_servicio WHERE id_ot=%s" % o)
+            sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)
+            sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)
+            bonita('/API/bpm/case/%s' % caso, 'DELETE')
+            bonita('/API/bpm/archivedCase/%s' % caso, 'DELETE')
+            print('     | detalle · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
@@ -1380,6 +1440,7 @@ PANTALLAS = {
     'informe_bonita': paridad_informe_bonita,
     'lectura': paridad_lectura,
     'bandeja': paridad_bandeja,
+    'bandeja_detalle': paridad_bandeja_detalle,
 }
 
 if __name__ == '__main__':
