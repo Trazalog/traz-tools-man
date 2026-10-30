@@ -86,7 +86,7 @@ class Tarea extends CI_Controller {
 		$idSs = ctype_digit((string) $det['id_ss']) ? (int) $det['id_ss'] : (ctype_digit((string) $det['sore_id']) ? (int) $det['sore_id'] : 0);
 		$ot = $idOt ? $this->Tareas->cabeceraOt($idOt) : null;
 		$solicitud = $idSs ? $this->Tareas->cabeceraSolicitud($idSs) : null;
-		$idEq = $ot ? $ot['id_equipo'] : ($solicitud ? $this->idEquipoDeSolicitud($idSs) : null);
+		$idEq = $ot ? $ot['id_equipo'] : ($solicitud ? $solicitud['id_equipo'] : null);
 		$equipo = ($idEq !== null && $idEq !== '') ? $this->Tareas->cabeceraEquipo($idEq) : null;
 
 		$data['permission'] = $permission;
