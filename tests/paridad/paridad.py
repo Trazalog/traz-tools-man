@@ -1568,10 +1568,149 @@ def paridad_calendario(asset, man, emp_asset):
                 sql("DELETE FROM %s WHERE %s=%s" % (t, pk, ids[k]))
 
 
+# ------------------------------------------------------------------ ABM de catálogo (MIG-ASSET-5a)
+# Cada entrada: controller de asset y de MAN, tabla, pk, columna marca (donde va el texto de prueba), columnas a comparar y los
+# datos que manda cada pantalla. El texto de prueba se agrega a la columna marca. emp = empresa de asset.
+def _cat(ctl_a, ctl_m, tabla, pk, marca, cols, alta, mod, baja, obtener, extra_alta=None, extra_mod=None):
+    return dict(ctl_a=ctl_a, ctl_m=ctl_m, tabla=tabla, pk=pk, marca=marca, cols=cols, alta=alta, mod=mod, baja=baja, obtener=obtener,
+                extra_alta=extra_alta or {}, extra_mod=extra_mod or {})
+
+
+def _std(ctl, nombre, tabla, pk, marca, campos, post_marca=None, lista='%s'):
+    """Controller con Guardar_x, Modificar_x, Eliminar_x y Obtener_x que reciben campos por nombre de columna."""
+    pm = post_marca or marca
+    return _cat(ctl, ctl, tabla, pk, marca, [marca] + [c for c in campos if c != marca] + ['id_empresa', 'estado'],
+                ('Guardar_' + nombre, pm), ('Modificar_' + nombre, pm), 'Eliminar_' + nombre, 'Obtener_' + nombre,
+                extra_alta=dict((c, 'x') for c in campos if c != marca), extra_mod=dict((c, 'y') for c in campos if c != marca))
+
+
+CATALOGOS = {
+    'grupo': dict(_std('Grupo', 'Grupo', 'grupo', 'id_grupo', 'descripcion', ['descripcion', 'form_id']),
+                  extra_alta={'form_id': '0'}, extra_mod={'formulario': '0'}),
+    'sector': _std('Sector', 'Sector', 'sector', 'id_sector', 'descripcion', ['descripcion']),
+    'contratista': _std('Contratista', 'Contratista', 'contratistas', 'id_contratista', 'nombre',
+                        ['nombre', 'contradireccion', 'contramail', 'contramail1', 'contracelular1', 'contracelular2', 'contratelefono',
+                         'contracontacto']),
+    'altparametro': _std('Altparametro', 'Altparametro', 'parametros', 'paramId', 'paramdescrip', ['paramdescrip', 'min']),
+    'family': _std('Family', 'Family', 'conffamily', 'famId', 'famName', ['famName']),
+    'marca': _std('Marca', 'Marca', 'marcasequipos', 'marcaid', 'marcadescrip', ['marcadescrip']),
+    'cliente': _std('Cliente', 'Cliente', 'admcustomers', 'cliId', 'cliName',
+                    ['cliName', 'cliDni', 'cliAddress', 'cliPhone', 'cliEmail', 'cliRazonSocial']),
+    'criticidad': _std('criticidad', 'criticidad', 'criticidad', 'id_criti', 'descripcion', ['descripcion']),
+    # Tareas estándar: asset lo tiene en Tarea/index2; MAN en su propio controller. visible no se compara (T69)
+    'tarea': dict(_std('Tarea', 'Tarea', 'tareas', 'id_tarea', 'descripcion', ['descripcion']), ctl_m='Tareaestandar', indice_a='index2'),
+}
+
+
+def paridad_catalogo(asset, man, emp_asset, clave):
+    c = CATALOGOS[clave]
+    pa = ASSET + c['ctl_a'] + '/'
+    pm = MAN + c['ctl_m'][0].upper() + c['ctl_m'][1:] + '/'
+    t, pk, marca = c['tabla'], c['pk'], c['marca']
+    cols = ', '.join(c['cols'])
+    fila = "SELECT %s FROM %s WHERE %s=%%s" % (cols, t, pk)
+    nom = clave
+
+    comparar(nom + ' · listado', celdas_tabla(asset.get(pa + c.get('indice_a', 'index') + '/Add-Edit-Del')), celdas_tabla(man.get(pm + 'index/Add-Edit-Del')))
+    propio = sql("SELECT %s FROM %s WHERE estado='AC' AND id_empresa=%d LIMIT 1" % (pk, t, emp_asset))
+    if propio:
+        ra, rm = jload(asset.post(pa + c['obtener'], {pk: propio[0][0]})), jload(man.post(pm + c['obtener'], {pk: propio[0][0]}))
+        if clave == 'cliente':
+            # T65: asset no contesta; MAN devuelve el cliente
+            comparar(nom + ' · obtener (propio): asset no contesta (T65) y MAN devuelve el cliente', (True, True),
+                     (ra == {'_no_json': ''}, isinstance(rm, list) and rm[0].get(pk) == propio[0][0]))
+        else:
+            comparar(nom + ' · obtener (propio)', ra, rm)
+
+    def datos(lado, extra, metodo_post):
+        d = dict(extra)
+        d[metodo_post] = PREFIJO + lado
+        return d
+    ra = jload(asset.post(pa + c['alta'][0], dict(datos(' A', c['extra_alta'], c['alta'][1]), id_empresa=emp_asset, estado='AC')))
+    rm = jload(man.post(pm + c['alta'][0], dict(datos(' M', c['extra_alta'], c['alta'][1]), id_empresa=emp_asset, estado='AC')))
+    if clave != 'cliente':
+        comparar(nom + ' · alta (respuesta)', ra, rm)
+    sel = "SELECT %s, %s FROM %s WHERE %s='%%s' ORDER BY %s DESC LIMIT 1" % (pk, cols, t, marca, pk)
+    fa, fm = sql(sel % (PREFIJO + ' A')), sql(sel % (PREFIJO + ' M'))
+    if not fa or not fm:
+        comparar(nom + ' · alta (fila creada)', bool(fa), bool(fm))
+        sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (t, marca, PREFIJO))
+        return
+    comparar(nom + ' · alta (fila en la base)', [x.replace(' A', ' M') for x in fa[0][1:]], list(fm[0][1:]))
+    ida, idm = fa[0][0], fm[0][0]
+
+    ra = jload(asset.post(pa + c['mod'][0], dict(datos(' A2', c['extra_mod'] or c['extra_alta'], c['mod'][1]), **{pk: ida})))
+    rm = jload(man.post(pm + c['mod'][0], dict(datos(' M2', c['extra_mod'] or c['extra_alta'], c['mod'][1]), **{pk: idm})))
+    if clave != 'cliente':
+        comparar(nom + ' · modificación (respuesta)', ra, rm)
+    ma, mm = sql(fila % ida), sql(fila % idm)
+    comparar(nom + ' · modificación (fila en la base)', [[x.replace(' A2', ' M2') for x in ma[0]]], [list(mm[0])])
+
+    ra = jload(asset.post(pa + c['baja'], {pk: ida}))
+    rm = jload(man.post(pm + c['baja'], {pk: idm}))
+    comparar(nom + ' · baja (respuesta)', ra, rm)
+    ba, bm = sql(fila % ida), sql(fila % idm)
+    comparar(nom + ' · baja (fila en la base)', [[x.replace(' A2', ' M2') for x in ba[0]]], [list(bm[0])])
+
+    ajeno = sql("SELECT %s FROM %s WHERE id_empresa<>%d AND estado='AC' LIMIT 1" % (pk, t, emp_asset))
+    if ajeno:
+        comparar(nom + ' · aislamiento: MAN no ve registros de otra empresa', None, jload(man.post(pm + c['obtener'], {pk: ajeno[0][0]})))
+        antes = sql(fila % ajeno[0][0])
+        man.post(pm + c['mod'][0], dict(datos(' HACK', c['extra_mod'] or c['extra_alta'], c['mod'][1]), **{pk: ajeno[0][0]}))
+        man.post(pm + c['baja'], {pk: ajeno[0][0]})
+        comparar(nom + ' · aislamiento: MAN no modifica ni da de baja registros de otra empresa', antes, sql(fila % ajeno[0][0]))
+    sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (t, marca, PREFIJO))
+
+
+def paridad_suc_sis(asset, man, emp_asset, clave):
+    """Sucursales y Sistemas: alta (agregarX), edición (editarX con 'parametros') y baja (bajaX), como en asset."""
+    if clave == 'sucursal':
+        ctl, tabla, pk, marca = 'Sucursal', 'sucursal', 'id_sucursal', 'descripc'
+        alta = lambda m: {'descripcion': m, 'direccion': 'd', 'zona': 'z', 'telefono': 't'}
+        mod = lambda m, i: {'idsucursal': i, 'parametros[descripc]': m, 'parametros[dire]': 'd2', 'parametros[zonas]': 'z2', 'parametros[telefono]': 't2'}
+        baja = lambda i: {'idSucursal': i}
+        cols, m_alta, m_mod, m_baja = 'descripc, dire, zonas, telefono, id_empresa, estado', 'agregarSucursal', 'editarSucursal', 'bajaSucursal'
+    else:
+        ctl, tabla, pk, marca = 'SistemaABM', 'sistema', 'sistemaid', 'descripcion'
+        alta = lambda m: {'descripcion': m}
+        mod = lambda m, i: {'idsistema': i, 'parametros[descripcion]': m}
+        baja = lambda i: {'idsistema': i}
+        cols, m_alta, m_mod, m_baja = 'descripcion, id_empresa, estado', 'agregarSistema', 'editarSistema', 'bajaSistema'
+    pa, pm = ASSET + ctl + '/', MAN + ctl + '/'
+    comparar(clave + ' · listado', celdas_tabla(asset.get(pa + 'index/Add-Edit-Del')), celdas_tabla(man.get(pm + 'index/Add-Edit-Del')))
+    asset.post(pa + m_alta, alta(PREFIJO + ' A'))
+    man.post(pm + m_alta, alta(PREFIJO + ' M'))
+    sel = "SELECT %s, %s FROM %s WHERE %s='%%s' ORDER BY %s DESC LIMIT 1" % (pk, cols, tabla, marca, pk)
+    fa, fm = sql(sel % (PREFIJO + ' A')), sql(sel % (PREFIJO + ' M'))
+    if not fa or not fm:
+        comparar(clave + ' · alta (fila creada)', bool(fa), bool(fm))
+        sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (tabla, marca, PREFIJO))
+        return
+    comparar(clave + ' · alta (fila en la base)', [x.replace(' A', ' M') for x in fa[0][1:]], list(fm[0][1:]))
+    ida, idm = fa[0][0], fm[0][0]
+    asset.post(pa + m_mod, mod(PREFIJO + ' A2', ida))
+    man.post(pm + m_mod, mod(PREFIJO + ' M2', idm))
+    fila = "SELECT %s FROM %s WHERE %s=%%s" % (cols, tabla, pk)
+    comparar(clave + ' · edición (fila en la base)', [[x.replace(' A2', ' M2') for x in sql(fila % ida)[0]]], [sql(fila % idm)[0]])
+    ra, rm = jload(asset.post(pa + m_baja, baja(ida))), jload(man.post(pm + m_baja, baja(idm)))
+    comparar(clave + ' · baja (isOk)', ra.get('isOk'), rm.get('isOk'))
+    comparar(clave + ' · baja (fila en la base)', [[x.replace(' A2', ' M2') for x in sql(fila % ida)[0]]], [sql(fila % idm)[0]])
+    ajeno = sql("SELECT %s FROM %s WHERE id_empresa<>%d AND estado='AC' LIMIT 1" % (pk, tabla, emp_asset))
+    if ajeno:
+        antes = sql(fila % ajeno[0][0])
+        man.post(pm + m_mod, mod(PREFIJO + ' HACK', ajeno[0][0]))
+        man.post(pm + m_baja, baja(ajeno[0][0]))
+        comparar(clave + ' · aislamiento: MAN no modifica ni da de baja registros de otra empresa', antes, sql(fila % ajeno[0][0]))
+    sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (tabla, marca, PREFIJO))
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
+    'sucursal': lambda a, m, e: paridad_suc_sis(a, m, e, 'sucursal'),
+    'sistema': lambda a, m, e: paridad_suc_sis(a, m, e, 'sistema'),
     'parametro': paridad_parametro,
+    **{k: (lambda a, m, e, k=k: paridad_catalogo(a, m, e, k)) for k in CATALOGOS},
     'componente': paridad_componente,
     'equipo': paridad_equipo,
     'planes': paridad_planes,
