@@ -175,8 +175,8 @@ class Calendarios extends CI_Model
 
 	/**
 	* Programa órdenes de trabajo desde un preventivo, predictivo, backlog o solicitud urgente (toolsMANAPI POST /tools/man/plan/programar).
-	* La API lee el origen de la empresa, crea las órdenes (una o una serie), lanza o cierra lo que corresponde en Bonita y deja los
-	* estados; si algo falla, deshace lo creado. Asset hacía todo esto desde PHP y dejaba restos si fallaba (T3, T51).
+	* La API lee el origen de la empresa, crea las órdenes (una o una serie), lanza o cierra lo que corresponde en Bonita (de los
+	* preventivos y predictivos, solo las órdenes dentro del margen de días: el resto se lanza después, MIG-8) y deja los estados; si algo falla, deshace lo creado. Asset hacía todo esto desde PHP y dejaba restos si fallaba (T3, T51).
 	* @param int $tipo 2 solicitud urgente, 3 preventivo, 4 backlog, 5 predictivo
 	* @param string $fechaProgr dd-mm-aaaa
 	* @param string $horaProgr hh:mm
@@ -203,6 +203,8 @@ class Calendarios extends CI_Model
 			'evento'     => (string) (int) $evento,
 			'cant_meses' => (string) $cantMeses,
 			'horas'      => ((int) $horas === 1) ? '1' : '0',
+			// MIG-8: solo se lanzan ahora las órdenes que caen dentro del margen; las demás quedan programadas sin lanzar
+			'dias_margen' => (string) man_dias_lanzamiento(empresa()),
 		));
 		$aux = json_decode($rsp['data'], true);
 		if (!$rsp['status'] || empty($aux['status'])) {

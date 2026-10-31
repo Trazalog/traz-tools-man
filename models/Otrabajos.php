@@ -371,6 +371,15 @@ class Otrabajos extends CI_Model
 		return (bool) $rsp['status'];
 	}
 
+	/**
+	* Lanza el caso de Bonita de una OT preventiva o predictiva programada sin lanzar (toolsMANAPI POST /tools/man/plan/lanzar, MIG-8).
+	* @return array status, id_orden, case_id o msj
+	*/
+	function lanzarPlan($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | lanzarPlan($idOt)");
+		return $this->planApi('plan/lanzar', array('id_orden' => (string) (int) $idOt, 'emprId' => (string) empresa()));
+	}
+
 	/** Pedido a un recurso de toolsMANAPI del Plan con los datos de la sesión. @return array respuesta ({status, msj, ...}) */
 	private function planApi($recurso, $datos){
 		$datos['id_empresa'] = man_empresa();

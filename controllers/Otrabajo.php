@@ -289,6 +289,15 @@ class Otrabajo extends CI_Controller {
 		echo json_encode($this->Otrabajos->reasignarPlan($this->input->post('ot'), $this->input->post('responsable')));
 	}
 
+	/**
+	* Lanza el caso de Bonita de una orden programada sin lanzar (botón "Lanzar" de la lista de órdenes, MIG-8)
+	* @return json status, id_orden y case_id, o status false y msj
+	*/
+	public function lanzar(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | lanzar()");
+		echo json_encode($this->Otrabajos->lanzarPlan($this->input->post('ot')));
+	}
+
 	/** Guarda el responsable elegido al cerrar la ventana de la orden (POST idOt, id_usuario_a). @return json bool */
 	public function updateResponsable(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | updateResponsable()");

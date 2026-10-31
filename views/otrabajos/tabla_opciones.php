@@ -23,6 +23,11 @@
                
     }
 
+    if (strpos($permission,'Asignar') !== false || strpos($permission,'Edit') !== false) {
+        // Solo se ve en las órdenes programadas sin lanzar (las marca el atributo data-sinlanzar de la fila, MIG-8)
+        echo '<li role="presentation" class="man-lanzar"><a onclick="lanzarOT(this)" style="color:white;" role="menuitem" tabindex="-1" href="#"><i class="fa fa-rocket text-white" style="color:white; cursor: pointer;"></i>Lanzar</a></li>';
+    }
+
     if (strpos($permission,'Edit') !== false) {
 
 			// if( ($a['estado'] == 'S') || ($a['estado'] == 'PL') ){

@@ -116,3 +116,4 @@ views/criticidad/view_.php
 views/sucursales/list.php
 views/sistemas/list.php
 views/tareaestandar/list.php
+controllers/Lanzamiento.php

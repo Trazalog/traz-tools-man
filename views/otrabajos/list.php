@@ -125,6 +125,7 @@ ul.dropdown-menu {
             <!-- <br> -->
             <hr>
                 <div class="box-body">
+                    <style>.ot-row:not([data-sinlanzar="1"]) .man-lanzar { display: none; }</style>
                     <table id="otrabajo" class="table table-striped table-hover">
                         <thead>
                             <tr>
@@ -159,7 +160,8 @@ ul.dropdown-menu {
                         $id_equipo   = $a['id_equipo'];
                         $causa       = $a['descripcion'];
                         $idsolicitud = $a['id_solicitud'];
-                        echo '<tr id="'.$id.'" class="'.$id.' ot-row" data-id_equipo="'.$id_equipo.'" data-causa="'.$causa.'" data-idsolicitud="'.$idsolicitud.'">';
+                        $sinLanzar = ($a['estado'] == 'PL' && in_array($a['tipo'], array('3', '5')) && (string) $a['case_id'] === '0') ? '1' : '0';
+                        echo '<tr id="'.$id.'" class="'.$id.' ot-row" data-id_equipo="'.$id_equipo.'" data-causa="'.$causa.'" data-idsolicitud="'.$idsolicitud.'" data-sinlanzar="'.$sinLanzar.'">';
                         echo '<td>';
                         $ordenservicioId = $a['ordenservicioId'];                       
                         echo $opciones;
@@ -193,7 +195,7 @@ ul.dropdown-menu {
                            }
                            if($a['estado'] == 'PL'){                           
                              //echo '<small class="label pull-left bg-orange">Planificada</small>';
-                             echo bolita('Planificada', 'yellow');
+                             echo $sinLanzar === '1' ? bolita('Sin lanzar', 'gray', 'Programada: el caso de Bonita se lanza cerca de la fecha') : bolita('Planificada', 'yellow');
                            }
                            if($a['estado'] == 'AS'){
                              // echo '<small class="label pull-left bg-yellow">Asignada</small>';
@@ -1563,6 +1565,22 @@ function nota_pedido(o) {
 
 // ASIGNAR OT (RESPONSBLE) 
 // carga vista modal ejecutar ot y asignar responsable
+// LANZAR: abre el caso de Bonita de una orden programada sin lanzar (MIG-8) y recarga la lista
+function lanzarOT(o) {
+    var id_orden = $(o).closest('tr').attr('id');
+    WaitingOpen('Lanzando la orden');
+    $.ajax({ type: 'POST', url: '<?php echo base_url(MAN); ?>Otrabajo/lanzar', data: { ot: id_orden }, dataType: 'json' })
+        .done(function (r) {
+            WaitingClose();
+            if (r && r.status) {
+                hecho('Perfecto!', 'La orden ' + id_orden + ' se lanzó: ya está en la bandeja de tareas');
+                linkTo('<?php echo base_url(MAN); ?>Otrabajo/index/<?php echo $permission; ?>');
+            } else {
+                error('Atención', (r && r.msj) ? r.msj : 'No se pudo lanzar la orden');
+            }
+        })
+        .fail(function () { WaitingClose(); error('Atención', 'No se pudo lanzar la orden'); });
+}
 function verEjecutarOT(o) {
     var id_orden = $(o).closest('tr').attr('id');
     WaitingOpen();
@@ -4709,7 +4727,7 @@ function filtrar() {
 
                 for(var i=0; i<resp.length; i++){
                     var movimCabecera = resp[i];
-                    var row = `<tr id="${resp[i].id_orden}" class="${resp[i].id_orden} ot-row" data-id_equipo="${resp[i].id_equipo}" data-causa="${resp[i].descripcion}" data-idsolicitud="${resp[i].id_solicitud}">`;
+                    var row = `<tr id="${resp[i].id_orden}" class="${resp[i].id_orden} ot-row" data-id_equipo="${resp[i].id_equipo}" data-causa="${resp[i].descripcion}" data-idsolicitud="${resp[i].id_solicitud}" data-sinlanzar="${(resp[i].estado == 'PL' && (resp[i].tipo == '3' || resp[i].tipo == '5') && String(resp[i].case_id) === '0') ? 1 : 0}">`;
                         row += `<td>`;
                         row += `<?php echo $opciones; ?>`;
                         if(resp[i].ordenservicioId !=  null){
@@ -4804,7 +4822,7 @@ function filtrar() {
                                             span_estado = estado('Solicitada', 'red');
                                             break;
                                         case 'PL':
-                                            span_estado = estado('Planificada', 'yellow');
+                                            span_estado = (resp[i].tipo == '3' || resp[i].tipo == '5') && String(resp[i].case_id) === '0' ? estado('Sin lanzar', 'gray') : estado('Planificada', 'yellow');
                                             break;
                                         case 'AS':
                                             span_estado = estado('Asignada', 'purple');

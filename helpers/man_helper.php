@@ -71,6 +71,46 @@ if (!function_exists('man_lista')) {
     }
 }
 
+if (!function_exists('man_dias_lanzamiento')) {
+    /**
+     * Días de anticipación con que se lanza el caso de Bonita de una OT preventiva o predictiva (MIG-8).
+     *
+     * Se lee de la lista de valores del sistema: core.tablas, tabla "configuraciones", días en valor2. El valor "man_dias_lanzamiento"
+     * vale para todas las empresas y "man_dias_lanzamiento_<id de empresa de tools>" para una sola (pisa al general). La clave de
+     * la fila es tabla + valor, por eso la empresa va en el valor y no en otra columna.
+     * Si no hay fila válida (entero de 0 a 365) se usa MAN_DIAS_LANZAMIENTO de constants.php.
+     *
+     * @param int|string $emprId empresa de tools (core.empresas.empr_id)
+     * @return int
+     */
+    function man_dias_lanzamiento($emprId)
+    {
+        $ci =& get_instance();
+        $rsp = $ci->rest->callAPI('GET', REST_CORE . '/tablas/configuraciones');
+        $aux = $rsp['status'] ? json_decode($rsp['data'], true) : null;
+        $filas = (isset($aux['tablas']['tabla']) && is_array($aux['tablas']['tabla'])) ? $aux['tablas']['tabla'] : array();
+        if ($filas && array_keys($filas) !== range(0, count($filas) - 1)) {
+            $filas = array($filas);
+        }
+        $general = null;
+        $propio = null;
+        foreach ($filas as $f) {
+            if (!isset($f['valor']) || !isset($f['valor2']) || !preg_match('/^\d{1,3}$/', trim($f['valor2'])) || (int) $f['valor2'] > 365) {
+                continue;
+            }
+            if ($f['valor'] === 'man_dias_lanzamiento') {
+                $general = (int) $f['valor2'];
+            } elseif ($f['valor'] === 'man_dias_lanzamiento_' . $emprId) {
+                $propio = (int) $f['valor2'];
+            }
+        }
+        if ($propio !== null) {
+            return $propio;
+        }
+        return $general !== null ? $general : (int) MAN_DIAS_LANZAMIENTO;
+    }
+}
+
 if (!function_exists('man_escribir')) {
     /**
      * Escribe en MANDataService con el envoltorio JSON que exige el DataService
