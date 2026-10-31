@@ -28,6 +28,11 @@
         echo '<li role="presentation" class="man-lanzar"><a onclick="lanzarOT(this)" style="color:white;" role="menuitem" tabindex="-1" href="#"><i class="fa fa-rocket text-white" style="color:white; cursor: pointer;"></i>Lanzar</a></li>';
     }
 
+    if (strpos($permission,'Edit') !== false || strpos($permission,'Del') !== false) {
+        // Igual que Lanzar: solo se ve en las órdenes programadas sin lanzar
+        echo '<li role="presentation" class="man-lanzar"><a onclick="anularOT(this)" style="color:white;" role="menuitem" tabindex="-1" href="#"><i class="fa fa-ban text-white" style="color:white; cursor: pointer;"></i>Anular</a></li>';
+    }
+
     if (strpos($permission,'Edit') !== false) {
 
 			// if( ($a['estado'] == 'S') || ($a['estado'] == 'PL') ){

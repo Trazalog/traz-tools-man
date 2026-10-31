@@ -298,6 +298,15 @@ class Otrabajo extends CI_Controller {
 		echo json_encode($this->Otrabajos->lanzarPlan($this->input->post('ot')));
 	}
 
+	/**
+	* Anula una orden programada sin lanzar (opción "Anular" de la lista de órdenes y del calendario, MIG-8)
+	* @return json status e id_orden, o status false y msj
+	*/
+	public function anular(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | anular()");
+		echo json_encode($this->Otrabajos->anularPlan($this->input->post('ot')));
+	}
+
 	/** Guarda el responsable elegido al cerrar la ventana de la orden (POST idOt, id_usuario_a). @return json bool */
 	public function updateResponsable(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | updateResponsable()");

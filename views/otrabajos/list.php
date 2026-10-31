@@ -1581,6 +1581,23 @@ function lanzarOT(o) {
         })
         .fail(function () { WaitingClose(); error('Atención', 'No se pudo lanzar la orden'); });
 }
+// ANULAR: da de baja una orden programada sin lanzar (MIG-8); no hay caso de Bonita que cerrar
+function anularOT(o) {
+    var id_orden = $(o).closest('tr').attr('id');
+    if (!confirm('¿Anular la orden ' + id_orden + '? Todavía no se lanzó, así que no se abre ningún caso. No se puede deshacer.')) { return; }
+    WaitingOpen('Anulando la orden');
+    $.ajax({ type: 'POST', url: '<?php echo base_url(MAN); ?>Otrabajo/anular', data: { ot: id_orden }, dataType: 'json' })
+        .done(function (r) {
+            WaitingClose();
+            if (r && r.status) {
+                hecho('Perfecto!', 'La orden ' + id_orden + ' se anuló');
+                linkTo('<?php echo base_url(MAN); ?>Otrabajo/index/<?php echo $permission; ?>');
+            } else {
+                error('Atención', (r && r.msj) ? r.msj : 'No se pudo anular la orden');
+            }
+        })
+        .fail(function () { WaitingClose(); error('Atención', 'No se pudo anular la orden'); });
+}
 function verEjecutarOT(o) {
     var id_orden = $(o).closest('tr').attr('id');
     WaitingOpen();

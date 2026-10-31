@@ -380,6 +380,16 @@ class Otrabajos extends CI_Model
 		return $this->planApi('plan/lanzar', array('id_orden' => (string) (int) $idOt, 'emprId' => (string) empresa()));
 	}
 
+	/**
+	* Anula una OT preventiva o predictiva programada sin lanzar (toolsMANAPI POST /tools/man/plan/anular, MIG-8). No abre ningún caso.
+	* @return array status e id_orden, o status false y msj
+	*/
+	function anularPlan($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | anularPlan($idOt)");
+		return $this->planApi('plan/anular', array('id_orden' => (string) (int) $idOt, 'usrId' => (string) man_usuario(),
+			'fecha' => date('Y-m-d H:i:s'), 'motivo' => 'Anulada antes de lanzar'));
+	}
+
 	/** Pedido a un recurso de toolsMANAPI del Plan con los datos de la sesión. @return array respuesta ({status, msj, ...}) */
 	private function planApi($recurso, $datos){
 		$datos['id_empresa'] = man_empresa();

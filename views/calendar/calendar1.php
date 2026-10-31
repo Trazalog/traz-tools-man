@@ -10,6 +10,8 @@
 <style>
     /* Orden sin responsable: borde azul */
     .fc-event.tipo-3-border { border: 2px solid blue; }
+    /* Orden programada que todavía no se lanzó (MIG-8): borde punteado */
+    .fc-event.man-sin-lanzar { border: 2px dashed #555; opacity: .8; }
     .man-cal-modal .col-xs-4 { margin-bottom: 10px; }
     @media print {
         body.imprimiendo-calendario * { visibility: hidden; }
@@ -86,8 +88,10 @@
                 title: f.id_orden + ' | ' + f.codigo + ' | ' + f.descripcion,
                 backgroundColor: COLORES[f.tipo] || '', borderColor: COLORES[f.tipo] || '',
                 classNames: (!f.id_usuario_a || f.id_usuario_a == 0) ? ['tipo-3-border'] : [],
-                extendedProps: {id_orden: f.id_orden, equipo: f.codigo, area: f.area, grupo: f.grupo, sector: f.sector, origen: f.origen}
+                extendedProps: {id_orden: f.id_orden, equipo: f.codigo, area: f.area, grupo: f.grupo, sector: f.sector, origen: f.origen,
+                    sinLanzar: (f.estado == 'PL' && (f.tipo == '3' || f.tipo == '5') && String(f.case_id) === '0')}
             };
+            if (e.extendedProps.sinLanzar) { e.classNames = e.classNames.concat(['man-sin-lanzar']); e.title = '(sin lanzar) ' + e.title; }
             e.codigo = f.codigo; e.area = f.area; e.grupo = f.grupo; e.sector = f.sector; e.origen = f.origen;
             if (pasaFiltro(e)) { out.push(e); }
         });
@@ -129,7 +133,10 @@
                 var d = calendar.getDate();
                 if (mesTablas !== d.getFullYear() + '-' + (d.getMonth() + 1)) { cargarTablas(); }
             },
-            eventClick: function (info) { verDetalleOT(info.event.extendedProps.id_orden); },
+            eventClick: function (info) {
+                // Una orden sin lanzar se puede ver, lanzar o anular desde acá (por si se planificó mal)
+                if (info.event.extendedProps.sinLanzar) { opcionesSinLanzar(info.event.extendedProps.id_orden); } else { verDetalleOT(info.event.extendedProps.id_orden); }
+            },
             eventDrop: function (info) {
                 if (!confirm('Realmente desea hacer este cambio?')) { info.revert(); return; }
                 $.ajax({
@@ -163,6 +170,32 @@
         $('#modalInformeServicios').empty().load(MAN_URL + 'Calendario/verEjecutarOT/' + parseInt(idOrden, 10) + '/', function () { WaitingClose(); });
         $('#modalInforme').modal('show');
     };
+
+    /* ---------- orden programada sin lanzar (MIG-8) ---------- */
+    window.opcionesSinLanzar = function (idOrden) {
+        $('#sl-orden').text(idOrden).data('id', idOrden);
+        $('#modalSinLanzar').modal('show');
+    };
+    function accionSinLanzar(ruta, pregunta, hecha) {
+        var id = $('#sl-orden').data('id');
+        if (pregunta && !confirm(pregunta.replace('%', id))) { return; }
+        WaitingOpen();
+        $.ajax({ url: MAN_URL + 'Otrabajo/' + ruta, type: 'POST', dataType: 'json', data: {ot: id} })
+            .done(function (r) {
+                if (r && r.status) {
+                    $('#modalSinLanzar').modal('hide');
+                    cache = null; calendar.refetchEvents(); cargarTablas();
+                    hecho('Perfecto!', hecha.replace('%', id));
+                } else { error('Atención', (r && r.msj) ? r.msj : 'No se pudo completar la operación'); }
+            })
+            .fail(function () { error('Atención', 'No se pudo completar la operación'); })
+            .always(function () { WaitingClose(); });
+    }
+    $(document).on('click', '#sl-ver', function () { $('#modalSinLanzar').modal('hide'); verDetalleOT($('#sl-orden').data('id')); });
+    $(document).on('click', '#sl-lanzar', function () { accionSinLanzar('lanzar', '', 'La orden % se lanzó: ya está en la bandeja de tareas'); });
+    $(document).on('click', '#sl-anular', function () {
+        accionSinLanzar('anular', '¿Anular la orden %? Todavía no se lanzó, así que no se abre ningún caso. No se puede deshacer.', 'La orden % se anuló');
+    });
 
     /* ---------- imprimir y Excel ---------- */
     $('#btnImprimir').on('click', function () {
@@ -275,6 +308,26 @@
     });
 })();
 </script>
+
+<!--  MODAL ORDEN PROGRAMADA SIN LANZAR (MIG-8)  -->
+<div class="modal fade" id="modalSinLanzar" tabindex="-1" role="dialog">
+    <div class="modal-dialog modal-sm" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title">Orden <span id="sl-orden"></span></h4>
+            </div>
+            <div class="modal-body">
+                <p>Está programada pero todavía no se lanzó: no tiene caso en Bonita. Si la planificaste mal, podés anularla.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-default" id="sl-ver">Ver orden</button>
+                <button type="button" class="btn btn-primary" id="sl-lanzar">Lanzar ahora</button>
+                <button type="button" class="btn btn-danger" id="sl-anular">Anular</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!--  MODAL VER OT Y ASIGNAR  -->
 <div class="modal bs-example-modal-lg" id="modalInforme" tabindex="-1" role="dialog" aria-labelledby="myLargeModalLabel">
