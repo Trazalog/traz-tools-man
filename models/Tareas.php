@@ -20,7 +20,7 @@ class Tareas extends CI_Model
     public function __construct()
     {
         parent::__construct();
-        $this->load->helper('man');
+        $this->load->helper(MAN . 'man');
     }
 
     /**
@@ -262,6 +262,77 @@ class Tareas extends CI_Model
         return $aux;
     }
 
+    /**
+     * Datos y pantalla de trabajo de una tarea de Mantenimiento, para la bandeja de MAN y para la de tools (panel del costado).
+     * No arma los comentarios ni la línea de tiempo (la pantalla de MAN los agrega; la plantilla de tools ya trae los suyos).
+     * @param int $idTarBonita tarea de Bonita
+     * @param string $permission acciones habilitadas
+     * @return array error (mensaje) o data (para la vista), vista (nombre) y tarea (la de Bonita)
+     */
+    public function datosVista($idTarBonita, $permission = '')
+    {
+        $this->load->helper(MAN . 'man_tarea');
+        $det = $this->detalle($idTarBonita);
+        if ($det === null) {
+            return array('error' => 'No se pudo abrir la tarea: no existe o no es de tu empresa.');
+        }
+        $tarea = $det['tarea'];
+        $idOt = ctype_digit((string) $det['id_ot']) ? (int) $det['id_ot'] : 0;
+        // Solicitud de servicio del caso: asset la leía de la variable del caso en Bonita; acá sale de asset (la del caso, o la del backlog)
+        $idSs = ctype_digit((string) $det['id_ss']) ? (int) $det['id_ss'] : (ctype_digit((string) $det['sore_id']) ? (int) $det['sore_id'] : 0);
+        $ot = $idOt ? $this->cabeceraOt($idOt) : null;
+        $solicitud = $idSs ? $this->cabeceraSolicitud($idSs) : null;
+        $idEq = $ot ? $ot['id_equipo'] : ($solicitud ? $solicitud['id_equipo'] : null);
+        $equipo = ($idEq !== null && $idEq !== '') ? $this->cabeceraEquipo($idEq) : null;
+
+        $data['permission'] = $permission;
+        $data['device'] = man_dispositivo();
+        $data['TareaBPM'] = $tarea;
+        $data['idTarBonita'] = (int) $idTarBonita;
+        $data['id_OT'] = $idOt;
+        $data['id_SS'] = $idSs;
+        $data['id_EQ'] = $idEq;
+        $data['cabecera'] = man_cabecera($equipo, $solicitud, $ot);
+        // Informe de servicio ya hecho: muestra el motivo del último rechazo
+        $data['idOServ'] = $ot && $ot['tiene_informe'] > 0;
+        $data['justificacion'] = $ot ? $ot['justificacion'] : '';
+        if ($idOt) {
+            $data['subtareas'] = $this->getSubtareas($idOt);
+        }
+        // Las pantallas de asset leen estos tres datos, que asset nunca cargaba: sin formulario ni tarea estándar
+        $data['idForm'] = 0;
+        $data['infoTarea'] = array('visible' => '');
+        $data['datos'] = array(array('id_listarea' => '', 'id_orden' => $idOt, 'duracion_std' => ''));
+
+        // Las tareas se llaman distinto según la versión del proceso de Bonita: las de asignar tienen el nombre viejo (asset) y el nuevo
+        $vista = array(
+            'Analisis de Solicitud de Servicio' => 'tareas/view_analisisSServicios',
+            'Planificar Solicitud' => 'tareas/view_planificar',
+            'Asignar Responsable OT Urgente ' => 'tareas/view_asignar',
+            'Asignar Responsable OT Urgente' => 'tareas/view_asignar',
+            'Asignar Resonsable OT' => 'tareas/view_asignar',
+            'Asignar Responsable OT' => 'tareas/view_asignar',
+            'Asignar Recursos y Tareas Urgente' => 'tareas/view_asignar',
+            'Asignar Recursos y Tareas' => 'tareas/view_asignar',
+            'Planificar Backlog' => 'tareas/view_planificar',
+            'Ejecutar OT' => 'tareas/view_ejecutarOT',
+            'Esperando cambio estado "a Ejecutar"' => 'tareas/view_cambio_estado',
+            'Esperando cambio estado "a Ejecutar" 2' => 'tareas/view_cambio_estado',
+            'Confecciona informe servicio' => 'tareas/view_informe_servicio',
+            'Verifica Informe de Servicio' => 'tareas/view_verifica_informe',
+            'Presta conformidad' => 'tareas/view_presta_conformidad',
+        );
+        $nombre = $tarea['displayName'];
+        if ($nombre == 'Editar Backlog') {
+            $data['info'] = $this->backlogDeTarea($idSs);
+            if (!$data['info']) {
+                return array('error' => 'No se encontró el backlog de esta tarea.');
+            }
+            $vista['Editar Backlog'] = 'backlog/nuevo_edicion_view_';
+        }
+        return array('data' => $data, 'vista' => isset($vista[$nombre]) ? $vista[$nombre] : 'tareas/view_', 'tarea' => $tarea);
+    }
+
     /** El usuario toma la tarea (queda asignada a él en Bonita). */
     public function tomarTarea($idTarea)
     {
@@ -396,7 +467,7 @@ class Tareas extends CI_Model
         if (!$f) {
             return null;
         }
-        $this->load->model('Sservicios');
+        $this->load->model(MAN . 'Sservicios');
         $adj = $this->Sservicios->getAdjuntosSolServicio($idSolicitud);
         $f[0]['adjuntos'] = $adj ? $adj : array();
         return $f[0];

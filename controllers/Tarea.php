@@ -75,68 +75,21 @@ class Tarea extends CI_Controller {
 			echo '<div class="alert alert-danger">La empresa no está vinculada con Mantenimiento. Contactá al administrador.</div>';
 			return;
 		}
-		$det = $this->Tareas->detalle($idTarBonita);
-		if ($det === null) {
-			echo '<div class="alert alert-danger">No se pudo abrir la tarea: no existe o no es de tu empresa.</div>';
+		$r = $this->Tareas->datosVista($idTarBonita, $permission);
+		if (isset($r['error'])) {
+			echo '<div class="alert alert-danger">' . $r['error'] . '</div>';
 			return;
 		}
-		$tarea = $det['tarea'];
-		$idOt = ctype_digit((string) $det['id_ot']) ? (int) $det['id_ot'] : 0;
-		// Solicitud de servicio del caso: asset la leía de la variable del caso en Bonita; acá sale de asset (la del caso, o la del backlog)
-		$idSs = ctype_digit((string) $det['id_ss']) ? (int) $det['id_ss'] : (ctype_digit((string) $det['sore_id']) ? (int) $det['sore_id'] : 0);
-		$ot = $idOt ? $this->Tareas->cabeceraOt($idOt) : null;
-		$solicitud = $idSs ? $this->Tareas->cabeceraSolicitud($idSs) : null;
-		$idEq = $ot ? $ot['id_equipo'] : ($solicitud ? $solicitud['id_equipo'] : null);
-		$equipo = ($idEq !== null && $idEq !== '') ? $this->Tareas->cabeceraEquipo($idEq) : null;
-
-		$data['permission'] = $permission;
-		$data['device'] = man_dispositivo();
-		$data['TareaBPM'] = $tarea;
-		$data['idTarBonita'] = (int) $idTarBonita;
-		$data['id_OT'] = $idOt;
-		$data['id_SS'] = $idSs;
-		$data['id_EQ'] = $idEq;
-		$data['cabecera'] = man_cabecera($equipo, $solicitud, $ot);
+		$data = $r['data'];
+		$tarea = $r['tarea'];
 		$data['lineaTiempo'] = man_timeline($this->Tareas->lineaTiempo($idTarBonita));
 		$data['comentarios'] = $this->load->view('tareas/componentes/comentarios', array(
 			'case_id' => $tarea['caseId'],
 			'idTarBonita' => (int) $idTarBonita,
 			'comentarios' => $this->Tareas->comentarios($idTarBonita),
 		), true);
-		// Informe de servicio ya hecho: muestra el motivo del último rechazo
-		$data['idOServ'] = $ot && $ot['tiene_informe'] > 0;
-		$data['justificacion'] = $ot ? $ot['justificacion'] : '';
-		if ($idOt) {
-			$data['subtareas'] = $this->Tareas->getSubtareas($idOt);
-		}
-		// Las pantallas de asset leen estos tres datos, que asset nunca cargaba: sin formulario ni tarea estándar
-		$data['idForm'] = 0;
-		$data['infoTarea'] = array('visible' => '');
-		$data['datos'] = array(array('id_listarea' => '', 'id_orden' => $idOt, 'duracion_std' => ''));
-
-		$vista = array(
-			'Analisis de Solicitud de Servicio' => 'tareas/view_analisisSServicios',
-			'Planificar Solicitud' => 'tareas/view_planificar',
-			'Asignar Responsable OT Urgente ' => 'tareas/view_asignar',
-			'Asignar Resonsable OT' => 'tareas/view_asignar',
-			'Planificar Backlog' => 'tareas/view_planificar',
-			'Ejecutar OT' => 'tareas/view_ejecutarOT',
-			'Esperando cambio estado "a Ejecutar"' => 'tareas/view_cambio_estado',
-			'Esperando cambio estado "a Ejecutar" 2' => 'tareas/view_cambio_estado',
-			'Confecciona informe servicio' => 'tareas/view_informe_servicio',
-			'Verifica Informe de Servicio' => 'tareas/view_verifica_informe',
-			'Presta conformidad' => 'tareas/view_presta_conformidad',
-		);
-		$nombre = $tarea['displayName'];
-		if ($nombre == 'Editar Backlog') {
-			$data['info'] = $this->Tareas->backlogDeTarea($idSs);
-			if (!$data['info']) {
-				echo '<div class="alert alert-danger">No se encontró el backlog de esta tarea.</div>';
-				return;
-			}
-			$vista['Editar Backlog'] = 'backlog/nuevo_edicion_view_';
-		}
-		$this->load->view(isset($vista[$nombre]) ? $vista[$nombre] : 'tareas/view_', $data);
+		$vista = $r['vista'];
+		$this->load->view($vista, $data);
 		$this->load->view('tareas/scripts/tarea_std', array('permission' => $permission));
 	}
 

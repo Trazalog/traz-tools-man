@@ -676,7 +676,12 @@
           WaitingClose();
           if(result['status']){
             $('#modalInforme').modal('hide');
-            linkTo("<?php echo base_url(MAN); ?>Tarea/index/<?php echo $permission; ?>");
+            if ($('.man-panel').length) {
+              // En el panel de la bandeja de tools: se cierra el panel y se actualiza la lista
+              cargarVista();
+            } else {
+              linkTo("<?php echo base_url(MAN); ?>Tarea/index/<?php echo $permission; ?>");
+            }
           }else{
             WaitingClose();
             $('#modalInforme').modal('hide');
