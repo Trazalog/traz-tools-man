@@ -16,8 +16,14 @@
 
     // Al terminar bien: se cierra el panel y se actualiza la lista de tareas
     window.cargarVista = function () {
-        if ($.fn.dataTable && $.fn.dataTable.isDataTable('#tareas')) { $('#tareas').DataTable().ajax.reload(null, false); }
-        if (typeof closeView === 'function') { closeView(); }
+        if ($.fn.dataTable && $.fn.dataTable.isDataTable('#tareas') && $('#tareas').DataTable().settings()[0].ajax) {
+            // Bandeja con tabla de servidor (Proceso2): alcanza con recargar los datos
+            $('#tareas').DataTable().ajax.reload(null, false);
+            if (typeof closeView === 'function') { closeView(); }
+        } else {
+            // Bandeja "Mis Tareas" (tabla fija): se vuelve a cargar completa
+            linkTo('<?php echo BPM; ?>Proceso');
+        }
     };
 
     // Llama a una acción de la tarea; si sale bien cierra el panel
