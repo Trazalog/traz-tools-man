@@ -123,3 +123,6 @@ views/kpis/rep_equipos.php
 controllers/Reporte.php
 models/Reportes.php
 views/reportes/rep_informes.php
+controllers/Reporteorden.php
+models/Reporteordenes.php
+views/reporteorden/rep_ordenes.php
