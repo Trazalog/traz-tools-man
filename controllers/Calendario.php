@@ -149,6 +149,10 @@ class Calendario extends CI_Controller
         $data['task'] = $task;
         $data['btnVisibilidad'] = $task > 0;
         $data['reasignaOt'] = ($reasignaOt !== null);
+        // E65 (REQ-ASSET-ALM de asset): pedido de materiales en el almacén de tools y herramientas de la OT
+        $data['pedido'] = $this->Otrabajos->pedidoDeOT($idOt);
+        $data['insumosOt'] = $this->Otrabajos->getOTInsumos($idOt);
+        $data['herramientasOt'] = $this->Otrabajos->getOTHerramientas($idOt);
         $this->load->view('calendar/view_OtEjecutar_modal', $data);
     }
 

@@ -277,10 +277,37 @@ class Otrabajo extends CI_Controller {
 	* POST ot, responsable, tareastd, tareaOpcional, latitud, longitud. La tarea de Bonita, el tipo y el origen salen de la orden.
 	* @return json status y msj si falla
 	*/
+	/**
+	* Asigna la OT (responsable y tarea). Antes guarda la lista de herramientas de la pestaña Herramientas y, si la asignación sale bien y la
+	* pestaña Pedido Materiales tiene artículos, crea y lanza el pedido al almacén de tools (E65; asset lo lanzaba al asignar).
+	* POST ot, responsable, tareastd, tareaOpcional, latitud, longitud, herramientas (json), pedido (json: arti_id, cantidad)
+	* @return json status, msj si falla; pedido (status, pema_id o msj) si se pidió
+	*/
 	public function EjecutarOT(){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | EjecutarOT()");
-		echo json_encode($this->Otrabajos->asignarPlan($this->input->post('ot'), $this->input->post('responsable'), $this->input->post('tareastd'),
-			$this->input->post('tareaOpcional'), $this->input->post('latitud'), $this->input->post('longitud')));
+		$ot = (int) $this->input->post('ot');
+		$herramientas = json_decode((string) $this->input->post('herramientas'), true);
+		if (is_array($herramientas) && !$this->Otrabajos->guardarHerramientasPlan($ot, $herramientas)) {
+			echo json_encode(array('status' => false, 'msj' => 'No se pudieron guardar las herramientas de la orden'));
+			return;
+		}
+		$rsp = $this->Otrabajos->asignarPlan($ot, $this->input->post('responsable'), $this->input->post('tareastd'),
+			$this->input->post('tareaOpcional'), $this->input->post('latitud'), $this->input->post('longitud'));
+		$items = json_decode((string) $this->input->post('pedido'), true);
+		if (!empty($rsp['status']) && is_array($items) && !empty($items)) {
+			$rsp['pedido'] = $this->Otrabajos->crearPedidoPlan($ot, $items);
+		}
+		echo json_encode($rsp);
+	}
+
+	/**
+	* Envía el pedido de materiales de una OT que todavía no tiene (por ejemplo, si al asignar falló el envío). POST ot, pedido (json).
+	* @return json status, pema_id o msj
+	*/
+	public function enviarPedido(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajo | enviarPedido()");
+		$items = json_decode((string) $this->input->post('pedido'), true);
+		echo json_encode($this->Otrabajos->crearPedidoPlan((int) $this->input->post('ot'), is_array($items) ? $items : array()));
 	}
 
 	/** Cambia el responsable de "Ejecutar OT" (POST ot, responsable). @return json status y msj si falla */

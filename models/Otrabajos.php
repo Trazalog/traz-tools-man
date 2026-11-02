@@ -349,6 +349,76 @@ class Otrabajos extends CI_Model
 		));
 	}
 
+	/**
+	* Pedido de materiales de la OT en el almacén de tools (E65): el primero de la OT, con sus líneas, o null si no tiene.
+	* @return array|null pema_id, estado, fecha, case_id y detalle (barcode, descripcion, cantidad, resto)
+	*/
+	function pedidoDeOT($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | pedidoDeOT($idOt)");
+		$pedidos = tools_pedidos_ot($idOt);
+		if (empty($pedidos)) {
+			return null;
+		}
+		$p = $pedidos[0];
+		$p['detalle'] = tools_pedido_detalle($p['pema_id']);
+		return $p;
+	}
+
+	/**
+	* Crea y lanza el pedido de materiales de la OT (toolsMANAPI POST /tools/man/plan/ot/pedido, E65): almacén de tools + Bonita + empresa,
+	* con marcha atrás si algo falla. Una OT tiene un solo pedido.
+	* @param array $items lista de array(arti_id, cantidad)
+	* @return array status, pema_id, case_id o msj
+	*/
+	function crearPedidoPlan($idOt, $items){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | crearPedidoPlan($idOt, " . json_encode($items) . ")");
+		$lista = array();
+		foreach ((array) $items as $i) {
+			if (isset($i['arti_id'], $i['cantidad']) && ctype_digit((string) $i['arti_id']) && is_numeric($i['cantidad']) && $i['cantidad'] > 0) {
+				$lista[] = array('arti_id' => (string) (int) $i['arti_id'], 'cantidad' => (string) (0 + $i['cantidad']));
+			}
+		}
+		if (empty($lista)) {
+			return array('status' => false, 'msj' => 'El pedido no tiene artículos');
+		}
+		return $this->planApi('plan/ot/pedido', array(
+			'id_orden' => (string) (int) $idOt,
+			'emprId'   => (string) tools_empr_id(),
+			'usrNick'  => (string) userNick(),
+			'items'    => $lista,
+		));
+	}
+
+	/**
+	* Reemplaza la lista de herramientas de la OT (pestaña Herramientas de Ejecutar OT, E65): del maestro del pañol de tools (herrId) o en texto
+	* libre (herrId 0 y descripcion_libre), como la pantalla de la OT (F3 de asset). Solo la base de MAN.
+	* @param array $lista lista de array(herrId, cantidad, descripcion_libre)
+	* @return bool
+	*/
+	function guardarHerramientasPlan($idOt, $lista){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | guardarHerramientasPlan($idOt, " . json_encode($lista) . ")");
+		$emp = man_empresa();
+		if (!$this->filas('/plan/ot/' . (int) $idOt . '/empresa/' . $emp)) {
+			return false;
+		}
+		$clave = array('id_orden' => (string) (int) $idOt, 'id_empresa' => $emp);
+		$filas = array();
+		foreach ((array) $lista as $h) {
+			$herr  = isset($h['herrId']) ? (int) $h['herrId'] : 0;
+			$libre = isset($h['descripcion_libre']) ? trim((string) $h['descripcion_libre']) : '';
+			if ($herr <= 0 && $libre === '') {
+				continue;
+			}
+			$filas[] = array_merge(array('herrId' => (string) max($herr, 0), 'cantidad' => man_numero(isset($h['cantidad']) ? $h['cantidad'] : 1),
+				'descripcion_libre' => $herr > 0 ? '' : $libre), $clave);
+		}
+		$rsp = requestBox(REST_MAN . '/', array(array('_put_ot_herramientas_borrar' => $clave)));
+		if (!$rsp['status']) {
+			return false;
+		}
+		return man_lote_detalle('ot', 'herramienta', $filas) !== false;
+	}
+
 	/** reasignaOt de asset: cambia el responsable de "Ejecutar OT" (toolsMANAPI POST /tools/man/plan/reasignar). @return array status y msj */
 	function reasignarPlan($idOt, $responsable){
 		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | reasignarPlan($idOt, $responsable)");
