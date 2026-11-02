@@ -53,11 +53,15 @@ if (!function_exists('man_cabecera')) {
             return '<div class="col-xs-12 col-sm-' . $col . '"><div class="form-group"><label style="margin-top: 7px;">' . $titulo
                 . ' </label><input type="text" class="form-control" value="' . man_esc($valor) . '" disabled/></div></div>';
         };
-        $caja = function ($titulo, $cuerpo, $clase = '') {
-            // Cabecera plegable gris oscuro (el tono del menú lateral: el gris claro de box-default no se distingue del fondo); se abre y se cierra con un clic en la barra, sin botón (+)
-            return '<div class="box box-default collapsed-box box-solid ' . $clase . '"><div class="box-header with-border" style="cursor: pointer; background-color: #3c4a50; color: #fff;" onclick="collapse(this)">'
-                . '<h3 class="box-title" style="color: #fff;">' . $titulo . ' / Mas Detalles</h3></div>'
-                . '<div class="box-body">' . $cuerpo . '</div></div>';
+        // Mismo acordeón de Bootstrap que usa almacenes para "Proceso N° pedido" (infoproceso_helper): panel-default, título en un enlace, cerrado de entrada
+        $n = 0;
+        $caja = function ($titulo, $cuerpo, $clase = '') use (&$n) {
+            $id = 'manCabecera' . (++$n) . '_' . mt_rand(1000, 9999);
+            return '<div class="panel-group ' . $clase . '" role="tablist" aria-multiselectable="true" style="margin-bottom: 7px !important;">'
+                . '<div class="panel panel-default"><div class="panel-heading" role="tab"><h4 class="panel-title">'
+                . '<a class="collapsed" role="button" data-toggle="collapse" href="#' . $id . '" aria-expanded="false" aria-controls="' . $id . '">'
+                . $titulo . ' / Mas Detalles</a></h4></div>'
+                . '<div id="' . $id . '" class="panel-collapse collapse" role="tabpanel"><div class="panel-body">' . $cuerpo . '</div></div></div></div>';
         };
         $estadoEquipo = array('AC' => 'Activo', 'IN' => 'Inactivo', 'AL' => 'Alta');
         $estadoOt = array('S' => 'Solicitada', 'PL' => 'Planificada', 'AS' => 'Asignada', 'C' => 'Curso', 'T' => 'Terminada',
