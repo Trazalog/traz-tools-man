@@ -183,6 +183,57 @@ class Ordenservicio extends CI_Controller {
 	}
 
 	/**
+	* Herramientas de la OT (del plan o cargadas en la OT; con texto libre), para la sección de materiales de la tarea (E65)
+	*/
+	public function getHerramientasOT(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | getHerramientasOT()");
+		echo json_encode($this->Otrabajos->getOTHerramientas($this->input->post('id_ot')));
+	}
+
+	/**
+	* Busca vales del pañol de tools para asociar a la OT (F5 de asset): el supervisor, sin DNI; el mantenedor, por DNI (def. 2 y 3).
+	* POST rol, dni, desde, hasta (aaaa-mm-dd; por defecto los últimos 3 meses)
+	*/
+	public function buscarVales(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | buscarVales()");
+		$this->load->helper('man_tools');
+		$rol = strtoupper((string) $this->input->post('rol'));
+		$desde = (string) $this->input->post('desde');
+		$hasta = (string) $this->input->post('hasta');
+		$desde = preg_match('/^\d{4}-\d{2}-\d{2}$/', $desde) ? $desde : date('Y-m-d', strtotime('-3 months'));
+		$hasta = preg_match('/^\d{4}-\d{2}-\d{2}$/', $hasta) ? $hasta : date('Y-m-d');
+		if ($rol === 'SUPERVISOR') {
+			echo json_encode(array('ok' => true, 'vales' => tools_vales($desde, $hasta)));
+			return;
+		}
+		$dni = trim((string) $this->input->post('dni'));
+		if ($dni === '') {
+			echo json_encode(array('ok' => false, 'msg' => 'Sin DNI cargado no se pueden asociar herramientas.', 'vales' => array()));
+			return;
+		}
+		echo json_encode(array('ok' => true, 'vales' => tools_vales_por_dni($dni, $desde, $hasta)));
+	}
+
+	/** Asocia un vale a la OT (POST id_ot, sapa_id, origen) */
+	public function asociarVale(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | asociarVale()");
+		echo json_encode($this->Ordenservicios->asociarVale($this->input->post('id_ot'), $this->input->post('sapa_id'), strtoupper((string) $this->input->post('origen'))));
+	}
+
+	/** Quita un vale de la OT (POST id_ot, sapa_id, rol; permisos controlados en el modelo) */
+	public function quitarVale(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | quitarVale()");
+		echo json_encode($this->Ordenservicios->quitarVale($this->input->post('id_ot'), $this->input->post('sapa_id'), strtoupper((string) $this->input->post('rol'))));
+	}
+
+	/** Marca o desmarca "se usó" una herramienta (POST id_ot, herr_id, sapa_id, activa) */
+	public function tildarHerramienta(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicio | tildarHerramienta()");
+		echo json_encode($this->Ordenservicios->setActivaHerramienta($this->input->post('id_ot'), $this->input->post('herr_id'),
+			$this->input->post('sapa_id'), $this->input->post('activa') == 1));
+	}
+
+	/**
 	* Verifica los informes seleccionados: cierra la tarea "Verifica Informe de Servicio" de cada caso en Bonita, si el
 	* usuario la tiene, registra la lectura de cierre y deja el informe y la OT cerrados. Si el caso no tiene esa tarea para
 	* el usuario, igual cierra los estados (como asset).

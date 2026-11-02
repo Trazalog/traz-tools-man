@@ -201,6 +201,81 @@ class Ordenservicios extends CI_Model
 		return array('status' => false, 'msj' => isset($aux['msj']) ? $aux['msj'] : ASP_104);
 	}
 
+	/**
+	* Asocia un vale del pañol de tools (y sus herramientas) a la OT como herramientas usadas (F5 de asset). Un vale va a una sola OT.
+	* @param string $origen PANOLERO | MANTENEDOR | SUPERVISOR (quién lo asocia)
+	* @return array ok, msg, herr (cantidad de herramientas)
+	*/
+	function asociarVale($otId, $sapa, $origen){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | asociarVale($otId, $sapa, $origen)");
+		$otId = (int) $otId;
+		$sapa = (int) $sapa;
+		$origen = in_array($origen, array('PANOLERO', 'MANTENEDOR', 'SUPERVISOR'), true) ? $origen : 'MANTENEDOR';
+		$emp = man_empresa();
+		if (!$otId || !$sapa || !$this->filas('/plan/ot/' . $otId . '/empresa/' . $emp)) {
+			return array('ok' => false, 'msg' => 'Faltan datos (OT o vale).', 'herr' => 0);
+		}
+		$ya = $this->filas('/ot/vale/' . $sapa . '/empresa/' . $emp);
+		if ($ya) {
+			return array('ok' => false, 'msg' => ((int) $ya[0]['otId'] === $otId) ? 'Este vale ya está asociado a esta OT.' : 'El vale ya está asociado a la OT ' . $ya[0]['otId'] . '.', 'herr' => 0);
+		}
+		$herrs = tools_herramientas_de_vale($sapa);
+		if (!$herrs) {
+			return array('ok' => false, 'msg' => 'El vale no tiene herramientas.', 'herr' => 0);
+		}
+		$rsp = man_escribir('POST', 'ot/vale', array('otId' => (string) $otId, 'sapa_id' => (string) $sapa, 'origen' => $origen,
+			'usrId' => (string) man_usuario(), 'id_empresa' => $emp));
+		if (!$rsp['status']) {
+			return array('ok' => false, 'msg' => 'No se pudo asociar el vale.', 'herr' => 0);
+		}
+		$filas = array();
+		foreach ($herrs as $h) {
+			$filas[(int) $h['herr_id']] = array('otId' => (string) $otId, 'herrId' => (string) (int) $h['herr_id'], 'sapa_id' => (string) $sapa, 'id_empresa' => $emp);
+		}
+		if (man_lote_detalle('ot', 'herramienta-usada', $filas) === false) {
+			// Sin herramientas el vale no sirve: se deshace
+			$this->borrarVale($otId, $sapa);
+			return array('ok' => false, 'msg' => 'No se pudo asociar el vale.', 'herr' => 0);
+		}
+		return array('ok' => true, 'msg' => 'Vale asociado.', 'herr' => count($filas));
+	}
+
+	/**
+	* Quita un vale asociado y sus herramientas usadas. El mantenedor solo quita lo que asoció él; el supervisor también los del pañolero (def. 8 de asset).
+	* @param string $rolActor MANTENEDOR | SUPERVISOR
+	* @return array ok y msg
+	*/
+	function quitarVale($otId, $sapa, $rolActor){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | quitarVale($otId, $sapa, $rolActor)");
+		$otId = (int) $otId;
+		$sapa = (int) $sapa;
+		$vale = $this->filas('/ot/vale/' . $sapa . '/empresa/' . man_empresa());
+		if (!$otId || !$sapa || !$vale || (int) $vale[0]['otId'] !== $otId) {
+			return array('ok' => false, 'msg' => 'El vale no está asociado a esta OT.');
+		}
+		$permitido = array('MANTENEDOR' => array('MANTENEDOR'), 'SUPERVISOR' => array('SUPERVISOR', 'PANOLERO'));
+		$rolActor = isset($permitido[$rolActor]) ? $rolActor : 'MANTENEDOR';
+		if (!in_array($vale[0]['origen'], $permitido[$rolActor], true)) {
+			return array('ok' => false, 'msg' => 'No tiene permiso para quitar este vale (' . $vale[0]['origen'] . ').');
+		}
+		return $this->borrarVale($otId, $sapa) ? array('ok' => true, 'msg' => 'Vale quitado.') : array('ok' => false, 'msg' => 'No se pudo quitar el vale.');
+	}
+
+	/** Marca o desmarca "se usó" una herramienta de un vale de la OT (def. 6 de asset). @return array ok */
+	function setActivaHerramienta($otId, $herrId, $sapa, $activa){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Ordenservicios | setActivaHerramienta($otId, $herrId, $sapa, $activa)");
+		$rsp = man_escribir('PUT', 'ot/herramienta-usada/activa', array('activa' => $activa ? '1' : '0', 'otId' => (string) (int) $otId,
+			'herrId' => (string) (int) $herrId, 'sapa_id' => (string) (int) $sapa, 'id_empresa' => man_empresa()));
+		return array('ok' => (bool) $rsp['status']);
+	}
+
+	/** Borra el vale de la OT y sus herramientas usadas, en una sola transacción. @return bool */
+	private function borrarVale($otId, $sapa){
+		$clave = array('otId' => (string) (int) $otId, 'sapa_id' => (string) (int) $sapa, 'id_empresa' => man_empresa());
+		$rsp = requestBox(REST_MAN . '/', array(array('_put_ot_vale_herramientas_borrar' => $clave), array('_put_ot_vale_borrar' => $clave)));
+		return (bool) $rsp['status'];
+	}
+
 	/** Filas de MANDataService, o false si no hay. */
 	private function filas($recurso){
 		$filas = man_lista(wso2(REST_MAN . $recurso));

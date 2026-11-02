@@ -484,3 +484,63 @@ if (!function_exists('tools_dias_entre')) {
         return $dias < 0 ? 0 : $dias;
     }
 }
+
+if (!function_exists('tools_normaliza_salidas')) {
+    /** Desempaqueta {salidas:{salida:[...] | {...}}} a una lista (el DSS devuelve un objeto suelto si hay uno solo). @return array */
+    function tools_normaliza_salidas($resp)
+    {
+        if (!isset($resp['salidas']['salida'])) {
+            return array();
+        }
+        $s = $resp['salidas']['salida'];
+        return isset($s['sapa_id']) ? array($s) : $s;
+    }
+}
+
+if (!function_exists('tools_vales_por_dni')) {
+    /** Vales de salida del pañol de tools de un DNI entre dos fechas (aaaa-mm-dd), para el mantenedor (F5 de asset). @return array */
+    function tools_vales_por_dni($dni, $desde, $hasta)
+    {
+        $ci =& get_instance();
+        $dni = trim((string) $dni);
+        $empr = tools_empr_id();
+        if ($dni === '' || $empr === null) {
+            return array();
+        }
+        $aux = $ci->rest->callAPI('GET', REST_PAN . '/salidas/dni/' . rawurlencode($dni) . '/empresa/' . $empr . '/desde/' . $desde . '/hasta/' . $hasta);
+        return tools_normaliza_salidas(json_decode($aux['data'], true));
+    }
+}
+
+if (!function_exists('tools_vales')) {
+    /** Vales de salida del pañol de tools entre dos fechas, sin filtro de DNI (supervisor, F5 de asset). @return array */
+    function tools_vales($desde, $hasta)
+    {
+        $ci =& get_instance();
+        $empr = tools_empr_id();
+        if ($empr === null) {
+            return array();
+        }
+        $aux = $ci->rest->callAPI('GET', REST_PAN . '/salidas/empresa/' . $empr . '/desde/' . $desde . '/hasta/' . $hasta);
+        return tools_normaliza_salidas(json_decode($aux['data'], true));
+    }
+}
+
+if (!function_exists('tools_herramientas_de_vale')) {
+    /** Herramientas de un vale del pañol de tools: lista de herr_id, codigo, descripcion. @return array */
+    function tools_herramientas_de_vale($sapa)
+    {
+        $ci =& get_instance();
+        if (!$sapa) {
+            return array();
+        }
+        $aux = $ci->rest->callAPI('GET', REST_PAN . '/panol/salida/' . (int) $sapa . '/herramientas');
+        $resp = json_decode($aux['data'], true);
+        if (!isset($resp['herramientas']['herramienta'])) {
+            return array();
+        }
+        $h = $resp['herramientas']['herramienta'];
+        return isset($h['herr_id']) ? array($h) : $h;
+    }
+}
+

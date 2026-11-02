@@ -19,6 +19,7 @@
 									<ul class="nav nav-tabs" role="tablist">
 										<li role="presentation" class="active"><a href="#home" aria-controls="home"
 												role="tab" data-toggle="tab">Tareas</a></li>
+										<li role="presentation"><a href="#matTab" aria-controls="matTab" role="tab" data-toggle="tab">Herramientas e Insumos</a></li>
 										<li role="presentation"><a href="#profile" aria-controls="profile" role="tab"
 												data-toggle="tab">Comentarios</a></li>
 										<li
@@ -31,6 +32,10 @@
 
 									<!-- Tab panes -->
 									<div class="tab-content">
+										<!-- E65: herramientas, pedido de materiales, entregas y herramientas usadas (solo lectura) -->
+										<div role="tabpanel" class="tab-pane" id="matTab">
+											<?php $this->load->view(MAN . 'ot/materiales', array('idOt' => $id_OT, 'rolVales' => '')); ?>
+										</div>
 
 										<div role="tabpanel" class="tab-pane active" id="home">
 											<!-- <h4 class="panel-heading">Tarea</h4> -->

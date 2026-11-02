@@ -1,7 +1,8 @@
 <?php
 /**
  * Tarea "Ejecutar OT" de la Bandeja (MIG-ASSET-3). Portada de asset sin lo que no se migra:
- *  - el pedido de materiales (nota_pedido, de almacenes);
+ *  - la lista de pedidos de almacenes de asset (nota_pedido): en su lugar, la pestaña "Herramientas e Insumos" (E65) muestra herramientas,
+ *    pedido al almacén de tools, entregas y herramientas usadas;
  *  - los formularios de las subtareas (tablas frm_* de asset, que no existen en assetv2) y su validación;
  *  - el modo sin conexión (service worker), que guardaba el estado en el navegador.
  * Variables: permission, device, TareaBPM, idTarBonita, id_OT, cabecera, lineaTiempo, comentarios, subtareas.
@@ -27,12 +28,17 @@
                                 <div class="form-group">
                                     <ul class="nav nav-tabs" role="tablist">
                                         <li role="presentation" class="active"><a href="#home" aria-controls="home" role="tab" data-toggle="tab">Tareas</a></li>
+                                        <li role="presentation"><a href="#matTab" aria-controls="matTab" role="tab" data-toggle="tab">Herramientas e Insumos</a></li>
                                         <li role="presentation"><a href="#info2" aria-controls="info2" role="tab" data-toggle="tab">Info </a></li>
                                         <li role="presentation"><a href="#profile" aria-controls="profile" role="tab" data-toggle="tab">Comentarios</a></li>
                                         <li <?php echo ($device == 'android' ? 'class="hidden"' : ''); ?> role="presentation">
                                             <a href="#messages" aria-controls="messages" role="tab" data-toggle="tab">Trazabildad</a></li>
                                     </ul>
                                     <div class="tab-content">
+                                        <!-- E65: herramientas, pedido de materiales, entregas y herramientas usadas (solo lectura) -->
+                                        <div role="tabpanel" class="tab-pane" id="matTab">
+                                            <div class="panel-body"><?php $this->load->view(MAN . 'ot/materiales', array('idOt' => $id_OT, 'rolVales' => '')); ?></div>
+                                        </div>
                                         <div role="tabpanel" class="tab-pane active" id="home">
                                             <div class="panel-body">
                                                 <div class="row">

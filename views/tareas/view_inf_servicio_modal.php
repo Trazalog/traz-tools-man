@@ -1,4 +1,4 @@
-<?php $this->load->view('_autocompletar'); ?>
+<?php $this->load->view(MAN . '_autocompletar'); ?>
  <!-- form  -->
 
  <form class="form-horizontal" role="form" id="form_order" action="" accept-charset="utf-8">
@@ -75,11 +75,16 @@
     <li role="presentation" class="active"><a href="#lecturaTab" aria-controls="lecturaTab" role="tab" data-toggle="tab">Lecturas</a></li>
     <li role="presentation"><a href="#tar" aria-controls="tar" role="tab" data-toggle="tab">Tareas</a></li>
     <li role="presentation"><a href="#rrhh" aria-controls="rrhh" role="tab" data-toggle="tab">Recursos Humanos</a></li> 
+    <li role="presentation"><a href="#matTab" aria-controls="matTab" role="tab" data-toggle="tab">Herramientas e Insumos</a></li>
     <li role="presentation"><a href="#evidencias" aria-controls="evidencias" role="tab" data-toggle="tab">Evidencias </a></li>   
   </ul>
 
   <!-- Tab panes -->
   <div class="tab-content">
+    <!-- E65: herramientas, pedido de materiales, entregas y herramientas usadas (vales del pañol, los asocia el mantenedor) -->
+    <div role="tabpanel" class="tab-pane" id="matTab">
+      <?php $this->load->view(MAN . 'ot/materiales', array('idOt' => $id_ot, 'rolVales' => 'MANTENEDOR')); ?>
+    </div>
     <div role="tabpanel" class="tab-pane active" id="lecturaTab">
       <!--  LECTURAS REALIZADAS  -->
       <div class="panel panel-default">
@@ -360,7 +365,7 @@
   // Llenar tabla tareas
     var regTar = 0;              // variable incrementable en func, para diferenciar los inputs
     function armarTablaTareas(){ // inserta valores de inputs en la tabla 
-      var tareas       = $("#tareas").val();
+      var tareas       = $("#form_order #tareas").val(); // la bandeja de tools tiene su propia tabla con id "tareas"
     
       var hayError = false;
       if (tareas == '') {
@@ -383,7 +388,7 @@
         ).draw();
     
         //limpio formulario
-        $('#tareas').val('');
+        $("#form_order #tareas").val("");
       }
     }    
     // elimina fila de la tabla listareas
