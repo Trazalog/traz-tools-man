@@ -117,3 +117,6 @@ views/sucursales/list.php
 views/sistemas/list.php
 views/tareaestandar/list.php
 controllers/Lanzamiento.php
+controllers/Kpi.php
+models/Kpis.php
+views/kpis/rep_equipos.php
