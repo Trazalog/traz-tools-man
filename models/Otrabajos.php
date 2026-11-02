@@ -60,7 +60,10 @@ class Otrabajos extends CI_Model
 		$libres = array();
 		$catalogo = array();
 		foreach ((array) $rows as $r) {
-			if ((int) $r['herrId'] === 0 && !empty($r['descripcion_libre'])) {
+			if ((int) $r['herrId'] === 0 && empty($r['descripcion_libre'])) {
+				continue; // fila de texto libre que perdió el texto al editar la OT (H35): no es ninguna herramienta
+			}
+			if ((int) $r['herrId'] === 0) {
 				$libres[] = array(
 					'herrId'      => 0,
 					'cantidad'    => $r['cantidad'],
