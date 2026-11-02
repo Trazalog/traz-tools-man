@@ -120,3 +120,6 @@ controllers/Lanzamiento.php
 controllers/Kpi.php
 models/Kpis.php
 views/kpis/rep_equipos.php
+controllers/Reporte.php
+models/Reportes.php
+views/reportes/rep_informes.php
