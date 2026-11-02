@@ -54,9 +54,9 @@ if (!function_exists('man_cabecera')) {
                 . ' </label><input type="text" class="form-control" value="' . man_esc($valor) . '" disabled/></div></div>';
         };
         $caja = function ($titulo, $cuerpo, $clase = '') {
-            // Igual que las cabeceras de almacenes (box-primary con barra roja); se abre y se cierra con un clic en la barra, sin botón (+)
-            return '<div class="box box-primary collapsed-box ' . $clase . '"><div class="box-header with-border" style="cursor: pointer;" onclick="collapse(this)">'
-                . '<h3 class="box-title">' . $titulo . ' / Mas Detalles</h3></div>'
+            // Cabecera plegable gris oscuro (el tono del menú lateral: el gris claro de box-default no se distingue del fondo); se abre y se cierra con un clic en la barra, sin botón (+)
+            return '<div class="box box-default collapsed-box box-solid ' . $clase . '"><div class="box-header with-border" style="cursor: pointer; background-color: #3c4a50; color: #fff;" onclick="collapse(this)">'
+                . '<h3 class="box-title" style="color: #fff;">' . $titulo . ' / Mas Detalles</h3></div>'
                 . '<div class="box-body">' . $cuerpo . '</div></div>';
         };
         $estadoEquipo = array('AC' => 'Activo', 'IN' => 'Inactivo', 'AL' => 'Alta');
