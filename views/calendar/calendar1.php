@@ -33,18 +33,14 @@
             <div id="caja-filtro" class="box box-default" style="display:none; margin-top:10px;">
                 <div class="box-body" id="filtro-body"></div>
             </div>
-            <div class="d-flex align-items-center" style="margin-top: 15px;">
-                <strong style="margin-left: 10px;">Referencias de colores:</strong>
-            </div>
-            <div style="margin-top: 5px;">
-                <ul style="list-style-type: none; padding-left: 0; display: flex; gap: 10px; flex-wrap: wrap;">
-                    <li><span style="background-color: #f56954; color: white; padding: 2px 5px; border-radius: 3px;">Urgente</span></li>
-                    <li><span style="background-color: #ff851b; color: white; padding: 2px 5px; border-radius: 3px;">Backlog</span></li>
-                    <li><span style="background-color: #39CCCC; color: white; padding: 2px 5px; border-radius: 3px;">Preventivo</span></li>
-                    <li><span style="background-color: #00a65a; color: white; padding: 2px 5px; border-radius: 3px;">Predictivo</span></li>
-                    <li><span style="background-color: #3c8dbc; color: white; padding: 2px 5px; border-radius: 3px;">Orden Trabajo</span></li>
-                    <li><span style="background-color: #D81B60; color: white; padding: 2px 5px; border-radius: 3px;">Correctivo programado</span></li>
-                </ul>
+            <div style="margin: 15px 0 10px 0; display: flex; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <strong>Referencias de colores:</strong>
+                <span style="background-color: #f56954; color: white; padding: 2px 6px; border-radius: 3px;">Urgente</span>
+                <span style="background-color: #ff851b; color: white; padding: 2px 6px; border-radius: 3px;">Backlog</span>
+                <span style="background-color: #39CCCC; color: white; padding: 2px 6px; border-radius: 3px;">Preventivo</span>
+                <span style="background-color: #00a65a; color: white; padding: 2px 6px; border-radius: 3px;">Predictivo</span>
+                <span style="background-color: #3c8dbc; color: white; padding: 2px 6px; border-radius: 3px;">Orden Trabajo</span>
+                <span style="background-color: #D81B60; color: white; padding: 2px 6px; border-radius: 3px;">Correctivo programado</span>
             </div>
             <div id="calendar"></div>
         </div>

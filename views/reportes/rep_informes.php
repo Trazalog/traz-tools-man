@@ -9,7 +9,7 @@
     <div class="row">
         <div class="col-xs-12">
             <div class="box">
-                <div class="box-header">
+                <div class="box-header with-border">
                     <h3 class="box-title">Reporte Ordenes de Servicio</h3>
                 </div>
                 <div class="box-body">

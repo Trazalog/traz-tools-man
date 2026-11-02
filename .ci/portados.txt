@@ -126,3 +126,4 @@ views/reportes/rep_informes.php
 controllers/Reporteorden.php
 models/Reporteordenes.php
 views/reporteorden/rep_ordenes.php
+views/_autocompletar.php

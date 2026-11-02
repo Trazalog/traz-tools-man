@@ -1,3 +1,4 @@
+<?php $this->load->view('_autocompletar'); ?>
  <!-- form  -->
 
  <form class="form-horizontal" role="form" id="form_order" action="" accept-charset="utf-8">

@@ -1,3 +1,4 @@
+<?php $this->load->view('_autocompletar'); ?>
 <?php
 /**
  * Ventana de la orden de trabajo (Plan de Mantenimiento, listado de OT y solicitudes) — MIG-ASSET-4.
@@ -239,3 +240,4 @@ $conComponente = isset($componente['descCompo']) && $componente['descCompo'] != 
     };
 })();
 </script>
+

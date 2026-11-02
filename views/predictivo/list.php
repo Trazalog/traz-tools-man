@@ -1,3 +1,4 @@
+<?php $this->load->view('_autocompletar'); ?>
 <input type="hidden" id="permission" value="<?php echo $permission;?>">
 
 <div class="box box-primary">
@@ -1023,5 +1024,6 @@ $("#fecha").datetimepicker({
     </div>
   </div>
 </div>
+
 
 

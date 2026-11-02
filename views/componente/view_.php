@@ -1,3 +1,4 @@
+<?php $this->load->view('_autocompletar'); ?>
 <input type="hidden" id="permission" value="<?php echo $permission;?>">   
 <div class="row">
   <div class="col-xs-12">
@@ -661,3 +662,4 @@ $('#tablaequipos').DataTable({
   "order": [[1, "asc"]],
 });
 </script>
+

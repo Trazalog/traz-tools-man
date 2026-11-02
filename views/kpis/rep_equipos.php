@@ -12,7 +12,7 @@ $etiquetas = array(
 ?>
 <section class="content">
     <div class="box box-primary">
-        <div class="box-header">
+        <div class="box-header with-border">
             <div class="box-title">Reporte de Disponibilidad de Equipos</div>
         </div>
         <div class="box-body">

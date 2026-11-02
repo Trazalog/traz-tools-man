@@ -1,3 +1,4 @@
+<?php $this->load->view('_autocompletar'); ?>
 <input type="hidden" id="permission" value="<?php echo $permission;?>">
 <div class="box box-primary">
   <div class="box-header with-border">
@@ -1173,3 +1174,4 @@ $('#tabprev').DataTable({
     </div>
   </div>
 </div>
+

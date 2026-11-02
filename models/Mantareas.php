@@ -57,7 +57,8 @@ class Mantareas extends CI_Model
     {
         $r = $this->info($tarea->caseId);
         if (empty($r)) {
-            return array('descripcion' => 'Sin datos de Mantenimiento para este caso');
+            // Casos que están en Bonita y registrados para la empresa pero sin solicitud ni orden en Mantenimiento (por ejemplo, casos de prueba viejos)
+            return array('descripcion' => 'Caso sin solicitud ni orden en Mantenimiento (no hay datos para mostrar)');
         }
         $lleno = function ($v) {
             return isset($v) && $v !== '' && $v !== null;

@@ -1,3 +1,4 @@
+<?php $this->load->view('_autocompletar'); ?>
 <style>
 .switch {
     position: relative;
