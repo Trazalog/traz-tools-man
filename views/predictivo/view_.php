@@ -1,3 +1,4 @@
+<?php $this->load->view(MAN . '_autocompletar'); ?>
 <input type="hidden" id="permission" value="<?php echo $permission;?>">
 <div class="row">
   <div class="col-xs-12">
@@ -9,9 +10,9 @@
 </div>
   <div class="row">
     <div class="col-xs-12">
-      <div class="box">
+      <div class="box box-primary">
         <form id="formPredictivo" role="form" action="<?php echo base_url(MAN); ?>Predictivo/guardar_predictivo" method="POST" >
-          <div class="box-header">
+          <div class="box-header with-border">
           <h3 class="box-title">Programación Predictivo</h3>
           <?php
             if (strpos($permission,'Add') !== false) {

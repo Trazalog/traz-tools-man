@@ -1,3 +1,4 @@
+<?php $this->load->view(MAN . '_autocompletar'); ?>
 <style>
 .switch {
     position: relative;
@@ -54,7 +55,7 @@ input:checked + .slider:before {
   <div class="row">
     <div class="col-xs-12">
       <div class="box box-primary">
-        <div class="box-header">
+        <div class="box-header with-border">
           <div class="col-xs-12">
             <h3 class="box-title">Solicitudes de Servicios</h3>
           </div>
@@ -721,7 +722,7 @@ function confirmarEliminacion() {
   $('#modalEliminarSolicitud').modal('hide');
 }
 
-let baseUrl = "<?php echo base_url(); ?>";
+var baseUrl = "<?php echo base_url(); ?>";
   // VER OT 
   function mostrarOT(o){
     

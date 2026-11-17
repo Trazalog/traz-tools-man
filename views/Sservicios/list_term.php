@@ -4,7 +4,7 @@
         <div class="col-md-12">
             <div class="box box-primary">
 
-                <div class="box-header">
+                <div class="box-header with-border">
                     <h3 class="box-title">Solicitudes Terminadas</h3>
                     <?php                    
                        echo '<button class="btn btn-block btn-success" style="width: 100px; margin-top: 10px;" id="solic_list">Ver Activas</button>';

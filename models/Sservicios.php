@@ -23,7 +23,7 @@ class Sservicios extends CI_Model
 	function __construct()
 	{
 		parent::__construct();
-		$this->load->helper('man');
+		$this->load->helper(MAN . 'man');
 	}
 
 	/** Equipo, sector, área y proceso de un equipo de la empresa. @return array objetos */

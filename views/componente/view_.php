@@ -1,3 +1,4 @@
+<?php $this->load->view(MAN . '_autocompletar'); ?>
 <input type="hidden" id="permission" value="<?php echo $permission;?>">   
 <div class="row">
   <div class="col-xs-12">
@@ -24,8 +25,8 @@
 <div class="componente-man">
   <div class="row">
     <div class="col-xs-12">
-      <div class="box">
-        <div class="box-header">
+      <div class="box box-primary">
+        <div class="box-header with-border">
           <h2 class="box-title ">Asociar Componentes a Equipo</h2>
            <?php
           if (strpos($permission,'Add') !== false) {
@@ -661,3 +662,4 @@ $('#tablaequipos').DataTable({
   "order": [[1, "asc"]],
 });
 </script>
+

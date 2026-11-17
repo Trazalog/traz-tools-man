@@ -906,14 +906,824 @@ def paridad_solicitud(asset, man, emp_asset):
     sql("DELETE FROM solicitud_reparacion WHERE solicitante LIKE '%s%%'" % PREFIJO)
 
 
+def paridad_ot(asset, man, emp_asset):
+    """Órdenes de trabajo, parte de lectura (MIG-ASSET-2)."""
+    pa, pm = ASSET + 'Otrabajo/', MAN + 'Otrabajo/'
+    orden = lambda l: sorted(l, key=lambda r: json.dumps(r, sort_keys=True)) if isinstance(l, list) else l
+    comparar('ot · listado (pantalla)', celdas_tabla(asset.get(pa + 'listOrden/Add-Edit-Del')), celdas_tabla(man.get(pm + 'listOrden/Add-Edit-Del')))
+    eq = sql("SELECT id_equipo FROM orden_trabajo WHERE id_empresa=%d ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0][0]
+    for nombre, filtros in (('sin filtros', {}), ('estado PL', {'estadoFilt': 'PL'}), ('estado T', {'estadoFilt': 'T'}), ('equipo', {'equipoFilt': eq}),
+                            ('desde', {'fec_desde': '2023-01-01'}), ('desde y hasta', {'fec_desde': '2020-01-01', 'fec_hasta': '2030-12-31'})):
+        comparar('ot · filtrar ' + nombre, orden(jload(asset.post(pa + 'filtrarListado', filtros))), orden(jload(man.post(pm + 'filtrarListado', filtros))))
+    for accion, datos in (('getproveedor', None), ('traer_sucursal', None), ('getequipo', None), ('getEquiposNuevaOT', None), ('getusuario', None),
+                          ('traer_cli', None), ('getInfoEquipoNuevaOT', {'id_equipo': eq})):
+        ra = asset.get(pa + accion) if datos is None else asset.post(pa + accion, datos)
+        rm = man.get(pm + accion) if datos is None else man.post(pm + accion, datos)
+        comparar('ot · ' + accion, orden(jload(ra)), orden(jload(rm)))
+    vistas = {'1': ('getViewDataOt', {}), '2': ('getViewDataSolServicio', 'idSolServicio'), '3': ('getViewDataPreventivo', 'idPreventivo'),
+              '4': ('getViewDataBacklog', 'idBacklog'), '5': ('getViewDataPredictivo', 'idPredictivo')}
+    for ot, tipo, sol, cli in sql("SELECT id_orden, tipo, id_solicitud, cliId FROM orden_trabajo WHERE id_empresa=%d ORDER BY id_orden" % emp_asset):
+        comparar('ot %s · editar' % ot, jload(asset.post(pa + 'getpencil', {'idp': ot})), jload(man.post(pm + 'getpencil', {'idp': ot})))
+        comparar('ot %s · origen' % ot, jload(asset.post(pa + 'getOrigenOt', {'idot': ot})), jload(man.post(pm + 'getOrigenOt', {'idot': ot})))
+        comparar('ot %s · asignar' % ot, jload(asset.get(pa + 'getasigna?id_orden=%s' % ot)), jload(man.get(pm + 'getasigna?id_orden=%s' % ot)))
+        comparar('ot %s · pedidos' % ot, jload(asset.get(pa + 'getpedidos?fechai=%s' % ot)), jload(man.get(pm + 'getpedidos?fechai=%s' % ot)))
+        if sql("SELECT id_empresa FROM admcustomers WHERE cliId=%s" % cli) == [[str(emp_asset)]]:
+            comparar('ot %s · cliente' % ot, jload(asset.post(pa + 'getcliente', {'idcliente': cli})), jload(man.post(pm + 'getcliente', {'idcliente': cli})))
+        else:
+            # La OT apunta a un cliente de otra empresa (T29): asset lo muestra, MAN no.
+            comparar('ot %s · cliente de otra empresa (MAN no lo muestra, T29)' % ot, 'nada', man.post(pm + 'getcliente', {'idcliente': cli}).strip())
+        if tipo in vistas:
+            accion, campo = vistas[tipo]
+            datos = {'idOt': ot}
+            if campo:
+                datos[campo] = sol
+            comparar('ot %s · %s' % (ot, accion), jload(asset.post(pa + accion, datos)), jload(man.post(pm + accion, datos)))
+    ajena = sql("SELECT id_orden, cliId FROM orden_trabajo WHERE id_empresa<>%d ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0]
+    comparar('ot · aislamiento: MAN no trae OTs ajenas', {'datos': 0}, jload(man.post(pm + 'getpencil', {'idp': ajena[0]})))
+    comparar('ot · aislamiento: MAN no trae el origen de OTs ajenas', None, jload(man.post(pm + 'getOrigenOt', {'idot': ajena[0]})))
+    comparar('ot · aislamiento: MAN no trae la vista de OTs ajenas', [], jload(man.post(pm + 'getViewDataPreventivo', {'idOt': ajena[0]})).get('preventivo'))
+    comparar('ot · aislamiento: MAN no trae pedidos de OTs ajenas', 'nada', man.get(pm + 'getpedidos?fechai=%s' % ajena[0]).strip())
+
+
+def paridad_ot_escrituras(asset, man, emp_asset):
+    """Órdenes de trabajo, escrituras sin Bonita (MIG-ASSET-2)."""
+    pa, pm = ASSET + 'Otrabajo/', MAN + 'Otrabajo/'
+    carpeta = '/mnt/win/dev/git/traz-prod-assetplanner/assets/filesOTrabajos/'
+    base = sql("SELECT id_orden FROM orden_trabajo WHERE id_empresa=%d ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0][0]
+    ots = {}
+    for lado in ('A', 'M'):
+        sql("INSERT INTO orden_trabajo (id_tarea, nro, fecha, fecha_program, fecha_inicio, fecha_entrega, fecha_terminada, fecha_aviso, fecha_entregada, descripcion, "
+            "cliId, estado, id_usuario, id_usuario_a, id_usuario_e, id_sucursal, id_proveedor, id_solicitud, tipo, id_equipo, id_empresa) SELECT id_tarea, nro, fecha, "
+            "fecha_program, fecha_inicio, fecha_entrega, fecha_terminada, fecha_aviso, fecha_entregada, '%s %s', cliId, 'PL', id_usuario, id_usuario_a, id_usuario_e, "
+            "id_sucursal, id_proveedor, id_solicitud, tipo, id_equipo, id_empresa FROM orden_trabajo WHERE id_orden=%s" % (PREFIJO, lado, base))
+        ots[lado] = sql("SELECT id_orden FROM orden_trabajo WHERE descripcion='%s %s'" % (PREFIJO, lado))[0][0]
+    oa, om = ots['A'], ots['M']
+    # Las OT de DEV apuntan a equipos de otras empresas (T29): la edición usa un equipo de la empresa.
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    herr = [h['value'] for h in jload(man.get(MAN + 'Preventivo/getHerramientasB'))][:1]
+    arts = [a['value'] for a in jload(man.get(MAN + 'Preventivo/getinsumo'))][:2]
+    fila = ("SELECT id_tarea, fecha_program, fecha_entrega, fecha_terminada, descripcion, estado, id_sucursal, id_proveedor, id_equipo FROM orden_trabajo "
+            "WHERE id_orden=%s")
+    det = lambda o: (sql("SELECT herrId, cantidad, id_empresa, descripcion_libre FROM tbl_otherramientas WHERE otId=%s ORDER BY id" % o),
+                     sql("SELECT artId, cantidad, id_empresa FROM tbl_otinsumos WHERE otId=%s ORDER BY id" % o))
+    def post_listas(s, url, campos):
+        return s.abrir(url, urllib.parse.urlencode([(k, x) for k, v in campos.items() for x in (v if isinstance(v, list) else [v])]).encode())
+    def editar(s, url, o, lado):
+        datos = {'idOT': o, 'parametros[fecha_program]': '2026-11-01 08:00:00', 'parametros[fecha_entrega]': '2026-11-05 18:00:00', 'parametros[id_tarea]': '0',
+                 'parametros[descripcion]': '%s %s' % (PREFIJO, lado), 'parametros[id_sucursal]': '', 'parametros[id_proveedor]': '', 'parametros[id_equipo]': eq,
+                 'idsherramienta[]': herr, 'cantHerram[]': ['2'], 'idsinsumo[]': arts, 'cantInsum[]': ['1', '3']}
+        return post_listas(s, url + 'guardar_editar', datos).strip()
+    comparar('ot · editar (respuesta)', editar(asset, pa, oa, 'A'), editar(man, pm, om, 'M'))
+    comparar('ot · editar (fila)', [r[:4] + r[5:] for r in sql(fila % oa)], [r[:4] + r[5:] for r in sql(fila % om)])
+    comparar('ot · editar (herramientas e insumos)', det(oa), det(om))
+    norm = lambda d: json.loads(re.sub(r'"\d+_%d_\d{4}-\d\d-\d\d-\d\d-\d\d-\d\d' % emp_asset, '"N', re.sub(r'(_)\d+(_)', r'\1N\2', json.dumps(d))))
+    def adjuntar(s, url, o):
+        return jload(s.post_archivo(url + 'agregarAdjunto', {'idAgregaAdjunto': o}, 'inputPDF', 'ot.pdf', PDF_PRUEBA))
+    ra, rm = adjuntar(asset, pa, oa), adjuntar(man, pm, om)
+    comparar('ot · agregar adjunto (respuesta, sin id ni nombre)', sorted(ra.keys()) if isinstance(ra, dict) else ra, sorted(rm.keys()) if isinstance(rm, dict) else rm)
+    comparar('ot · agregar adjunto (archivo en la carpeta de asset)', True, isinstance(rm, dict) and os.path.exists(carpeta.replace('assets/filesOTrabajos/', '') + rm['ot_adjunto']))
+    comparar('ot · eliminar adjunto', jload(asset.post(pa + 'eliminarAdjunto', {'id_adjunto': ra.get('id') if isinstance(ra, dict) else 0})),
+             jload(man.post(pm + 'eliminarAdjunto', {'id_adjunto': rm.get('id') if isinstance(rm, dict) else 0})))
+    comparar('ot · eliminar adjunto (filas)', sql("SELECT COUNT(*) FROM tbl_otadjuntos WHERE otId=%s" % oa), sql("SELECT COUNT(*) FROM tbl_otadjuntos WHERE otId=%s" % om))
+    usr = sql("SELECT usrId FROM sisusers WHERE usrNick='%s'" % os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test'))[0][0]
+    ta = asset.post(pa + 'agregar_tarea', {'parametros[id_orden]': oa, 'parametros[tareadescrip]': PREFIJO + ' tarea', 'parametros[estado]': 'C'}).strip()
+    tm = man.post(pm + 'agregar_tarea', {'parametros[id_orden]': om, 'parametros[tareadescrip]': PREFIJO + ' tarea', 'parametros[estado]': 'C'}).strip()
+    comparar('ot · agregar tarea (devuelve un id)', ta.isdigit() and int(ta) > 0, tm.isdigit() and int(tm) > 0)
+    tarea = "SELECT tareadescrip, id_usuario, fecha, estado FROM tbl_listarea WHERE id_listarea=%s"
+    for nombre, url, datos_a, datos_m in (
+            ('usuario', 'ModificarUsuario', {'idtarea': ta, 'idusu': usr}, {'idtarea': tm, 'idusu': usr}),
+            ('fecha', 'ModificarFecha', {'idtarea': ta, 'idusu': usr, 'fe': '15/11/2026'}, {'idtarea': tm, 'idusu': usr, 'fe': '15/11/2026'})):
+        comparar('ot · tarea %s (respuesta)' % nombre, asset.post(pa + url, datos_a).strip(), man.post(pm + url, datos_m).strip())
+        comparar('ot · tarea %s (fila)' % nombre, sql(tarea % ta), sql(tarea % tm))
+    comparar('ot · tareas (pantalla)', celdas_tabla(asset.get(pa + 'cargartarea/Add-Edit-Del-OP/%s' % oa)), celdas_tabla(man.get(pm + 'cargartarea/Add-Edit-Del-OP/%s' % om)))
+    comparar('ot · tarea realizada', asset.get(pa + 'TareaRealizada?id_orden=%s' % ta).strip(), man.get(pm + 'TareaRealizada?id_orden=%s' % tm).strip())
+    comparar('ot · tarea eliminada', asset.post(pa + 'EliminarTarea', {'idtarea': ta}).strip(), man.post(pm + 'EliminarTarea', {'idtarea': tm}).strip())
+    comparar('ot · tareas (filas)', sql(tarea % ta), sql(tarea % tm))
+    n = sql("SELECT COUNT(*) FROM orden_trabajo")
+    comparar('ot · total sin acción (setotrabajo)', jload(asset.post(pa + 'setotrabajo', {'nro': '', 'fech': ''})), jload(man.post(pm + 'setotrabajo', {'nro': '', 'fech': ''})))
+    comparar('ot · total sin acción no crea OTs', n, sql("SELECT COUNT(*) FROM orden_trabajo"))
+    comparar('ot · finalizar', asset.post(pa + 'FinalizaOt', {'idfin': oa}).strip(), man.post(pm + 'FinalizaOt', {'idfin': om}).strip())
+    comparar('ot · finalizar (fila)', [[r[3], r[5]] for r in sql(fila % oa)], [[r[3], r[5]] for r in sql(fila % om)])
+    comparar('ot · anular', asset.post(pa + 'baja_predictivo', {'gloid': oa}).strip(), man.post(pm + 'baja_predictivo', {'gloid': om}).strip())
+    comparar('ot · anular (estado)', sql("SELECT estado FROM orden_trabajo WHERE id_orden=%s" % oa), sql("SELECT estado FROM orden_trabajo WHERE id_orden=%s" % om))
+
+    ajena = sql("SELECT id_orden FROM orden_trabajo WHERE id_empresa<>%d ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0][0]
+    foto = lambda: (sql("SELECT * FROM orden_trabajo WHERE id_orden=%s" % ajena), det(ajena), sql("SELECT * FROM tbl_otadjuntos WHERE otId=%s" % ajena),
+                    sql("SELECT * FROM tbl_listarea WHERE id_orden=%s" % ajena))
+    antes = foto()
+    editar(man, pm, ajena, 'HACK')
+    comparar('ot · aislamiento: MAN no adjunta a OTs ajenas', False, adjuntar(man, pm, ajena))
+    man.post(pm + 'agregar_tarea', {'parametros[id_orden]': ajena, 'parametros[tareadescrip]': 'HACK', 'parametros[estado]': 'C'})
+    man.post(pm + 'FinalizaOt', {'idfin': ajena})
+    man.post(pm + 'baja_predictivo', {'gloid': ajena})
+    lt = sql("SELECT id_listarea FROM tbl_listarea WHERE id_orden=%s LIMIT 1" % ajena)
+    if lt:
+        man.post(pm + 'EliminarTarea', {'idtarea': lt[0][0]})
+    comparar('ot · aislamiento: MAN no modifica OTs ajenas, su detalle, adjuntos ni tareas', antes, foto())
+
+    for o in (oa, om):
+        for nombre in os.listdir(carpeta):
+            if re.match(r'^%s_%d_%s-' % (o, emp_asset, time.strftime('%Y-%m-%d')), nombre):
+                os.remove(carpeta + nombre)
+        for tbl in ('tbl_otherramientas', 'tbl_otinsumos', 'tbl_otadjuntos'):
+            sql("DELETE FROM %s WHERE otId=%s" % (tbl, o))
+        sql("DELETE FROM tbl_listarea WHERE id_orden=%s" % o)
+        sql("DELETE FROM orden_trabajo WHERE id_orden=%s AND descripcion LIKE '%s%%'" % (o, PREFIJO))
+
+
+def bonita_admin():
+    """Sesión de administrador en la Bonita de DEV, con los datos de constants.php de tools (no se imprimen).
+    Devuelve (consultar, modificar con PUT, enviar con POST)."""
+    cons = open(os.path.join(os.path.dirname(__file__), '../../../../config/constants.php'), encoding='utf-8').read()
+    valor = lambda n: re.search(r"define\('%s',\s*'([^']*)'" % n, cons).group(1)
+    base = valor('BONITA_URL').rstrip('/')
+    base = base[:base.index('/bonita') + 7] if '/bonita' in base else base
+    s = Sesion()
+    s.abrir(base + '/loginservice', urllib.parse.urlencode({'username': valor('BPM_ADMIN_USER'), 'password': valor('BPM_ADMIN_PASS'),
+                                                             'redirect': 'false'}).encode())
+    token = next((c.value for c in next(h for h in s.op.handlers if isinstance(h, urllib.request.HTTPCookieProcessor)).cookiejar
+                  if c.name == 'X-Bonita-API-Token'), '')
+    cab = {'X-Bonita-API-Token': token, 'Content-Type': 'application/json'}
+    return (lambda ruta, metodo='GET': jload(s.abrir(urllib.request.Request(base + ruta, method=metodo, headers=cab))),
+            lambda ruta, cuerpo: s.abrir(urllib.request.Request(base + ruta, json.dumps(cuerpo).encode(), cab, method='PUT')),
+            lambda ruta, cuerpo: s.abrir(urllib.request.Request(base + ruta, json.dumps(cuerpo).encode(), cab, method='POST')))
+
+
+def paridad_ot_bonita(asset, man, emp_asset):
+    """Alta de OT con su caso real en la Bonita de DEV y asignación de responsable (A5). Solo con MAN_PARIDAD_BONITA=1.
+    Asset no se compara: lanza los casos como el usuario y el de prueba no tiene la contraseña común de Bonita (T28)."""
+    if os.environ.get('MAN_PARIDAD_BONITA') != '1':
+        print('     | ot · alta y asignación con Bonita: no se corre (MAN_PARIDAD_BONITA=1 para correrlo)')
+        return
+    pm = MAN + 'Otrabajo/'
+    carpeta = '/mnt/win/dev/git/traz-prod-assetplanner/assets/filesOTrabajos/'
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    tarea = sql("SELECT id_tarea, descripcion FROM tareas WHERE id_empresa=%d ORDER BY id_tarea LIMIT 1" % emp_asset)[0]
+    herr = [h['value'] for h in jload(man.get(MAN + 'Preventivo/getHerramientasB'))][:1]
+    arts = [a['value'] for a in jload(man.get(MAN + 'Preventivo/getinsumo'))][:2]
+    antes = int(sql("SELECT IFNULL(MAX(id_orden), 0) FROM orden_trabajo")[0][0])
+    datos = {'equipo': eq, 'id_tarea': tarea[0], 'tareacustom': '', 'fechaInicio': '01/11/2026', 'fechaEntrega': '05/11/2026', 'suci': '', 'prov': '',
+             'id_her[0]': herr[0], 'cant_herr[0]': '2', 'desc_libre[0]': '', 'id_her[1]': '0', 'cant_herr[1]': '1', 'desc_libre[1]': PREFIJO + ' llave',
+             'id_insumo[0]': arts[0], 'cant_insumo[0]': '1', 'id_insumo[1]': arts[1], 'cant_insumo[1]': '3'}
+    comparar('ot · alta con caso de Bonita (respuesta)', True, jload(man.post_archivo(pm + 'guardar_agregar', datos, 'inputPDF', 'ot.pdf', PDF_PRUEBA)))
+    fila = sql("SELECT id_orden, id_tarea, descripcion, CAST(fecha_program AS CHAR), CAST(fecha_entrega AS CHAR), estado, tipo, id_equipo, case_id "
+               "FROM orden_trabajo WHERE id_orden>%d AND id_empresa=%d AND id_equipo=%s ORDER BY id_orden DESC LIMIT 1" % (antes, emp_asset, eq))
+    if not fila:
+        comparar('ot · alta con caso de Bonita (fila)', 'una OT nueva', 'ninguna')
+        return
+    o, caso = fila[0][0], fila[0][8]
+    comparar('ot · alta con caso de Bonita (fila: descripción de la tarea estándar, fechas, PL, tipo 1)',
+             [tarea[0], tarea[1], '2026-11-01 00:00:00', '2026-11-05 00:00:00', 'PL', '1', str(eq)], [str(x) for x in fila[0][1:8]])
+    comparar('ot · alta con caso de Bonita (herramientas, con texto libre, e insumos)',
+             ([[str(herr[0]), '2', 'NULL'], ['0', '1', PREFIJO + ' llave']], [[str(arts[0]), '1'], [str(arts[1]), '3']]),
+             (sql("SELECT herrId, cantidad, IFNULL(descripcion_libre, 'NULL') FROM tbl_otherramientas WHERE otId=%s ORDER BY id" % o),
+              sql("SELECT artId, cantidad FROM tbl_otinsumos WHERE otId=%s ORDER BY id" % o)))
+    comparar('ot · alta con caso de Bonita (case_id y case_empresa en assetv2)', True,
+             caso not in ('NULL', '0', '') and bool(sql("SELECT 1 FROM case_empresa WHERE case_id=%s" % caso)))
+    adj = sql("SELECT ot_adjunto FROM tbl_otadjuntos WHERE otId=%s" % o)
+    comparar('ot · alta con caso de Bonita (adjunto en la carpeta de asset)', True,
+             bool(adj) and os.path.exists(carpeta.replace('assets/filesOTrabajos/', '') + adj[0][0]))
+    bonita, bonita_put, _ = bonita_admin()
+    tareas = bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % caso)
+    usr, nick = sql("SELECT usrId, usrNick FROM sisusers WHERE usrNick='%s'" % os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test'))[0]
+    if tareas:
+        # La bandeja toma la tarea antes de abrir el modal; Bonita no deja cerrar una tarea sin asignar.
+        uid = bonita('/API/identity/user?p=0&c=1&f=userName%%3D%s' % urllib.parse.quote(nick))
+        bonita_put('/API/bpm/humanTask/%s' % tareas[0]['id'], {'assigned_id': uid[0]['id']})
+        r = man.post(pm + 'guardar', {'id_orden': o, 'fecha_entrega': '10/11/2026', 'usuario': usr, 'case_id': caso, 'task_id': tareas[0]['id']}).strip()
+        comparar('ot · asignar responsable (respuesta, tarea "%s")' % tareas[0]['name'], '1', r)
+        comparar('ot · asignar responsable (fila)', [['As', str(usr), '2026-11-10 00:00:00']],
+                 [[str(x) for x in f] for f in sql("SELECT estado, id_usuario_a, CAST(fecha_entrega AS CHAR) FROM orden_trabajo WHERE id_orden=%s" % o)])
+        ejecutar = [t for t in bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % caso) if t['name'] == 'Ejecutar OT']
+        comparar('ot · asignar responsable ("Ejecutar OT" asignada al usuario de Bonita con su correo)', True,
+                 bool(ejecutar) and bool(uid) and ejecutar[0]['assigned_id'] == uid[0]['id'])
+    else:
+        comparar('ot · asignar responsable (el caso tiene una tarea pendiente)', True, False)
+    otra = sql("SELECT id_orden, case_id FROM orden_trabajo WHERE id_empresa<>%d AND case_id IS NOT NULL ORDER BY id_orden DESC LIMIT 1" % emp_asset)[0]
+    previo = sql("SELECT estado, id_usuario_a, fecha_entrega FROM orden_trabajo WHERE id_orden=%s" % otra[0])
+    man.post(pm + 'guardar', {'id_orden': otra[0], 'fecha_entrega': '10/11/2026', 'usuario': usr, 'case_id': '0', 'task_id': '0'})
+    comparar('ot · aislamiento: MAN no asigna OTs ajenas', previo, sql("SELECT estado, id_usuario_a, fecha_entrega FROM orden_trabajo WHERE id_orden=%s" % otra[0]))
+
+    bonita('/API/bpm/case/%s' % caso, 'DELETE')
+    print('     | ot · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
+    for nombre in os.listdir(carpeta):
+        if re.match(r'^%s_%d_%s-' % (o, emp_asset, time.strftime('%Y-%m-%d')), nombre):
+            os.remove(carpeta + nombre)
+    for tbl in ('tbl_otherramientas', 'tbl_otinsumos', 'tbl_otadjuntos'):
+        sql("DELETE FROM %s WHERE otId=%s" % (tbl, o))
+    sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)
+    sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)
+
+
+def texto_vista(pagina):
+    """Lo que ve el usuario en una vista: textos y valores de campos, sin los scripts (que tienen las URLs de cada lado)."""
+    pagina = re.sub(r'<script.*?</script>', '', pagina, flags=re.S)
+    valores = re.findall(r'value="([^"]*)"', pagina)
+    texto = [t for t in (html.unescape(x).strip() for x in re.sub(r'<[^>]+>', '\n', pagina).split('\n')) if t]
+    return {'valores': valores, 'texto': texto}
+
+
+def informe_prueba(o, eq, emp_asset, horometro):
+    """Informe de servicio de prueba para la OT o (las tablas del informe solo las escribe la bandeja, que va en MIG-3)."""
+    sql("INSERT INTO orden_servicio (lectura, fecha, comprobante, id_equipo, id_contratista, id_solicitudreparacion, valesid, estado, id_ordenherraminetas, "
+        "id_orden_insumo, id_ot, id_empresa, fechahorainicio, fechahorafin, horometroinicio, horometrofin) VALUES (0, '2026-10-28', '%s', %s, 0, 0, 0, 'C', 0, 0, "
+        "%s, %d, '2026-10-28 08:00:00', '2026-10-28 10:30:00', 100, %s)" % (PREFIJO, eq, o, emp_asset, horometro))
+    return sql("SELECT MAX(id_orden) FROM orden_servicio WHERE id_ot=%s" % o)[0][0]
+
+
+def paridad_informe(asset, man, emp_asset):
+    """Informes de servicio, lectura: listado, ventana de ver informe y su detalle (MIG-ASSET-2)."""
+    pa, pm = ASSET + 'Ordenservicio/', MAN + 'Ordenservicio/'
+    usr = sql("SELECT usrId FROM sisusers WHERE usrNick='%s'" % os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test'))[0][0]
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    tarea = sql("SELECT id_tarea FROM tareas WHERE id_empresa=%d ORDER BY id_tarea LIMIT 1" % emp_asset)[0][0]
+    ots = []
+    for desc, id_tarea in ((PREFIJO + ' informe estándar', tarea), (PREFIJO + ' informe libre', '0')):
+        sql("INSERT INTO orden_trabajo (id_tarea, fecha, fecha_program, fecha_inicio, fecha_entrega, fecha_terminada, fecha_aviso, fecha_entregada, descripcion, "
+            "estado, id_usuario, id_usuario_a, id_usuario_e, id_sucursal, id_proveedor, id_solicitud, tipo, id_equipo, id_empresa) VALUES (%s, '2026-10-20', "
+            "'2026-10-21', '2026-10-27 08:00:00', '2026-10-30', '2026-10-28 11:00:00', '2026-10-20', '2026-10-28', '%s', 'T', %s, %s, 0, 0, 0, 0, 1, %s, %d)"
+            % (id_tarea, desc, usr, usr, eq, emp_asset))
+        ots.append(sql("SELECT MAX(id_orden) FROM orden_trabajo WHERE descripcion='%s'" % desc)[0][0])
+    try:
+        os1 = informe_prueba(ots[0], eq, emp_asset, '112.5')
+        informe_prueba(ots[1], eq, emp_asset, '90')
+        sql("INSERT INTO asignausuario (usrId, id_orden, fechahora) VALUES (%s, %s, NOW())" % (usr, os1))
+        sql("INSERT INTO deta_ordenservicio (id_ordenservicio, id_tarea, tiempo, observacion, monto, id_componente, rh) VALUES (%s, '%s tarea', '1', '%s', 0, 0, 0)"
+            % (os1, PREFIJO, PREFIJO))
+        sql("INSERT INTO orden_servicio_adjuntos (id_orden, valor_base64, nombre) VALUES (%s, 'data:text/plain;base64,TUlHIHBhcmlkYWQ=', '%s.txt')" % (os1, PREFIJO))
+        sql("INSERT INTO tbl_otvales (otId, sapa_id, origen, usrId, fecha, id_empresa) VALUES (%s, 999999, 'SUPERVISOR', %s, NOW(), %d)" % (ots[0], usr, emp_asset))
+        sql("INSERT INTO tbl_otherramientasusadas (otId, herrId, sapa_id, activa, id_empresa) VALUES (%s, 999999, 999999, 1, %d)" % (ots[0], emp_asset))
+        comparar('informe · listado (pantalla)', celdas_tabla(asset.get(pa + 'index/Add-Edit-Del')), celdas_tabla(man.get(pm + 'index/Add-Edit-Del')))
+        for o in ots:
+            comparar('informe OT %s · ver informe' % o, texto_vista(asset.get(pa + 'verInforme/%s/%s/' % (o, eq))), texto_vista(man.get(pm + 'verInforme/%s/%s/' % (o, eq))))
+            for accion in ('getInsumosPorOT', 'getEntregasPorOT', 'getHerramientasUsadas'):
+                comparar('informe OT %s · %s' % (o, accion), jload(asset.post(pa + accion, {'id_ot': o})), jload(man.post(pm + accion, {'id_ot': o})))
+        # Una OT con pedidos de materiales en el almacén de tools, si hay
+        con_pedido = sql("SELECT id_orden FROM orden_trabajo WHERE id_empresa=%d ORDER BY id_orden DESC LIMIT 3" % emp_asset)
+        for (o,) in con_pedido:
+            for accion in ('getInsumosPorOT', 'getEntregasPorOT'):
+                comparar('informe OT %s · %s' % (o, accion), jload(asset.post(pa + accion, {'id_ot': o})), jload(man.post(pm + accion, {'id_ot': o})))
+        ajena = sql("SELECT os.id_ot, ot.id_equipo FROM orden_servicio os JOIN orden_trabajo ot ON ot.id_orden=os.id_ot WHERE os.id_empresa<>%d "
+                    "ORDER BY os.id_orden DESC LIMIT 1" % emp_asset)[0]
+        vista = man.get(pm + 'verInforme/%s/%s/' % tuple(ajena))
+        campo = lambda nombre: (re.findall(r'id="%s"[^>]*value="([^"]*)"' % nombre, vista) or ['(sin campo)'])[0]
+        comparar('informe · aislamiento: MAN no muestra la OT ni el equipo de otra empresa', ['', ''], [campo('causa'), campo('nomEquipo')])
+        comparar('informe · aislamiento: MAN no lista informes de otra empresa', [],
+                 [f for f in celdas_tabla(man.get(pm + 'index/Add-Edit-Del')) if len(f) > 2 and f[2] == ajena[0]])
+    finally:
+        for o in ots:
+            ids = [f[0] for f in sql("SELECT id_orden FROM orden_servicio WHERE id_ot=%s" % o)]
+            for i in ids:
+                for tbl, col in (('asignausuario', 'id_orden'), ('deta_ordenservicio', 'id_ordenservicio'), ('orden_servicio_adjuntos', 'id_orden')):
+                    sql("DELETE FROM %s WHERE %s=%s" % (tbl, col, i))
+            for tbl in ('tbl_otherramientasusadas', 'tbl_otvales'):
+                sql("DELETE FROM %s WHERE otId=%s AND sapa_id=999999" % (tbl, o))
+            sql("DELETE FROM orden_servicio WHERE id_ot=%s AND comprobante='%s'" % (o, PREFIJO))
+            sql("DELETE FROM orden_trabajo WHERE id_orden=%s AND descripcion LIKE '%s%%'" % (o, PREFIJO))
+
+
+def paridad_informe_bonita(asset, man, emp_asset):
+    """Verificación de informes con casos reales en la Bonita de DEV: una OT la verifica asset y otra MAN, y se compara lo que
+    queda (A5). Solo con MAN_PARIDAD_BONITA=1. Las OTs se crean con el alta de MAN (asset no puede lanzar casos con el usuario
+    de prueba, T28) y se hacen avanzar hasta "Verifica Informe de Servicio" como lo haría la bandeja (tomar y cerrar)."""
+    if os.environ.get('MAN_PARIDAD_BONITA') != '1':
+        print('     | informe · verificación con Bonita: no se corre (MAN_PARIDAD_BONITA=1 para correrlo)')
+        return
+    bonita, bonita_put, bonita_post = bonita_admin()
+    nick = os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test')
+    usr = sql("SELECT usrId FROM sisusers WHERE usrNick='%s'" % nick)[0][0]
+    uid = bonita('/API/identity/user?p=0&c=1&f=userName%%3D%s' % urllib.parse.quote(nick))[0]['id']
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    lectura_antes = sql("SELECT CAST(ultima_lectura AS CHAR) FROM equipos WHERE id_equipo=%s" % eq)[0][0]
+    antes = int(sql("SELECT IFNULL(MAX(id_orden), 0) FROM orden_trabajo")[0][0])
+    casos = {}
+    try:
+        for lado, horometro in (('asset', '77'), ('MAN', '88')):
+            man.post_archivo(MAN + 'Otrabajo/guardar_agregar', {'equipo': eq, 'id_tarea': '', 'tareacustom': PREFIJO + ' verificar ' + lado,
+                                                                'fechaInicio': '01/11/2026', 'fechaEntrega': '05/11/2026', 'suci': '', 'prov': ''},
+                             'inputPDF', '', b'')
+            fila = sql("SELECT id_orden, case_id FROM orden_trabajo WHERE id_orden>%d AND descripcion='%s verificar %s'" % (antes, PREFIJO, lado))
+            if not fila or fila[0][1] in ('NULL', '0', ''):
+                comparar('informe · OT con caso para %s' % lado, 'una OT con caso', fila)
+                return
+            o, caso = fila[0]
+            casos[o] = caso
+            for _ in range(6):
+                ts = bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % caso)
+                if not ts or any(t['name'] == 'Verifica Informe de Servicio' for t in ts):
+                    break
+                bonita_put('/API/bpm/humanTask/%s' % ts[0]['id'], {'assigned_id': uid})
+                bonita_post('/API/bpm/userTask/%s/execution' % ts[0]['id'], {})
+            os_id = informe_prueba(o, eq, emp_asset, horometro)
+            sel = {'selected[0][id_orden]': os_id, 'selected[0][id_ot]': o, 'selected[0][case_id]': caso, 'selected[0][id_equipo]': eq}
+            s, base = (asset, ASSET) if lado == 'asset' else (man, MAN)
+            r = jload(s.post(base + 'Ordenservicio/cierreMasivoVerificaInforme', sel))
+            comparar('informe · verificar por %s (respuesta)' % lado, [{'id_orden': os_id, 'status': 'OK'}], r)
+            comparar('informe · verificar por %s (informe y OT cerrados)' % lado, [['CE'], ['CE']],
+                     sql("SELECT estado FROM orden_servicio WHERE id_ot=%s" % o) + sql("SELECT estado FROM orden_trabajo WHERE id_orden=%s" % o))
+            comparar('informe · verificar por %s (lectura de cierre)' % lado, [[str(eq), horometro, str(usr), '-', '-', 'AC']],
+                     sql("SELECT id_equipo, lectura, usrId, operario_nom, turno, estado FROM historial_lecturas WHERE observacion LIKE '%%| OT: %s'" % o))
+            hecha = [t for t in bonita('/API/bpm/archivedHumanTask?p=0&c=20&f=caseId%%3D%s' % caso) if t['name'] == 'Verifica Informe de Servicio']
+            comparar('informe · verificar por %s (tarea cerrada en Bonita por el usuario)' % lado, [uid], [t['assigned_id'] for t in hecha])
+        # Aislamiento: una OT de otra empresa con su caso; MAN no toca nada
+        ajena = sql("SELECT os.id_orden, os.id_ot, ot.case_id, os.estado, ot.estado FROM orden_servicio os JOIN orden_trabajo ot ON ot.id_orden=os.id_ot "
+                    "WHERE os.id_empresa<>%d AND ot.case_id IS NOT NULL ORDER BY os.id_orden DESC LIMIT 1" % emp_asset)[0]
+        r = jload(man.post(MAN + 'Ordenservicio/cierreMasivoVerificaInforme', {'selected[0][id_orden]': ajena[0], 'selected[0][id_ot]': ajena[1],
+                                                                                'selected[0][case_id]': ajena[2]}))
+        comparar('informe · aislamiento: MAN no verifica informes de otra empresa', ['ERROR_BPM', ajena[3], ajena[4]],
+                 [r[0].get('status') if isinstance(r, list) and r else r] + sql("SELECT estado FROM orden_servicio WHERE id_orden=%s" % ajena[0])[0]
+                 + sql("SELECT estado FROM orden_trabajo WHERE id_orden=%s" % ajena[1])[0])
+    finally:
+        for o, caso in casos.items():
+            sql("DELETE FROM historial_lecturas WHERE observacion LIKE '%%| OT: %s' AND usrId=%s" % (o, usr))
+            sql("DELETE FROM orden_servicio WHERE id_ot=%s AND comprobante='%s'" % (o, PREFIJO))
+            sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)
+            sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)
+            bonita('/API/bpm/case/%s' % caso, 'DELETE')
+            print('     | informe · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
+        sql("UPDATE equipos SET ultima_lectura=%s WHERE id_equipo=%s" % (lectura_antes, eq))
+
+
+# ------------------------------------------------------------------------- lecturas de parámetros
+def paridad_lectura(asset, man, emp_asset):
+    """Carga de lecturas de parámetros (parametroequipo): pantalla, listas, alta, lecturas del día, baja y
+    aislamiento entre empresas. Cada lado graba la suya con un valor propio; se borran al final."""
+    pa, pm = ASSET + 'Lectura/', MAN + 'Lectura/'
+    orden = lambda l: sorted(l, key=lambda f: json.dumps(f, sort_keys=True)) if isinstance(l, list) else l
+    comparar('lectura · pantalla', texto_vista(asset.get(pa + 'index/Add-Edit-Del')), texto_vista(man.get(pm + 'index/Add-Edit-Del')))
+    # Sin equipos con parámetros asset responde null (variable sin definir, con aviso de PHP) y MAN una lista vacía,
+    # que es lo que espera el autocompletar: se comparan como iguales.
+    vacio = lambda r: [] if r is None else r
+    comparar('lectura · equipos con parámetros (sin datos de prueba)', vacio(orden(jload(asset.get(pa + 'getEquipo?term=a')))),
+             orden(jload(man.get(pm + 'getEquipo?term=a'))))
+    # Parámetro de prueba asociado a un equipo activo de la empresa
+    eq = sql("SELECT id_equipo FROM equipos WHERE estado='AC' AND id_empresa=%d ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    sql("INSERT INTO parametros (paramdescrip, min, estado, id_empresa) VALUES ('%s', '0', 'AC', %d)" % (PREFIJO + ' L', emp_asset))
+    prm = sql("SELECT paramId FROM parametros WHERE paramdescrip='%s'" % (PREFIJO + ' L'))[0][0]
+    sql("INSERT INTO setupparam (id_equipo, id_parametro, maximo, minimo, id_empresa) VALUES (%s, %s, 10, 1, %d)" % (eq, prm, emp_asset))
+    comparar('lectura · parámetros del equipo', orden(jload(asset.post(pa + 'getParametrosAsoc', {'equipoId': eq}))),
+             orden(jload(man.post(pm + 'getParametrosAsoc', {'equipoId': eq}))))
+    fecha = '2026/10/29 3:05:00'
+    try:
+        comparar('lectura · equipos con parámetros', orden(jload(asset.get(pa + 'getEquipo?term=a'))), orden(jload(man.get(pm + 'getEquipo?term=a'))))
+        ra = jload(asset.post(pa + 'guardar_lectura', {'id_equipo': eq, 'id_parametro': prm, 'fecha': fecha, 'valor': PREFIJO + ' A'}))
+        rm = jload(man.post(pm + 'guardar_lectura', {'id_equipo': eq, 'id_parametro': prm, 'fecha': fecha, 'valor': PREFIJO + ' M'}))
+        comparar('lectura · alta (respuesta)', ra, rm)
+        fila = "SELECT paramId, id_equipo, CAST(fechahora AS CHAR), id_empresa FROM parametroequipo WHERE valor='%s'"
+        comparar('lectura · alta (fila en la base)', sql(fila % (PREFIJO + ' A')), sql(fila % (PREFIJO + ' M')))
+        dia = {'fecha': fecha, 'idequipo': eq}
+        la = orden(jload(asset.post(pa + 'getLecturasCargadas', dia)))
+        comparar('lectura · lecturas del día (trae las dos de prueba)', 2, len(la) if isinstance(la, list) else la)
+        comparar('lectura · lecturas del día', la,
+                 orden(jload(man.post(pm + 'getLecturasCargadas', dia))))
+        ida = sql("SELECT id FROM parametroequipo WHERE valor='%s'" % (PREFIJO + ' A'))[0][0]
+        idm = sql("SELECT id FROM parametroequipo WHERE valor='%s'" % (PREFIJO + ' M'))[0][0]
+        comparar('lectura · baja (respuesta)', jload(asset.post(pa + 'deleteLectura', {'id': ida})), jload(man.post(pm + 'deleteLectura', {'id': idm})))
+        comparar('lectura · baja (fila en la base)', sql(fila % (PREFIJO + ' A')), sql(fila % (PREFIJO + ' M')))
+        # Aislamiento: una lectura de otra empresa. MAN no la lista ni la borra, y no graba sobre equipos ajenos.
+        ajeno = sql("SELECT s.id_equipo, s.id_parametro, e.id_empresa FROM setupparam s JOIN equipos e ON e.id_equipo=s.id_equipo "
+                    "WHERE e.id_empresa<>%d LIMIT 1" % emp_asset)
+        if ajeno:
+            aeq, aprm, aemp = ajeno[0]
+            sql("INSERT INTO parametroequipo (paramId, id_equipo, valor, fechahora, id_empresa) VALUES (%s, %s, '%s', '2026-10-29 03:05:00', %s)"
+                % (aprm, aeq, PREFIJO + ' AJENA', aemp))
+            idaj = sql("SELECT id FROM parametroequipo WHERE valor='%s'" % (PREFIJO + ' AJENA'))[0][0]
+            comparar('lectura · aislamiento: MAN no lista lecturas de otra empresa', [],
+                     jload(man.post(pm + 'getLecturasCargadas', {'fecha': fecha, 'idequipo': aeq})))
+            man.post(pm + 'deleteLectura', {'id': idaj})
+            comparar('lectura · aislamiento: MAN no borra lecturas de otra empresa', [[idaj]],
+                     sql("SELECT id FROM parametroequipo WHERE id=%s" % idaj))
+            man.post(pm + 'guardar_lectura', {'id_equipo': aeq, 'id_parametro': aprm, 'fecha': fecha, 'valor': PREFIJO + ' HACK'})
+            comparar('lectura · aislamiento: MAN no graba lecturas en equipos de otra empresa', [],
+                     sql("SELECT id FROM parametroequipo WHERE valor='%s'" % (PREFIJO + ' HACK')))
+    finally:
+        sql("DELETE FROM parametroequipo WHERE valor LIKE '%s%%'" % PREFIJO)
+        sql("DELETE FROM setupparam WHERE id_parametro=%s" % prm)
+        sql("DELETE FROM parametros WHERE paramId=%s" % prm)
+
+
+# ------------------------------------------------------------------------------------- bandeja
+def paginado(sesion, base, search='', orden=None, largo=50):
+    """Una página de la bandeja (Tarea/paginado) como la pide DataTables."""
+    datos = {'draw': '1', 'start': '0', 'length': str(largo), 'search[value]': search}
+    if orden:
+        datos['order[0][column]'], datos['order[0][dir]'] = orden
+    return jload(sesion.post(base + 'Tarea/paginado', datos))
+
+
+def paridad_bandeja(asset, man, emp_asset):
+    """Bandeja (lista de tareas del usuario). La pantalla se compara siempre; la lista con casos reales en la Bonita de DEV solo con
+    MAN_PARIDAD_BONITA=1: se crean dos OT con el alta de MAN (una con su tarea asignada al usuario de prueba y otra sin asignar, que no
+    aparece en la bandeja) y se comparan filas, búsqueda y orden de asset y MAN."""
+    comparar('bandeja · pantalla', texto_vista(asset.get(ASSET + 'Tarea/index/Add-Edit-Del')), texto_vista(man.get(MAN + 'Tarea/index/Add-Edit-Del')))
+    if os.environ.get('MAN_PARIDAD_BONITA') != '1':
+        print('     | bandeja · lista con Bonita: no se corre (MAN_PARIDAD_BONITA=1 para correrlo)')
+        return
+    bonita, bonita_put, _ = bonita_admin()
+    nick = os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test')
+    uid = bonita('/API/identity/user?p=0&c=1&f=userName%%3D%s' % urllib.parse.quote(nick))[0]['id']
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    antes = int(sql("SELECT IFNULL(MAX(id_orden), 0) FROM orden_trabajo")[0][0])
+    casos = {}
+    sin_datos = lambda r: [{k: v for k, v in f.items()} for f in r['data']] if isinstance(r, dict) and 'data' in r else r
+    try:
+        for n in (1, 2):
+            man.post_archivo(MAN + 'Otrabajo/guardar_agregar', {'equipo': eq, 'id_tarea': '', 'tareacustom': PREFIJO + ' bandeja %d' % n,
+                                                                'fechaInicio': '01/11/2026', 'fechaEntrega': '05/11/2026', 'suci': '', 'prov': ''},
+                             'inputPDF', '', b'')
+            fila = sql("SELECT id_orden, case_id FROM orden_trabajo WHERE id_orden>%d AND descripcion='%s bandeja %d'" % (antes, PREFIJO, n))
+            if not fila or fila[0][1] in ('NULL', '0', ''):
+                comparar('bandeja · OT con caso %d' % n, 'una OT con caso', fila)
+                return
+            casos[fila[0][0]] = fila[0][1]
+        primera = sorted(casos)[0]
+        for t in bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % casos[primera]):
+            bonita_put('/API/bpm/humanTask/%s' % t['id'], {'assigned_id': uid})
+        ra, rm = paginado(asset, ASSET), paginado(man, MAN)
+        propias = lambda r: sorted([f for f in r['data'] if f.get('caseId') in casos.values()], key=lambda f: f['id']) if isinstance(r, dict) else r
+        # La tarea sin asignar del usuario no aparece en su bandeja: solo la de la OT asignada
+        comparar('bandeja · la OT asignada está en la lista (asset)', 1, len(propias(ra)) if isinstance(ra, dict) else ra)
+        comparar('bandeja · filas de las OT de prueba', propias(ra), propias(rm))
+        comparar('bandeja · total de filas', ra.get('recordsTotal') if isinstance(ra, dict) else ra, rm.get('recordsTotal') if isinstance(rm, dict) else rm)
+        comparar('bandeja · todas las filas, en el mismo orden', [f['id'] for f in ra['data']], [f['id'] for f in rm['data']])
+        o = str(primera)
+        comparar('bandeja · búsqueda por número de OT', sin_datos(paginado(asset, ASSET, o)), sin_datos(paginado(man, MAN, o)))
+        comparar('bandeja · búsqueda sin resultados', sin_datos(paginado(asset, ASSET, 'zzzz-no-existe')), sin_datos(paginado(man, MAN, 'zzzz-no-existe')))
+        for col in ('10', '4', '3'):
+            for dir_ in ('asc', 'desc'):
+                comparar('bandeja · orden columna %s %s' % (col, dir_), [f['id'] for f in paginado(asset, ASSET, '', (col, dir_))['data']],
+                         [f['id'] for f in paginado(man, MAN, '', (col, dir_))['data']])
+        # Aislamiento: MAN no muestra tareas de casos de otra empresa
+        ajenos = [r[0] for r in sql("SELECT case_id FROM case_empresa WHERE empr_id<>%d" % emp_asset)]
+        vistos = [f['caseId'] for f in rm['data']]
+        comparar('bandeja · aislamiento: MAN no lista casos de otra empresa', [], [c for c in vistos if c in ajenos])
+    finally:
+        for o, caso in casos.items():
+            sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)
+            sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)
+            bonita('/API/bpm/case/%s' % caso, 'DELETE')
+            print('     | bandeja · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
+
+
+def paridad_bandeja_detalle(asset, man, emp_asset):
+    """Pantalla de cada tarea de una OT real (solo con MAN_PARIDAD_BONITA=1): se crea una OT con el alta de MAN y se la hace avanzar por Bonita.
+    En cada tarea se comprueba que la pantalla de MAN muestre lo que corresponde (tarea, OT, equipo, comentarios, línea de tiempo) y no tenga
+    errores de PHP. No se compara con asset: su pantalla de tarea entra a Bonita con la contraseña del usuario y con el usuario de prueba falla
+    (muestra la primera OT sin caso), así que no hay una pantalla de asset equivalente para ese caso."""
+    if os.environ.get('MAN_PARIDAD_BONITA') != '1':
+        print('     | bandeja · detalle de tareas: no se corre (MAN_PARIDAD_BONITA=1 para correrlo)')
+        return
+    bonita, bonita_put, bonita_post = bonita_admin()
+    nick = os.environ.get('MAN_TEST_NICK', 'mig.man.a@trazalog.test')
+    uid = bonita('/API/identity/user?p=0&c=1&f=userName%%3D%s' % urllib.parse.quote(nick))[0]['id']
+    eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%d AND estado='AC' ORDER BY id_equipo LIMIT 1" % emp_asset)[0][0]
+    codigo = sql("SELECT codigo FROM equipos WHERE id_equipo=%s" % eq)[0][0]
+    antes = int(sql("SELECT IFNULL(MAX(id_orden), 0) FROM orden_trabajo")[0][0])
+    o = caso = None
+    try:
+        man.post_archivo(MAN + 'Otrabajo/guardar_agregar', {'equipo': eq, 'id_tarea': '', 'tareacustom': PREFIJO + ' detalle',
+                                                            'fechaInicio': '01/11/2026', 'fechaEntrega': '05/11/2026', 'suci': '', 'prov': ''},
+                         'inputPDF', '', b'')
+        fila = sql("SELECT id_orden, case_id FROM orden_trabajo WHERE id_orden>%d AND descripcion='%s detalle'" % (antes, PREFIJO))
+        if not fila or fila[0][1] in ('NULL', '0', ''):
+            comparar('detalle · OT con caso', 'una OT con caso', fila)
+            return
+        o, caso = fila[0]
+        vistos = set()
+        for paso in range(8):
+            ts = bonita('/API/bpm/humanTask?p=0&c=10&f=caseId%%3D%s' % caso)
+            if not ts:
+                break
+            t = ts[0]
+            bonita_put('/API/bpm/humanTask/%s' % t['id'], {'assigned_id': uid})
+            if t['name'] not in vistos:
+                vistos.add(t['name'])
+                pagina = man.get(MAN + 'Tarea/detaTarea/Add-Edit-Del/%s' % t['id'])
+                if os.environ.get('MAN_PARIDAD_VOLCAR'):
+                    open(os.path.join(os.environ['MAN_PARIDAD_VOLCAR'], 'detalle_%s.html' % t['name'].replace(' ', '_')), 'w', encoding='utf-8').write(pagina)
+                v = texto_vista(pagina)
+                esperado = [t['name'], 'Orden de Trabajo N°: %s / Mas Detalles' % o, 'Equipo: %s' % codigo, 'Línea de Tiempo', 'Comentarios']
+                comparar('detalle · %s · muestra tarea, OT, equipo, comentarios y línea de tiempo' % t['name'],
+                         [True] * len(esperado), [any(e in x for x in v['texto']) for e in esperado])
+                comparar('detalle · %s · sin errores de PHP' % t['name'], [],
+                         [x for x in v['texto'] if re.search(r'A PHP Error|A Database Error|Fatal error|Warning:|Notice:|Undefined (variable|index)', x)])
+                comparar('detalle · %s · tarea y OT en los campos ocultos' % t['name'], True,
+                         ('value="%s"' % t['id']) in pagina and ('value="%s"' % o) in pagina)
+            if t['name'] == 'Verifica Informe de Servicio':
+                edicion = man.get(MAN + 'Ordenservicio/cargarOrden/0/0/0/%s/?permission=Add-Edit-Del' % t['id'])
+                comparar('detalle · informe · con informe cargado se abre la edición con sus datos', True,
+                         'Prueba de informe' in edicion and 'Herramientas' not in edicion and 'Insumos' not in edicion
+                         and not re.search(r'A PHP Error|A Database Error|Fatal error|Warning:|Notice:|Undefined (variable|index)', re.sub(r'<script.*?</script>', '', edicion, flags=re.S)))
+            if t['name'] == 'Confecciona informe servicio':
+                # Se carga el informe por MAN (ventana, guardado y cierre de la tarea) como lo haría el usuario
+                ventana = man.get(MAN + 'Ordenservicio/cargarOrden/0/0/0/%s/?permission=Add-Edit-Del' % t['id'])
+                vv = texto_vista(ventana)
+                comparar('detalle · informe · la ventana de carga muestra la OT y las pestañas sin herramientas ni insumos', True,
+                         any('Informe de Servicios' in x for x in vv['texto']) and ('value="%s"' % o) in ventana
+                         and 'Herramientas' not in ventana and 'Insumos' not in ventana and 'Evidencias' in ventana)
+                comparar('detalle · informe · la ventana de carga sin errores de PHP', [],
+                         [x for x in vv['texto'] if re.search(r'A PHP Error|A Database Error|Fatal error|Warning:|Notice:|Undefined (variable|index)', x)])
+                r = man.post(MAN + 'Ordenservicio/setOrdenServ', {
+                    'datosInfoServicio[idTarBonita]': t['id'], 'datosInfoServicio[fecha_inicio]': '2026-10-29 08:00:00',
+                    'datosInfoServicio[fecha_fin]': '2026-10-29 10:30:00', 'datosInfoServicio[horometro_inicio]': '100',
+                    'datosInfoServicio[horometro_fin]': '120.5', 'tarea[0][0]': 'Prueba de informe', 'operario[0][0]': 'Operario', 'operario[0][1]': '213',
+                    'func': 'guardar'})
+                comparar('detalle · informe · se guarda y cierra la tarea', True, jload(r).get('status') is True if isinstance(jload(r), dict) else False)
+                comparar('detalle · informe · queda en la base', ['Prueba de informe', '213'],
+                         [sql("SELECT d.id_tarea FROM deta_ordenservicio d JOIN orden_servicio s ON s.id_orden=d.id_ordenservicio WHERE s.id_ot=%s" % o)[0][0],
+                          sql("SELECT a.usrId FROM asignausuario a JOIN orden_servicio s ON s.id_orden=a.id_orden WHERE s.id_ot=%s" % o)[0][0]])
+                continue
+            if t['name'] == 'Presta conformidad':
+                break
+            bonita_post('/API/bpm/userTask/%s/execution' % t['id'], {})
+        comparar('detalle · tareas recorridas (al menos 4)', True, len(vistos) >= 4)
+    finally:
+        if caso:
+            for tabla, col in (('orden_servicio_adjuntos', 'id_orden'), ('deta_ordenservicio', 'id_ordenservicio'), ('asignausuario', 'id_orden')):
+                sql("DELETE FROM %s WHERE %s IN (SELECT id_orden FROM orden_servicio WHERE id_ot=%s)" % (tabla, col, o))
+            sql("DELETE FROM orden_servicio WHERE id_ot=%s" % o)
+            sql("DELETE FROM case_empresa WHERE case_id=%s" % caso)
+            sql("DELETE FROM orden_trabajo WHERE id_orden=%s" % o)
+            bonita('/API/bpm/case/%s' % caso, 'DELETE')
+            bonita('/API/bpm/archivedCase/%s' % caso, 'DELETE')
+            print('     | detalle · caso de Bonita %s borrado; queda su fila en core.case_empresa de PostgreSQL' % caso)
+
+
+# ------------------------------------------------------------------------------------- calendario (Plan de Mantenimiento)
+def tabla_visible(pagina, id_tabla):
+    """Filas de una tabla del calendario como listas de textos de las celdas visibles (sin las ocultas); None si no está la tabla."""
+    m = re.search(r'<table id="%s".*?</table>' % id_tabla, pagina, re.S)
+    if not m:
+        return None
+    filas = []
+    for tr in re.findall(r'<tr[^>]*>(.*?)</tr>', m.group(0), re.S):
+        tds = re.findall(r'<td([^>]*)>(.*?)</td>', tr, re.S)
+        if tds:
+            filas.append([html.unescape(re.sub(r'<[^>]+>', '', t)).strip() for a, t in tds if 'hidden' not in a])
+    return sorted(filas)
+
+
+def opciones_filtro(pagina, formato):
+    """Opciones de cada lista del panel del filtro: {clave: [textos]}. formato 'asset' (<option>x</option>) o 'man' (<option value="x">)."""
+    out = {}
+    for clave, cuerpo in re.findall(r'<datalist id="(?:lst-)?(\w+)">(.*?)</datalist>', pagina, re.S):
+        out[clave] = sorted(html.unescape(o) for o in (re.findall(r'<option>(.*?)</option>', cuerpo) if formato == 'asset'
+                                                         else re.findall(r'<option value="(.*?)">', cuerpo)))
+    return out
+
+
+def paridad_calendario(asset, man, emp_asset):
+    """Plan de Mantenimiento (lecturas): períodos, órdenes del calendario, opciones del filtro y las cuatro tablas de lo que falta
+    programar (preventivo por tiempo, por contador, backlog y predictivo), con planes y órdenes de prueba en la empresa. Las tablas de
+    solicitudes urgentes dependen de la bandeja de Bonita de cada usuario y se prueban en e2e_calendario.py. La programación
+    (escrituras) no se compara con asset: asset lanza los casos como el usuario y el de prueba no tiene la contraseña de Bonita (T28)."""
+    pa, pm = ASSET + 'Calendario/', MAN + 'Calendario/'
+    # Períodos
+    comparar('calendario · períodos (sin datos: nada)', asset.post(pa + 'getperiodo', {}).strip(), man.post(pm + 'getperiodo', {}).strip())
+    comparar('calendario · períodos', jload(asset.post(pa + 'getperiodo', {'periodoE': ''})), jload(man.post(pm + 'getperiodo', {'periodoE': ''})))
+    # Filtro
+    comparar('calendario · opciones del filtro', opciones_filtro(asset.get(pa + 'panelFiltro'), 'asset'), opciones_filtro(man.get(pm + 'panelFiltro'), 'man'))
+    eq = sql("SELECT e.id_equipo FROM equipos e JOIN sector s ON s.id_sector=e.id_sector WHERE e.estado='AC' AND e.id_empresa=%d ORDER BY e.id_equipo LIMIT 1" % emp_asset)[0][0]
+    tarea = sql("SELECT id_tarea FROM tareas WHERE id_empresa=%d AND estado='AC' ORDER BY id_tarea LIMIT 1" % emp_asset)[0][0]
+    per = dict((d, i) for i, d in sql("SELECT idperiodo, descripcion FROM periodo WHERE id_empresa=%d" % emp_asset))
+    otra_emp = sql("SELECT id_empresa FROM equipos WHERE id_empresa<>%d LIMIT 1" % emp_asset)[0][0]
+    otro_eq = sql("SELECT id_equipo FROM equipos WHERE id_empresa=%s LIMIT 1" % otra_emp)[0][0]
+    ids = {}
+    try:
+        ins = lambda q: sql(q + "; SELECT LAST_INSERT_ID()")[0][0]
+        ids['prev'] = ins("INSERT INTO preventivo (id_equipo,id_tarea,perido,cantidad,ultimo,id_componente,critico1,horash,estadoprev,prev_duracion,id_unidad,prev_canth,id_empresa,lectura_base) "
+                          "VALUES (%s,%s,'%s',3,'2026-11-02',0,NULL,1,'C',60,1,1,%d,NULL)" % (eq, tarea, per['Diario'], emp_asset))
+        ids['cont'] = ins("INSERT INTO preventivo (id_equipo,id_tarea,perido,cantidad,ultimo,id_componente,critico1,horash,estadoprev,prev_duracion,id_unidad,prev_canth,id_empresa,lectura_base) "
+                          "VALUES (%s,%s,'%s',20,'2026-11-02',0,0,1,'C',30,1,1,%d,0)" % (eq, tarea, per.get('Ciclos', per.get('Horas')), emp_asset))
+        ids['back'] = ins("INSERT INTO tbl_back (id_equipo,id_tarea,fecha,horash,estado,back_duracion,id_unidad,back_canth,id_empresa,sore_id,tarea_opcional) "
+                          "VALUES (%s,%s,'2026-11-10',1,'C',45,1,1,%d,NULL,'%s tarea')" % (eq, tarea, emp_asset, PREFIJO))
+        ids['pred'] = ins("INSERT INTO predictivo (id_equipo,tarea_descrip,fecha,periodo,cantidad,horash,estado,pred_duracion,id_unidad,pred_canth,id_empresa) "
+                          "VALUES (%s,'%s','2026-11-12','%s',2,1,'C',90,1,1,%d)" % (eq, tarea, per['Mensual'], emp_asset))
+        # Órdenes del calendario: de distinto tipo, con y sin responsable, terminada, anulada, de otro mes y de otra empresa
+        ots = []
+        for tipo, dia, usr, est, emp, e in (('3', '2026-11-03 08:00:00', 'NULL', 'PL', emp_asset, eq), ('2', '2026-11-15 10:30:00', '213', 'AS', emp_asset, eq),
+                                           ('5', '2026-11-30 23:00:00', 'NULL', 'PL', emp_asset, eq), ('4', '2026-11-20 09:00:00', 'NULL', 'T', emp_asset, eq),
+                                           ('1', '2026-11-21 09:00:00', 'NULL', 'AN', emp_asset, eq), ('3', '2026-12-01 00:00:00', 'NULL', 'PL', emp_asset, eq),
+                                           ('3', '2026-11-04 08:00:00', 'NULL', 'PL', otra_emp, otro_eq)):
+            ots.append(ins("INSERT INTO orden_trabajo (tipo,id_solicitud,id_empresa,estado,id_equipo,descripcion,fecha_program,duracion,id_usuario_a,nro) "
+                           "VALUES ('%s',0,%s,'%s',%s,'%s ot',  '%s',45,%s,'1')" % (tipo, emp, est, e, PREFIJO, dia, usr)))
+        ids['ots'] = ots
+        # Órdenes del mes: misma lista en los dos (asset pide mes 0-based y año; MAN, el rango)
+        norm = lambda f: sorted([[str(x[k]) if x.get(k) is not None else None for k in ('id_orden', 'fecha_program', 'tipo', 'descripcion', 'duracion', 'id_usuario_a',
+                                                                                          'codigo', 'area', 'grupo', 'sector', 'origen')] for x in (f or [])])
+        a = jload(asset.post(pa + 'getcalendarot', {'month': 10, 'year': 2026}))
+        m = jload(man.post(pm + 'getcalendarot', {'desde': '2026-11-01', 'hasta': '2026-12-01'}))
+        comparar('calendario · órdenes de noviembre 2026 (con una terminada, una anulada, una de otra empresa y una de otro mes)', norm(a), norm(m))
+        comparar('calendario · órdenes: las de prueba del mes son las 3 vigentes de la empresa', 3, len([x for x in (m or []) if x['descripcion'] == PREFIJO + ' ot']))
+        comparar('calendario · órdenes: rango vacío', jload(asset.post(pa + 'getcalendarot', {'month': 0, 'year': 2001})), jload(man.post(pm + 'getcalendarot', {'desde': '2001-01-01', 'hasta': '2001-02-01'})))
+        comparar('calendario · órdenes: rango inválido', False, jload(man.post(pm + 'getcalendarot', {'desde': 'ayer', 'hasta': 'hoy'})))
+        # Tablas del mes
+        permiso = 'Correctivo-Preventivos-Backlog-Predictivo-'
+        ta = asset.post(pa + 'getTablas', {'mes': 11, 'year': 2026, 'permission': permiso, 'tareas[0][caseId]': '0'})
+        tm = man.post(pm + 'getTablas', {'mes': 11, 'year': 2026, 'permission': permiso})
+        for tabla in ('preventivo', 'backlog'):
+            comparar('calendario · tabla %s' % tabla, tabla_visible(ta, tabla), tabla_visible(tm, tabla))
+        # Por contador: asset rotula el período por su número (5, 6 y 7) y a una empresa con otros números siempre le pone "Horas" (T56); MAN, por su nombre
+        sin_per = lambda filas: [f[:4] + f[5:] for f in filas]
+        comparar('calendario · tabla preventivo_horas (sin la columna Período)', sin_per(tabla_visible(ta, 'preventivo_horas')), sin_per(tabla_visible(tm, 'preventivo_horas')))
+        comparar('calendario · tabla preventivo_horas: el período es el del plan', True,
+                 any(f[4] in ('Ciclos', 'Horas', 'Km') and f[1] == 'COMP-001' for f in tabla_visible(tm, 'preventivo_horas')))
+        sin_periodo = lambda filas: [f[:4] + f[5:] for f in filas]   # asset muestra el número del período; MAN su nombre
+        comparar('calendario · tabla predictivo (sin la columna Período: asset muestra el número y MAN el nombre)', sin_periodo(tabla_visible(ta, 'predictivo')),
+                 sin_periodo(tabla_visible(tm, 'predictivo')))
+        comparar('calendario · tabla preventivo trae el de prueba', True, any(f[1] == 'COMP-001' or f[2] for f in tabla_visible(tm, 'preventivo')))
+        for tit in ('Solicitud de Servicios (Noviembre 2026)', 'Preventivo (Noviembre 2026)', 'Preventivo por ciclos/horas (Noviembre 2026)', 'Backlog (Noviembre 2026)',
+                    'Predictivo (Noviembre 2026)'):
+            comparar('calendario · título "%s"' % tit, True, tit in ta and tit in tm)
+        # Solo las tablas permitidas
+        comparar('calendario · permisos: solo backlog', tabla_visible(asset.post(pa + 'getTablas', {'mes': 11, 'year': 2026, 'permission': 'Backlog-', 'tareas[0][caseId]': '0'}), 'backlog'),
+                 tabla_visible(man.post(pm + 'getTablas', {'mes': 11, 'year': 2026, 'permission': 'Backlog-'}), 'backlog'))
+        comparar('calendario · permisos: con "Backlog-" no hay tabla de preventivos', None, tabla_visible(man.post(pm + 'getTablas', {'mes': 11, 'year': 2026, 'permission': 'Backlog-'}), 'preventivo'))
+        comparar('calendario · mes inválido', '<HTTP 400>', man.post(pm + 'getTablas', {'mes': 13, 'year': 2026, 'permission': permiso}))
+        # Aislamiento: cambiar fecha y duración de una orden de otra empresa
+        ajena = ots[-1]
+        previo = sql("SELECT CAST(fecha_program AS CHAR), duracion FROM orden_trabajo WHERE id_orden=%s" % ajena)
+        comparar('calendario · mover una orden de otra empresa (T47)', False, jload(man.post(pm + 'updateDiaProg', {'id': ajena, 'prog': '2026-11-25 10:00:00'})))
+        comparar('calendario · estirar una orden de otra empresa (T47)', False, jload(man.post(pm + 'updateDuracion', {'id': ajena, 'duracion': 30})))
+        comparar('calendario · la orden de otra empresa no cambió', previo, sql("SELECT CAST(fecha_program AS CHAR), duracion FROM orden_trabajo WHERE id_orden=%s" % ajena))
+        # Mover y estirar una propia: asset y MAN dejan lo mismo
+        propia_a, propia_m = ots[0], ots[2]
+        ra = jload(asset.post(pa + 'updateDiaProg', {'id': propia_a, 'prog': '2026-11-05 11:15:00'}))
+        rm = jload(man.post(pm + 'updateDiaProg', {'id': propia_m, 'prog': '2026-11-05 11:15:00'}))
+        comparar('calendario · mover una orden propia (respuesta)', ra, rm)
+        rb = jload(asset.post(pa + 'updateDuracion', {'id': propia_a, 'duracion': 30}))
+        rn = jload(man.post(pm + 'updateDuracion', {'id': propia_m, 'duracion': 30}))
+        comparar('calendario · estirar una orden propia (respuesta)', rb, rn)
+        fila = "SELECT CAST(fecha_program AS CHAR), duracion FROM orden_trabajo WHERE id_orden=%s"
+        comparar('calendario · mover y estirar (fila)', sql(fila % propia_a), sql(fila % propia_m))
+        comparar('calendario · mover con fecha inválida', False, jload(man.post(pm + 'updateDiaProg', {'id': propia_m, 'prog': 'mañana'})))
+        # Ventana de la orden: de otra empresa no se muestra (T46); la propia trae su detalle
+        comparar('calendario · ventana de una orden de otra empresa (T46)', True, 'La orden no existe' in man.get(pm + 'verEjecutarOT/%s/' % ajena))
+        v = man.get(pm + 'verEjecutarOT/%s/' % propia_m)
+        comparar('calendario · ventana de la orden propia (detalle)', True, 'id="tblOrden"' in v and 'COMP-001' in v and 'id="ejecutar_ot"' not in v)
+    finally:
+        sql("DELETE FROM orden_trabajo WHERE descripcion='%s ot'" % PREFIJO)
+        for t, k, pk in (('preventivo', 'prev', 'prevId'), ('preventivo', 'cont', 'prevId'), ('tbl_back', 'back', 'backId'), ('predictivo', 'pred', 'predId')):
+            if k in ids:
+                sql("DELETE FROM %s WHERE %s=%s" % (t, pk, ids[k]))
+
+
+# ------------------------------------------------------------------ ABM de catálogo (MIG-ASSET-5a)
+# Cada entrada: controller de asset y de MAN, tabla, pk, columna marca (donde va el texto de prueba), columnas a comparar y los
+# datos que manda cada pantalla. El texto de prueba se agrega a la columna marca. emp = empresa de asset.
+def _cat(ctl_a, ctl_m, tabla, pk, marca, cols, alta, mod, baja, obtener, extra_alta=None, extra_mod=None):
+    return dict(ctl_a=ctl_a, ctl_m=ctl_m, tabla=tabla, pk=pk, marca=marca, cols=cols, alta=alta, mod=mod, baja=baja, obtener=obtener,
+                extra_alta=extra_alta or {}, extra_mod=extra_mod or {})
+
+
+def _std(ctl, nombre, tabla, pk, marca, campos, post_marca=None, lista='%s'):
+    """Controller con Guardar_x, Modificar_x, Eliminar_x y Obtener_x que reciben campos por nombre de columna."""
+    pm = post_marca or marca
+    return _cat(ctl, ctl, tabla, pk, marca, [marca] + [c for c in campos if c != marca] + ['id_empresa', 'estado'],
+                ('Guardar_' + nombre, pm), ('Modificar_' + nombre, pm), 'Eliminar_' + nombre, 'Obtener_' + nombre,
+                extra_alta=dict((c, 'x') for c in campos if c != marca), extra_mod=dict((c, 'y') for c in campos if c != marca))
+
+
+CATALOGOS = {
+    'grupo': dict(_std('Grupo', 'Grupo', 'grupo', 'id_grupo', 'descripcion', ['descripcion', 'form_id']),
+                  extra_alta={'form_id': '0'}, extra_mod={'formulario': '0'}),
+    'sector': _std('Sector', 'Sector', 'sector', 'id_sector', 'descripcion', ['descripcion']),
+    'contratista': _std('Contratista', 'Contratista', 'contratistas', 'id_contratista', 'nombre',
+                        ['nombre', 'contradireccion', 'contramail', 'contramail1', 'contracelular1', 'contracelular2', 'contratelefono',
+                         'contracontacto']),
+    'altparametro': _std('Altparametro', 'Altparametro', 'parametros', 'paramId', 'paramdescrip', ['paramdescrip', 'min']),
+    'family': _std('Family', 'Family', 'conffamily', 'famId', 'famName', ['famName']),
+    'marca': _std('Marca', 'Marca', 'marcasequipos', 'marcaid', 'marcadescrip', ['marcadescrip']),
+    'cliente': _std('Cliente', 'Cliente', 'admcustomers', 'cliId', 'cliName',
+                    ['cliName', 'cliDni', 'cliAddress', 'cliPhone', 'cliEmail', 'cliRazonSocial']),
+    'criticidad': _std('criticidad', 'criticidad', 'criticidad', 'id_criti', 'descripcion', ['descripcion']),
+    # Tareas estándar: asset lo tiene en Tarea/index2; MAN en su propio controller. visible no se compara (T69)
+    'tarea': dict(_std('Tarea', 'Tarea', 'tareas', 'id_tarea', 'descripcion', ['descripcion']), ctl_m='Tareaestandar', indice_a='index2'),
+}
+
+
+def paridad_catalogo(asset, man, emp_asset, clave):
+    c = CATALOGOS[clave]
+    pa = ASSET + c['ctl_a'] + '/'
+    pm = MAN + c['ctl_m'][0].upper() + c['ctl_m'][1:] + '/'
+    t, pk, marca = c['tabla'], c['pk'], c['marca']
+    cols = ', '.join(c['cols'])
+    fila = "SELECT %s FROM %s WHERE %s=%%s" % (cols, t, pk)
+    nom = clave
+
+    comparar(nom + ' · listado', celdas_tabla(asset.get(pa + c.get('indice_a', 'index') + '/Add-Edit-Del')), celdas_tabla(man.get(pm + 'index/Add-Edit-Del')))
+    propio = sql("SELECT %s FROM %s WHERE estado='AC' AND id_empresa=%d LIMIT 1" % (pk, t, emp_asset))
+    if propio:
+        ra, rm = jload(asset.post(pa + c['obtener'], {pk: propio[0][0]})), jload(man.post(pm + c['obtener'], {pk: propio[0][0]}))
+        if clave == 'cliente':
+            # T65: asset no contesta; MAN devuelve el cliente
+            comparar(nom + ' · obtener (propio): asset no contesta (T65) y MAN devuelve el cliente', (True, True),
+                     (ra == {'_no_json': ''}, isinstance(rm, list) and rm[0].get(pk) == propio[0][0]))
+        else:
+            comparar(nom + ' · obtener (propio)', ra, rm)
+
+    def datos(lado, extra, metodo_post):
+        d = dict(extra)
+        d[metodo_post] = PREFIJO + lado
+        return d
+    ra = jload(asset.post(pa + c['alta'][0], dict(datos(' A', c['extra_alta'], c['alta'][1]), id_empresa=emp_asset, estado='AC')))
+    rm = jload(man.post(pm + c['alta'][0], dict(datos(' M', c['extra_alta'], c['alta'][1]), id_empresa=emp_asset, estado='AC')))
+    if clave != 'cliente':
+        comparar(nom + ' · alta (respuesta)', ra, rm)
+    sel = "SELECT %s, %s FROM %s WHERE %s='%%s' ORDER BY %s DESC LIMIT 1" % (pk, cols, t, marca, pk)
+    fa, fm = sql(sel % (PREFIJO + ' A')), sql(sel % (PREFIJO + ' M'))
+    if not fa or not fm:
+        comparar(nom + ' · alta (fila creada)', bool(fa), bool(fm))
+        sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (t, marca, PREFIJO))
+        return
+    comparar(nom + ' · alta (fila en la base)', [x.replace(' A', ' M') for x in fa[0][1:]], list(fm[0][1:]))
+    ida, idm = fa[0][0], fm[0][0]
+
+    ra = jload(asset.post(pa + c['mod'][0], dict(datos(' A2', c['extra_mod'] or c['extra_alta'], c['mod'][1]), **{pk: ida})))
+    rm = jload(man.post(pm + c['mod'][0], dict(datos(' M2', c['extra_mod'] or c['extra_alta'], c['mod'][1]), **{pk: idm})))
+    if clave != 'cliente':
+        comparar(nom + ' · modificación (respuesta)', ra, rm)
+    ma, mm = sql(fila % ida), sql(fila % idm)
+    comparar(nom + ' · modificación (fila en la base)', [[x.replace(' A2', ' M2') for x in ma[0]]], [list(mm[0])])
+
+    ra = jload(asset.post(pa + c['baja'], {pk: ida}))
+    rm = jload(man.post(pm + c['baja'], {pk: idm}))
+    comparar(nom + ' · baja (respuesta)', ra, rm)
+    ba, bm = sql(fila % ida), sql(fila % idm)
+    comparar(nom + ' · baja (fila en la base)', [[x.replace(' A2', ' M2') for x in ba[0]]], [list(bm[0])])
+
+    ajeno = sql("SELECT %s FROM %s WHERE id_empresa<>%d AND estado='AC' LIMIT 1" % (pk, t, emp_asset))
+    if ajeno:
+        comparar(nom + ' · aislamiento: MAN no ve registros de otra empresa', None, jload(man.post(pm + c['obtener'], {pk: ajeno[0][0]})))
+        antes = sql(fila % ajeno[0][0])
+        man.post(pm + c['mod'][0], dict(datos(' HACK', c['extra_mod'] or c['extra_alta'], c['mod'][1]), **{pk: ajeno[0][0]}))
+        man.post(pm + c['baja'], {pk: ajeno[0][0]})
+        comparar(nom + ' · aislamiento: MAN no modifica ni da de baja registros de otra empresa', antes, sql(fila % ajeno[0][0]))
+    sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (t, marca, PREFIJO))
+
+
+def paridad_suc_sis(asset, man, emp_asset, clave):
+    """Sucursales y Sistemas: alta (agregarX), edición (editarX con 'parametros') y baja (bajaX), como en asset."""
+    if clave == 'sucursal':
+        ctl, tabla, pk, marca = 'Sucursal', 'sucursal', 'id_sucursal', 'descripc'
+        alta = lambda m: {'descripcion': m, 'direccion': 'd', 'zona': 'z', 'telefono': 't'}
+        mod = lambda m, i: {'idsucursal': i, 'parametros[descripc]': m, 'parametros[dire]': 'd2', 'parametros[zonas]': 'z2', 'parametros[telefono]': 't2'}
+        baja = lambda i: {'idSucursal': i}
+        cols, m_alta, m_mod, m_baja = 'descripc, dire, zonas, telefono, id_empresa, estado', 'agregarSucursal', 'editarSucursal', 'bajaSucursal'
+    else:
+        ctl, tabla, pk, marca = 'SistemaABM', 'sistema', 'sistemaid', 'descripcion'
+        alta = lambda m: {'descripcion': m}
+        mod = lambda m, i: {'idsistema': i, 'parametros[descripcion]': m}
+        baja = lambda i: {'idsistema': i}
+        cols, m_alta, m_mod, m_baja = 'descripcion, id_empresa, estado', 'agregarSistema', 'editarSistema', 'bajaSistema'
+    pa, pm = ASSET + ctl + '/', MAN + ctl + '/'
+    comparar(clave + ' · listado', celdas_tabla(asset.get(pa + 'index/Add-Edit-Del')), celdas_tabla(man.get(pm + 'index/Add-Edit-Del')))
+    asset.post(pa + m_alta, alta(PREFIJO + ' A'))
+    man.post(pm + m_alta, alta(PREFIJO + ' M'))
+    sel = "SELECT %s, %s FROM %s WHERE %s='%%s' ORDER BY %s DESC LIMIT 1" % (pk, cols, tabla, marca, pk)
+    fa, fm = sql(sel % (PREFIJO + ' A')), sql(sel % (PREFIJO + ' M'))
+    if not fa or not fm:
+        comparar(clave + ' · alta (fila creada)', bool(fa), bool(fm))
+        sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (tabla, marca, PREFIJO))
+        return
+    comparar(clave + ' · alta (fila en la base)', [x.replace(' A', ' M') for x in fa[0][1:]], list(fm[0][1:]))
+    ida, idm = fa[0][0], fm[0][0]
+    asset.post(pa + m_mod, mod(PREFIJO + ' A2', ida))
+    man.post(pm + m_mod, mod(PREFIJO + ' M2', idm))
+    fila = "SELECT %s FROM %s WHERE %s=%%s" % (cols, tabla, pk)
+    comparar(clave + ' · edición (fila en la base)', [[x.replace(' A2', ' M2') for x in sql(fila % ida)[0]]], [sql(fila % idm)[0]])
+    ra, rm = jload(asset.post(pa + m_baja, baja(ida))), jload(man.post(pm + m_baja, baja(idm)))
+    comparar(clave + ' · baja (isOk)', ra.get('isOk'), rm.get('isOk'))
+    comparar(clave + ' · baja (fila en la base)', [[x.replace(' A2', ' M2') for x in sql(fila % ida)[0]]], [sql(fila % idm)[0]])
+    ajeno = sql("SELECT %s FROM %s WHERE id_empresa<>%d AND estado='AC' LIMIT 1" % (pk, tabla, emp_asset))
+    if ajeno:
+        antes = sql(fila % ajeno[0][0])
+        man.post(pm + m_mod, mod(PREFIJO + ' HACK', ajeno[0][0]))
+        man.post(pm + m_baja, baja(ajeno[0][0]))
+        comparar(clave + ' · aislamiento: MAN no modifica ni da de baja registros de otra empresa', antes, sql(fila % ajeno[0][0]))
+    sql("DELETE FROM %s WHERE %s LIKE '%s%%'" % (tabla, marca, PREFIJO))
+
+
 PANTALLAS = {
     'area': lambda a, m, e: paridad_abm(a, m, e, 'area', 'area', 'id_area'),
     'proceso': lambda a, m, e: paridad_abm(a, m, e, 'proceso', 'proceso', 'id_proceso'),
+    'sucursal': lambda a, m, e: paridad_suc_sis(a, m, e, 'sucursal'),
+    'sistema': lambda a, m, e: paridad_suc_sis(a, m, e, 'sistema'),
     'parametro': paridad_parametro,
+    **{k: (lambda a, m, e, k=k: paridad_catalogo(a, m, e, k)) for k in CATALOGOS},
     'componente': paridad_componente,
     'equipo': paridad_equipo,
     'planes': paridad_planes,
     'solicitud': paridad_solicitud,
+    'ot': paridad_ot,
+    'ot_escrituras': paridad_ot_escrituras,
+    'ot_bonita': paridad_ot_bonita,
+    'informe': paridad_informe,
+    'informe_bonita': paridad_informe_bonita,
+    'lectura': paridad_lectura,
+    'bandeja': paridad_bandeja,
+    'bandeja_detalle': paridad_bandeja_detalle,
+    'calendario': paridad_calendario,
 }
 
 if __name__ == '__main__':

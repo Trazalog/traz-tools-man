@@ -382,3 +382,165 @@ if (!function_exists('tools_herramientas_full')) {
         return $out;
     }
 }
+
+/*
+ * Entregas de pedidos y uso de herramientas de una OT (informe de servicio, MIG-ASSET-2). Mismas funciones que
+ * tools_helper.php de asset (F4/F5 de REQ-ASSET-ALM), con las constantes de tools.
+ */
+if (!function_exists('tools_lista_rest')) {
+    /**
+     * GET a un DataService de tools; devuelve la lista $raiz.$fila de la respuesta (una sola fila llega como objeto).
+     *
+     * @return array
+     */
+    function tools_lista_rest($url, $raiz, $fila)
+    {
+        $ci =& get_instance();
+        $aux  = $ci->rest->callAPI('GET', $url);
+        $resp = json_decode($aux['data'], true);
+        $out  = isset($resp[$raiz][$fila]) ? $resp[$raiz][$fila] : array();
+        if ($out && !isset($out[0])) {
+            $out = array($out);
+        }
+        return $out;
+    }
+}
+
+if (!function_exists('tools_pedidos_ot')) {
+    /** Pedidos de materiales de una OT de asset en el almacén de tools, de la empresa de la sesión. @return array */
+    function tools_pedidos_ot($idOt)
+    {
+        $emprId = tools_empr_id();
+        if ($emprId === null) {
+            return array();
+        }
+        return tools_lista_rest(REST_ALM . '/pedidos/orden/' . (int) $idOt . '/' . $emprId, 'pedidos', 'pedido');
+    }
+}
+
+if (!function_exists('tools_pedido_detalle')) {
+    /** Detalle de un pedido de materiales. @return array */
+    function tools_pedido_detalle($pema)
+    {
+        return $pema ? tools_lista_rest(REST_ALM . '/pedidos/detalle/' . (int) $pema, 'detalles', 'detalle') : array();
+    }
+}
+
+if (!function_exists('tools_entregas_pedido')) {
+    /** Entregas de un pedido. @return array */
+    function tools_entregas_pedido($pema)
+    {
+        return $pema ? tools_lista_rest(REST_ALM . '/entregas/pedido/' . (int) $pema, 'entregas', 'entrega') : array();
+    }
+}
+
+if (!function_exists('tools_entrega_detalle')) {
+    /** Detalle de una entrega. @return array */
+    function tools_entrega_detalle($enma)
+    {
+        return $enma ? tools_lista_rest(REST_ALM . '/entregas/detalle/' . (int) $enma, 'detalles', 'detalle') : array();
+    }
+}
+
+if (!function_exists('tools_salida_fecha')) {
+    /** Salida de pañol de un vale. @return array|null */
+    function tools_salida_fecha($sapa)
+    {
+        $ci =& get_instance();
+        if (!$sapa) {
+            return null;
+        }
+        $aux  = $ci->rest->callAPI('GET', REST_PAN . '/salida/fecha/' . (int) $sapa);
+        $resp = json_decode($aux['data'], true);
+        return isset($resp['salida']) ? $resp['salida'] : null;
+    }
+}
+
+if (!function_exists('tools_devolucion_herramienta')) {
+    /** Fecha de la primera devolución de la herramienta desde $desde, o null. @return string|null */
+    function tools_devolucion_herramienta($herrId, $desde)
+    {
+        $ci =& get_instance();
+        if (!$herrId || !$desde) {
+            return null;
+        }
+        $aux  = $ci->rest->callAPI('GET', REST_PAN . '/herramienta/' . (int) $herrId . '/devolucion/desde/' . rawurlencode($desde));
+        $resp = json_decode($aux['data'], true);
+        $f = isset($resp['devolucion']['fecha']) ? $resp['devolucion']['fecha'] : '';
+        return ($f !== '' && $f !== null) ? $f : null;
+    }
+}
+
+if (!function_exists('tools_dias_entre')) {
+    /** Días enteros entre dos fechas (sin $hasta: hasta hoy); nunca negativo. @return int */
+    function tools_dias_entre($desde, $hasta)
+    {
+        if (!$desde) {
+            return 0;
+        }
+        $d1 = strtotime(substr($desde, 0, 10));
+        $d2 = $hasta ? strtotime(substr($hasta, 0, 10)) : time();
+        $dias = (int) floor(($d2 - $d1) / 86400);
+        return $dias < 0 ? 0 : $dias;
+    }
+}
+
+if (!function_exists('tools_normaliza_salidas')) {
+    /** Desempaqueta {salidas:{salida:[...] | {...}}} a una lista (el DSS devuelve un objeto suelto si hay uno solo). @return array */
+    function tools_normaliza_salidas($resp)
+    {
+        if (!isset($resp['salidas']['salida'])) {
+            return array();
+        }
+        $s = $resp['salidas']['salida'];
+        return isset($s['sapa_id']) ? array($s) : $s;
+    }
+}
+
+if (!function_exists('tools_vales_por_dni')) {
+    /** Vales de salida del pañol de tools de un DNI entre dos fechas (aaaa-mm-dd), para el mantenedor (F5 de asset). @return array */
+    function tools_vales_por_dni($dni, $desde, $hasta)
+    {
+        $ci =& get_instance();
+        $dni = trim((string) $dni);
+        $empr = tools_empr_id();
+        if ($dni === '' || $empr === null) {
+            return array();
+        }
+        $aux = $ci->rest->callAPI('GET', REST_PAN . '/salidas/dni/' . rawurlencode($dni) . '/empresa/' . $empr . '/desde/' . $desde . '/hasta/' . $hasta);
+        return tools_normaliza_salidas(json_decode($aux['data'], true));
+    }
+}
+
+if (!function_exists('tools_vales')) {
+    /** Vales de salida del pañol de tools entre dos fechas, sin filtro de DNI (supervisor, F5 de asset). @return array */
+    function tools_vales($desde, $hasta)
+    {
+        $ci =& get_instance();
+        $empr = tools_empr_id();
+        if ($empr === null) {
+            return array();
+        }
+        $aux = $ci->rest->callAPI('GET', REST_PAN . '/salidas/empresa/' . $empr . '/desde/' . $desde . '/hasta/' . $hasta);
+        return tools_normaliza_salidas(json_decode($aux['data'], true));
+    }
+}
+
+if (!function_exists('tools_herramientas_de_vale')) {
+    /** Herramientas de un vale del pañol de tools: lista de herr_id, codigo, descripcion. @return array */
+    function tools_herramientas_de_vale($sapa)
+    {
+        $ci =& get_instance();
+        if (!$sapa) {
+            return array();
+        }
+        $aux = $ci->rest->callAPI('GET', REST_PAN . '/panol/salida/' . (int) $sapa . '/herramientas');
+        $resp = json_decode($aux['data'], true);
+        if (!isset($resp['herramientas']['herramienta'])) {
+            return array();
+        }
+        $h = $resp['herramientas']['herramienta'];
+        return isset($h['herr_id']) ? array($h) : $h;
+    }
+}
+

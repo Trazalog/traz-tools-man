@@ -1,3 +1,4 @@
+<?php $this->load->view(MAN . '_autocompletar'); ?>
 <input type="hidden" id="permission" value="<?php echo $permission;?>">
 <div class="row">
   <div class="col-xs-12">
@@ -9,8 +10,8 @@
 </div>
   <div class="row">
     <div class="col-xs-12">
-      <div class="box">
-        <div class="box-header">
+      <div class="box box-primary">
+        <div class="box-header with-border">
           <h3 class="box-title">Preventivo</h3>
           <?php
           if (strpos($permission,'Add') !== false) {
@@ -897,3 +898,4 @@ function ordenaArregloDeObjetosPor(propiedad) {
 
 
 </script>
+

@@ -1,1565 +1,562 @@
 <?php if ( ! defined('BASEPATH')) exit('No direct script access allowed');
 
-class Otrabajos extends CI_Model {
-
+/**
+ * Órdenes de trabajo.
+ *
+ * MIG-ASSET-2: portado desde el asset actual (diverge del fork). Datos por MANDataService (ADR-014), limitado a la
+ * empresa de la sesión (asset no filtraba getpencil, getOrigenOt, getcliente, getpedidos ni las vistas de la OT);
+ * herramientas e insumos del pañol y del almacén de tools (man_tools_helper). Lo que habla con Bonita va por
+ * toolsMANAPI y la plantilla BPM (A5). Se conservan firmas y formato de salida del model de asset (E9).
+ */
+class Otrabajos extends CI_Model
+{
 	function __construct()
 	{
 		parent::__construct();
-        $this->assetDB = $this->load->database('asset_db', TRUE);
-	}
-	
-	/**
-	 * Trae las ordenes de de trabajo de la empresa logueada.
-	 *
-	 * @return  Array   Arreglo con Ordenes de Trabajo.
-	 */
-	function otrabajos_List( $ot=NULL, $tipo ) // Ok
-	{
-	
-		$userdata = $this->session->userdata('user_data');
-		$empId    = $userdata[0]['id_empresa'];
-	
-		$this->assetDB->select('orden_trabajo.*, tbl_tipoordentrabajo.descripcion AS tipoDescrip, 
-												user1.usrName AS nombre, user1.usrLastName,
-												sisusers.usrName, 
-												sisusers.usrLastName, equipos.codigo, 
-												0 as grpId,
-												equipos.id_equipo,
-												admcustomers.cliRazonSocial AS nomCli,
-												orden_servicio.id_orden AS ordenservicioId');
-		$this->assetDB->from('orden_trabajo');
-		$this->assetDB->join('tbl_tipoordentrabajo', 'tbl_tipoordentrabajo.tipo_orden = orden_trabajo.tipo');
-		$this->assetDB->join('sisusers', 'sisusers.usrId = orden_trabajo.id_usuario');
-		$this->assetDB->join('sisusers AS user1', 'orden_trabajo.id_usuario_a = user1.usrId', 'left');//usuario asignado?
-		$this->assetDB->join('equipos','equipos.id_equipo = orden_trabajo.id_equipo');
-		$this->assetDB->join('admcustomers','admcustomers.cliId = equipos.id_customer');
-	
-		//LEFT JOIN orden_servicio ON orden_trabajo.id_orden = orden_servicio.id_ot
-
-		$this->assetDB->join('orden_servicio', 'orden_trabajo.id_orden = orden_servicio.id_ot', 'left');
-	
-		$this->assetDB->where('equipos.estado !=','AN');
-
-		if($tipo == 1){
-			$this->assetDB->where('orden_trabajo.tipo', 1);
-			
-		}
-
-		$this->assetDB->where('orden_trabajo.id_empresa', $empId);
-		$query = $this->assetDB->get();
-
-
-
-
-		if ($query->num_rows()!=0)
-		{
-			return $query->result_array();
-		}
-		else
-		{
-			return false;
-		}
+		$this->load->helper(array('man', 'man_tools'));
 	}
 
-	/**
-	 * Trae los proveedores de la empresa logueada.
-	 *
-	 * @return  Array   Arreglo con Proveedores.
-	 */
-	function getproveedor() // Ok
-	{
-			$userdata = $this->session->userdata('user_data');
-			$empId    = $userdata[0]['id_empresa'];
-			$this->assetDB->select('abmproveedores.provnombre, abmproveedores.provid');
-			$this->assetDB->from('abmproveedores');
-			$this->assetDB->where('abmproveedores.estado', 'AC');
-			$this->assetDB->where('abmproveedores.id_empresa', $empId);
-			$query = $this->assetDB->get();
-
-			if ($query->num_rows()!=0)
-			{
-					return $query->result_array();
-			}
-			else
-			{
-					return false;
-			}
-	}
-	/**
-	 * Trae las ordenes de de trabajo de ua empresa logueada.
-	 *
-	 * @return  Array   Arreglo con Ordenes de Trabajo.
-	 */
-	function traer_sucursal() // Ok
-	{
-			$userdata = $this->session->userdata('user_data');
-			$empId    = $userdata[0]['id_empresa'];
-			$query    = $this->assetDB->get_where('sucursal', array('id_empresa' => $empId));
-			if($query->num_rows()>0)
-			{
-					return $query->result();
-			}
-			else
-			{
-					return false;
-			}       
-	}
-	/**
-	 * Trae las ordenes de de trabajo de ua empresa logueada.
-	 *
-	 * @return  Array   Arreglo con Ordenes de Trabajo.
-	 */
-	function getequipo() // Ok
-	{
-			$userdata = $this->session->userdata('user_data');
-			$empId    = $userdata[0]['id_empresa'];
-			$this->assetDB->select('*');
-			$this->assetDB->from('equipos');
-			$this->assetDB->where('id_empresa', $empId);
-			$this->assetDB->where('estado !=', 'AN');
-			//$this->assetDB->where( array('estado'=>'AC', 'id_empresa'=>$empId) );
-			//$this->assetDB->or_where('estado', 'RE');
-			$query = $this->assetDB->get();
-			if($query->num_rows()>0)
-			{
-					return $query->result();
-			}
-			else
-			{
-					return false;
-			}   
+	/** Proveedores activos. @return array|false */
+	function getproveedor(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getproveedor()");
+		return $this->filas('/ots/proveedores/empresa/' . man_empresa());
 	}
 
-	
-	// Trae equipos por empresa logueada - Listo
+	/** Sucursales. @return array|false objetos */
+	function traer_sucursal(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | traer_sucursal()");
+		return $this->objetos('/ots/sucursales/empresa/' . man_empresa());
+	}
+
+	/** Equipos no anulados (todas las columnas). @return array|false objetos */
+	function getequipo(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getequipo()");
+		return $this->objetos('/equipos/no-anulados/empresa/' . man_empresa());
+	}
+
+	/** Equipos no anulados (id y código). @return array|false */
 	function getEquiposNuevaOT(){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | listOrden()");
-		$empId = empresa();
-			
-		$this->assetDB->select('equipos.id_equipo,equipos.codigo');
-		$this->assetDB->from('equipos');
-		$this->assetDB->where('equipos.estado!=', 'AN');
-		$this->assetDB->where('equipos.id_empresa', $empId);
-		$query = $this->assetDB->get();
-		
-	 	if ($query->num_rows()!=0){
-	 		return $query->result_array();
-	 	}else{	
-	 		return false;
-	 	}	
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getEquiposNuevaOT()");
+		return $this->filas('/equipos/no-anulados/codigos/empresa/' . man_empresa());
 	}
-	/**
-    * Trae info de equipos por ID y por empresa logueada
-    * @param Integer $id_equipo id del equipo
-    * @return Array data del equipo
-    */
+
+	/** Equipo con marca y cliente. @return array|false */
 	function getInfoEquiposNuevaOT($id){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getInfoEquipoNuevaOT($id)");
-    	$empId = empresa();
-		
-		$this->assetDB->select('equipos.*, marcasequipos.marcadescrip, admcustomers.cliRazonSocial AS nomCli');
-		$this->assetDB->join('marcasequipos', 'marcasequipos.marcaid = equipos.marca');
-		$this->assetDB->join('admcustomers', 'admcustomers.cliId = equipos.id_customer' );
-		$this->assetDB->from('equipos');
-		$this->assetDB->where('equipos.id_empresa', $empId);
-		$this->assetDB->where('equipos.id_equipo', $id); 	
-		$query= $this->assetDB->get();
-	
-		if ($query->num_rows()!=0){
-			return $query->result_array();
-		}else{
-			return false;
-		}
-	}
-	/**
-	 * Devuelve la descripcion para una tarea estandar.por ID
-	 * @param Integer $id_tar id de tarea
-	 * @return String descripcion de la tarea.
-	*/
-	function getDescTareaSTD($id_tar){
-		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getDescTareaSTD(ID tarea: $id_tar)");
-		$this->assetDB->select('tareas.descripcion');
-		$this->assetDB->from('tareas');
-		$this->assetDB->where('tareas.id_tarea', $id_tar);
-		$query = $this->assetDB->get();
-		$row = $query->row();	
-		
-		return $row->descripcion; 
-	}
-	/**
-	 * Guarda Orden de Trabajo
-	 * @param Array $data array con los datos de la OT.
-	 * @return Int Id de la OT guardada.
-	 */
-	function guardar_agregar($data){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | guardar_agregar(".json_encode($data).")");
-		$this->assetDB->insert("orden_trabajo", $data);
-		$id_insert = $this->assetDB->insert_id(); 
-		return $id_insert;
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getInfoEquiposNuevaOT(" . json_encode($id) . ")");
+		return $this->filas('/ots/equipo/' . (int) $id . '/info/empresa/' . man_empresa());
 	}
 
-	/**
-	 * guarda responsable en modalejecutar ot al ser 
-	 * seleccionado en tabla Orden_trabajo
-	 * 
-	 */
-	function updateResponsables($id_orden, $id_responsable){
-		$this->assetDB->set('orden_trabajo.id_usuario_a', $id_responsable);
-		$this->assetDB->where('orden_trabajo.id_orden', $id_orden);
-		$response = $this->assetDB->update('orden_trabajo');
-		return $response;
-	}
-	/**
-	 * guarda responsable en modalejecutar ot al ser 
-	 * seleccionado en tabla Orden_trabajo
-	 * 
-	 */
-	function updateTarea($id_orden, $idTarea, $tarea){
-		
-	
-		$this->assetDB->where('orden_trabajo.id_orden', $id_orden);
-		$response = $this->assetDB->update('orden_trabajo', array('id_tarea'=>$idTarea,
-		'descripcion'=>$tarea));
-		return $response;
+	/** OT a editar. @return array|int filas o 0 */
+	function getpencil($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getpencil(" . json_encode($id) . ")");
+		$filas = $this->filas('/ot/' . (int) $id . '/editar/empresa/' . man_empresa());
+		return $filas ? $filas : 0;
 	}
 
-
-	/**
-	 * Guarda el Case id generado por bonita en la OT
-	 * @param Integer $case_id id de case; @param Integer $id id de OT
-	 * @return Bool true si se actualizo, false si no.
-	 */
-	function setCaseidenOTNueva($case_id, $id){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | setCaseidenOTNueva(case_id: $case_id |id_ot : $id");
-		$this->assetDB->where('orden_trabajo.id_orden', $id);
-		return $this->assetDB->update('orden_trabajo', array('case_id'=>$case_id));			
-	}
-	//////////////		EDICION 	//////////////////
-		/**
-		 * Devuelve valores de la OT con id_orden = $id.
-		 * @param Integer Id de Orden de Trabajo.
-		 * @return Array datos de la OT
-		 */
-		function getpencil($id) {
-			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getpencil(id OT: $id");
-			$this->assetDB->select('orden_trabajo.id_orden,
-												orden_trabajo.id_tarea,												
-												orden_trabajo.nro,
-												orden_trabajo.fecha_program,
-												orden_trabajo.fecha_inicio,
-												orden_trabajo.fecha_terminada,
-												orden_trabajo.descripcion AS tareadescrip,
-												orden_trabajo.estado,
-												orden_trabajo.id_usuario,
-												orden_trabajo.id_usuario_a,
-												orden_trabajo.id_usuario,
-												orden_trabajo.id_sucursal,
-												admcustomers.cliRazonSocial AS nomCli,
-												sucursal.descripc,											
-												abmproveedores.provnombre,
-												abmproveedores.provid,
-												equipos.id_equipo,
-												equipos.fecha_ingreso,
-												
-												equipos.ubicacion,
-												equipos.descripcion AS equipodescrip,
-												equipos.codigo,
-												marcasequipos.marcadescrip AS marca');
-			$this->assetDB->from('orden_trabajo');		
-			$this->assetDB->join('equipos', 'equipos.id_equipo = orden_trabajo.id_equipo');
-			$this->assetDB->join('sucursal', 'sucursal.id_sucursal = orden_trabajo.id_sucursal', 'left');
-			$this->assetDB->join('marcasequipos', 'equipos.marca = marcasequipos.marcaid');
-			//$this->assetDB->join('sisusers', 'sisusers.usrId=orden_trabajo.id_usuario');
-			$this->assetDB->join('abmproveedores', 'abmproveedores.provid=orden_trabajo.id_proveedor', 'left');
-			$this->assetDB->join('admcustomers','admcustomers.cliId = equipos.id_customer');
-			$this->assetDB->where('orden_trabajo.id_orden', $id);
-			$query = $this->assetDB->get();
-			
-			if( $query->num_rows() > 0)
-			{
-				return $query->result_array();
+	/** Herramientas de la OT: las del pañol de tools completadas, más las de texto libre. @return array */
+	function getOTHerramientas($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTHerramientas(" . json_encode($id) . ")");
+		$rows = $this->filas('/ot/' . (int) $id . '/herramientas/empresa/' . man_empresa());
+		$libres = array();
+		$catalogo = array();
+		foreach ((array) $rows as $r) {
+			if ((int) $r['herrId'] === 0 && empty($r['descripcion_libre'])) {
+				continue; // fila de texto libre que perdió el texto al editar la OT (H35): no es ninguna herramienta
 			}
-			else {
-				return 0;
-			}
-		}
-		/**
-		 * Trae herramientas por id de preventivo para Editar
-		 *  @param Integer $idp id de la orden de trabajo
-		 *  @return Array herramientas de la OT
-		*/
-		function getOTHerramientas($id){
-			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTHerramientas(id OT: $id");	
-			$empId = empresa(); 
-
-			$this->assetDB->select('tbl_otherramientas.cantidad,
-													herramientas.herrcodigo,
-													herramientas.herrmarca,
-													herramientas.herrdescrip,
-													herramientas.herrId');
-			$this->assetDB->from('tbl_otherramientas');
-			$this->assetDB->join('herramientas', 'herramientas.herrId = tbl_otherramientas.herrId');   
-			$this->assetDB->where('tbl_otherramientas.otId', $id);        
-			$this->assetDB->where('tbl_otherramientas.id_empresa', $empId);
-			$query= $this->assetDB->get();
-
-			if( $query->num_rows() > 0){
-				return $query->result_array();
-			}else{
-				return 0;
-			}
-		}
-		/**
-		 * Trae insumos por id de preventivo para Editar
-		 *  @param Integer $idp id de la orden de trabajo
-		 *  @return Array insumos de la OT
-		*/
-		function getOTInsumos($id){
-			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTHerramientas(id OT: $id");	
-			$empId = empresa(); 
-
-			$this->assetDB->select('tbl_otinsumos.id,
-													tbl_otinsumos.cantidad,
-													articles.artBarCode,
-													articles.artId,
-													articles.artDescription,
-													articles.id_empresa');                            
-			$this->assetDB->from('tbl_otinsumos');
-			$this->assetDB->join('articles', 'articles.artId = tbl_otinsumos.artId');   
-			$this->assetDB->where('tbl_otinsumos.otId', $id);        
-			$this->assetDB->where('articles.id_empresa', $empId);
-			$query= $this->assetDB->get(); 
-
-			if( $query->num_rows() > 0){
-				return $query->result_array();
-			}else {
-				return 0;
-			}
-		}
-		/**
-		 * 	Trae adjuntos de OT por id
-		 *  @param Integer $idp id de la orden de trabajo
-		 *  @return Array insumos de la OT
-		*/
-		function getOTadjuntos($id){
-			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTadjuntos(id OT: $id");	
-			$this->assetDB->select('tbl_otadjuntos.*');
-			$this->assetDB->from('tbl_otadjuntos');
-			$this->assetDB->where('tbl_otadjuntos.otId', $id);
-			$query = $this->assetDB->get();
-
-			if( $query->num_rows() > 0)
-			{
-				return $query->result_array();
-			}
-			else {
-				return 0;
-			}
-		}
-		/**
-		 * Guarda le edicion de una OT (actualiza OT).
-		 *
-		 * @param   Int     $idequipo   Id de equipo.
-		 * @param   Array   $data       Arreglo con los datos a editar del equipo $idequipo.
-		 */
-		function update_edita($id,$data) // Ok
-		{
-				$this->assetDB->where('id_orden', $id);
-				$query = $this->assetDB->update("orden_trabajo",$data);
-				return $query;
-		}
-		/**
-		 * guarda adjunto en Edicion y en OT nueva
-		 * @param String $adjunto nombre codificado del adjunto.
-		 * @return Bool  true/false segun resultado de la operacion.
-		 */
-		function setAdjunto($adjunto){
-			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | setAdjunto(nombre: $adjunto");
-			$query = $this->assetDB->insert("tbl_otadjuntos", $adjunto);
-			return $query;
-		}
-		// Elimina adjunto por id 
-		function eliminarAdjunto($id){
-			$this->assetDB->where('id', $id);
-			$query = $this->assetDB->delete('tbl_otadjuntos');
-			return $query;
-		}
-
-		// Delete herramientas 
-		function deleteHerramOT($id){        
-			$this->assetDB->where('otId', $id);
-			$query = $this->assetDB->delete('tbl_otherramientas');
-			return $query;
-		}
-		/**
-		*Guarda el batch de datos de herramientas cargados en la OT
-		* @param Array $herram datos de las herramientas
-		* @return Int/Bool id de la cantidad de herramientas guardadas o false si no se guardo.
-		*/
-		function insertOTHerram($herram){
-			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | insertOTHerram(". json_encode($herram).")");
-			$query = $this->assetDB->insert_batch("tbl_otherramientas",$herram);
-			return $query;
-		}
-		// Delete insumos
-		function deleteInsumOT($id){
-			$this->assetDB->where('otId', $id);
-			$query = $this->assetDB->delete('tbl_otinsumos');
-			return $query;
-		}
-		/**
-		*Guarda el batch de datos de insumos cargados en la OT
-		* @param Array $insumo datos de los insumos
-		* @return Int/Bool id de la cantidad de insumos guardados o false si no se guardo.
-		*/
-		// Guarda el bacht de insumos 
-		function insertOTInsum($insumo){
-			log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | insertOTInsum(". json_encode($insumo).")");
-			$query = $this->assetDB->insert_batch("tbl_otinsumos",$insumo);
-			return $query;
-		}
-
-	//////////////		FIN EDICION 	//////////////////
-
-
-	/**
-	 * Devuelve el listado de tareas asociadas a una OT.
-	 *
-	 * @param   Int     $idglob     Id de Orden de Trabajo.
-	 * @return  Array               Listado de Tareas.
-	 */
-	function cargartareas($idglob) // Ok
-	{
-			//$userdata = $this->session->userdata('user_data');
-			//$empId    = $userdata[0]['id_empresa'];
-			$this->assetDB->select('*');
-			$this->assetDB->from('tbl_listarea');
-			$this->assetDB->join('sisusers', 'sisusers.usrId = tbl_listarea.id_usuario', 'left outer');
-			$this->assetDB->where('tbl_listarea.id_orden',$idglob);
-			//$this->assetDB->where('tbl_listarea.id_empresa',$empId);
-			$this->assetDB->group_by('tbl_listarea.id_listarea');
-			$query= $this->assetDB->get();
-			if ($query->num_rows()!=0)
-			{
-					return $query->result_array();
-			}
-			else
-			{
-					return false;
-			}
-	}
-	/**
-	 * Trae datos de orden de trabajo por id y empresa logueada para asignar.
-	 *
-	 * @param   Int     $id     Id de orden de trabajo.
-	 *
-	 * @return  Array|false     Arreglo con los datos de la orden de trabajo
-	 */
-	function getasigna($id) // Ok
-	{
-			$userdata = $this->session->userdata('user_data');
-			$empId = $userdata[0]['id_empresa'];
-
-			$this->assetDB->select('orden_trabajo.id_orden, orden_trabajo.nro, orden_trabajo.id_usuario,
-					orden_trabajo.fecha_inicio,
-					orden_trabajo.fecha_entrega,
-					orden_trabajo.descripcion,
-					equipos.id_equipo,
-					equipos.codigo,
-					equipos.descripcion as equipoDescrip');
-			$this->assetDB->from('orden_trabajo');
-			$this->assetDB->join('equipos','equipos.id_equipo=orden_trabajo.id_equipo');
-			$this->assetDB->where('orden_trabajo.id_empresa', $empId);//no hace falta. Es redundante
-			$this->assetDB->where('orden_trabajo.id_orden', $id);
-			$query = $this->assetDB->get();
-
-			if ($query->num_rows()!=0)
-			{
-					return $query->result_array();
-			}
-			else
-			{
-					return false;
-			}
-	}
-	/**
-	 * Trae usuarios por id de empresa logueada
-	 *
-	 * @return  Array|false     Arreglo con usuarios de la empresa.
-	 */
-	function getusuario() // Ok
-	{
-			$userdata = $this->session->userdata('user_data');
-			$empId    = $userdata[0]['id_empresa'];
-			$this->assetDB->select('*');
-			$this->assetDB->from('sisusers');
-			$this->assetDB->join('usuarioasempresa', 'usuarioasempresa.usrId = sisusers.usrId');
-			$this->assetDB->where('usuarioasempresa.empresaid', $empId);
-			$query = $this->assetDB->get();
-			if ($query->num_rows()!=0)
-			{
-					$i = 0;
-					foreach ($query->result() as $row)
-					{
-							$data[$i]["usrId"]       = $row->usrId;
-							$data[$i]["usrName"]     = $row->usrName;
-							$data[$i]["usrLastName"] = $row->usrLastName;
-							$i++;
-					}
-					return $data;
-			}
-	}
-	/**
-	 * trae detalle de nota de pedido (hg)
-	 *
-	 * @return  Array|false     Arreglo con detallle de la nota de pedido por id de OT
-	 */
-	function getdatos($id_OT){ //id_trabajo
-		
-		$this->assetDB->select('tbl_detanotapedido.id_detaNota,
-											tbl_detanotapedido.id_notaPedido,
-											tbl_detanotapedido.artId,
-											tbl_detanotapedido.cantidad,
-											tbl_detanotapedido.provid,
-											tbl_detanotapedido.fechaEntrega,
-											tbl_detanotapedido.fechaEntregado,
-											tbl_detanotapedido.remito,
-											tbl_detanotapedido.estado,
-											articles.artDescription,
-											articles.artBarCode,
-											abmproveedores.provnombre,
-											tbl_notapedido.id_ordTrabajo,
-											tbl_notapedido.fecha');
-		$this->assetDB->from('tbl_detanotapedido');
-		$this->assetDB->join('tbl_notapedido', 'tbl_detanotapedido.id_notaPedido = tbl_notapedido.id_notaPedido');
-		$this->assetDB->join('articles', 'articles.artId = tbl_detanotapedido.artId');
-		$this->assetDB->join('abmproveedores', 'abmproveedores.provid = tbl_detanotapedido.provid');
-		$this->assetDB->where('tbl_notapedido.id_ordTrabajo', $id_OT);
-		$query = $this->assetDB->get();
-		if($query->num_rows()>0){
-			return $query->result();
-		}else{
-			return false;
-		}		
-	}
-    function traer_cli()
-    {
-        $userdata = $this->session->userdata('user_data');
-        $empId = $userdata[0]['id_empresa'];
-
-        $this->assetDB->select('admcustomers.*');
-        $this->assetDB->from('admcustomers');
-        $this->assetDB->where('admcustomers.id_empresa', $empId);
-        $this->assetDB->where('admcustomers.estado', 'C');
-        $query = $this->assetDB->get();   
-        if( $query->num_rows() > 0)
-        {
-          return $query->result_array();    
-        } 
-        else {
-          return false;
-        }
-    }
-
-	function getprint($id){ //JOIN grupo ON grupo.id_grupo=equipos.id_grupo
-	    $sql="SELECT orden_trabajo.id_orden, orden_trabajo.id_tarea, orden_trabajo.nro, orden_trabajo.fecha, orden_trabajo.fecha_program, orden_trabajo.fecha_inicio, orden_trabajo.fecha_entrega, orden_trabajo.fecha_terminada, orden_trabajo.fecha_aviso, orden_trabajo.fecha_entregada, orden_trabajo.descripcion, orden_trabajo.estado, orden_trabajo.id_usuario, orden_trabajo.id_usuario_a, orden_trabajo.id_solicitud, orden_trabajo.tipo, orden_trabajo.id_equipo, orden_trabajo.duracion, orden_trabajo.id_tareapadre, tareas.descripcion AS detarea, orden_trabajo.id_equipo, equipos.codigo, equipos.descripcion AS deequipos, user1.usrName AS nombre,user1.usrLastName, sisgroups.grpId AS grp, sisusers.usrName, sisusers.usrLastName, sisgroups.grpId, tbl_tipoordentrabajo.id
-	    	FROM orden_trabajo
-	    	JOIN tareas ON tareas.id_tarea=orden_trabajo.id_tarea
-	    	JOIN tbl_tipoordentrabajo ON tbl_tipoordentrabajo.id=orden_trabajo.tipo
-	    	JOIN equipos ON equipos.id_equipo=orden_trabajo.id_equipo
-	    	JOIN sisusers ON sisusers.usrId = orden_trabajo.id_usuario
-			join sisusers AS user1 ON user1.usrId = orden_trabajo.id_usuario_a
-			JOIN usuarioasempresa ON usuarioasempresa.usrId = user1.usrId
-			join sisgroups ON sisgroups.grpId = usuarioasempresa.grpId
-	    	  WHERE equipos.estado !='AN' AND orden_trabajo.id_orden=$id AND usuarioasempresa.tipo = 1";
-
-	    $query= $this->assetDB->query($sql);
-
-	    if( $query->num_rows() > 0)
-	    {
-	      return $query->result_array();
-	    }
-	    else {
-	      return 0;
-	    }
-	}
-	
-	function getotrabajos($data = null){
-
-		if($data == null)
-		{
-			return false;
-		}
-		else
-		{
-			$action = $data['act'];
-			$otid = $data['id'];
-			$data = array();
-			$query= $this->assetDB->get_where('orden_trabajo',array('id_orden'=>$otid));
-
-			if ($query->num_rows() != 0)
-			{
-				
-				$f = $query->result_array();
-				$data['ot'] = $f[0];
+			if ((int) $r['herrId'] === 0) {
+				$libres[] = array(
+					'herrId'      => 0,
+					'cantidad'    => $r['cantidad'],
+					'codigo'      => '(texto libre)',
+					'marca'       => '',
+					'descripcion' => $r['descripcion_libre'],
+				);
 			} else {
-				$ot = array();
-				$ot['nro'] = '';
-				$ot['fecha_inicio'] = '';
-				$ot['fecha_fecha_entrega'] = '';
-				$ot['descripcion'] = '';
-				$ot['cliId'] = '';
-				$ot['estado'] = '';
-				$ot['id_usuario'] = '';
-				$ot['id_sucursal'] = '';
-				$data['ot'] = $ot;
+				$catalogo[] = $r;
 			}
-
-			//Readonly
-			$readonly = false;
-			if($action == 'Del' || $action == 'View'){
-				$readonly = true;
-			}
-			$data['read'] = $readonly;
-				$query= $this->assetDB->get('sucursal');
-			if ($query->num_rows() != 0)
-			{
-				$data['sucursal'] = $query->result_array();	
-			}
-
-				$query= $this->assetDB->get('admcustomers');
-			if ($query->num_rows() != 0)
-			{
-				$data['clientes'] = $query->result_array();	
-			}
-			
-
-			return $data;
 		}
-	}
-	
-	function setotrabajos($data = null){
-
-		if($data == null)
-		{
-			return false;
-		}
-		else
-		{
-			$id = $data['id'];
-			$nro = $data['nro'];
-			$fech = $data['fech'];
-			$deta = $data['deta'];
-			$sucid = $data['sucid'];
-			$act = $data['act'];
-			$cli=$data['cli'];
-			$usu=1;
-			$estado='C';
-
-			$data = array(
-					   'nro' => $nro,
-					    'fecha_inicio' => $fech,
-					    'descripcion' => $deta,
-					    'id_sucursal' => $sucid,
-					     'cliId' => $cli,
-					     'id_usuario' => $usu,
-					     'id_usuario_a' => $usu,
-					      'id_usuario_e' => $usu,
-					      'estado' => $estado
-					   
-					);
-
-			switch($act)
-			{
-				case 'Add':
-					//Agregar familia
-					if($this->assetDB->insert('orden_trabajo', $data) == false) {
-						return false;
-					}
-					break;
-
-				case 'Edit':
-					//Actualizar nombre
-					if($this->assetDB->update('orden_trabajo', $data, array('id_orden'=>$id)) == false) {
-						return false;
-					}
-					break;
-
-				case 'Del':
-					//Eliminar familia
-					if($this->assetDB->delete('orden_trabajo', $data, array('id_orden'=>$id)) == false) {
-						return false;
-					}
-					
-					break;
-			}
-
-			return true;
-
-		}
+		return array_merge(tools_merge_herramientas($catalogo), $libres);
 	}
 
-	//pediso a entregar x fecha
+	/** Insumos de la OT, completados con el almacén de tools. @return array */
+	function getOTInsumos($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTInsumos(" . json_encode($id) . ")");
+		$rows = $this->filas('/ot/' . (int) $id . '/insumos/empresa/' . man_empresa());
+		return tools_merge_articulos($rows ? $rows : array());
+	}
+
+	/** Adjuntos de la OT. @return array|int filas o 0 */
+	function getOTadjuntos($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOTadjuntos(" . json_encode($id) . ")");
+		$filas = $this->filas('/ot/' . (int) $id . '/adjuntos/empresa/' . man_empresa());
+		return $filas ? $filas : 0;
+	}
+
+	/** Datos de la OT para asignar. @return array|false */
+	function getasigna($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getasigna(" . json_encode($id) . ")");
+		return $this->filas('/ot/' . (int) $id . '/asigna/empresa/' . man_empresa());
+	}
+
+	/** Usuarios de asset de la empresa (usrId, usrName, usrLastName). @return array|null */
+	function getusuario(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getusuario()");
+		$filas = $this->filas('/usuarios/empresa/' . man_empresa());
+		return $filas ? $filas : null;
+	}
+
+	/** Clientes en estado C. @return array|false */
+	function traer_cli(){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | traer_cli()");
+		return $this->filas('/ots/clientes/empresa/' . man_empresa());
+	}
+
+	/** OT con los datos de su cliente (SELECT * de las dos tablas, como en asset). @return array|int filas o 0 */
 	function getpedidos($id){
-
-	    $sql="SELECT * 
-	    	  FROM orden_trabajo
-	    	  JOIN admcustomers ON admcustomers.cliId= orden_trabajo.cliId
-	    	  WHERE id_orden=$id
-	    	  ";
-	    
-	    $query= $this->assetDB->query($sql);  
-	    if( $query->num_rows() > 0)
-	    {
-	      return $query->result_array();	
-	    } 
-	    else {
-	      return 0;
-	    }
-	}
-
-	function getcliente($data = null){
-
-		if($data == null)
-		{
-			return false;
-		}
-		else{
-			
-			$idcli = $data['idcliente'];
-			//Datos del usuario
-			$query= $this->assetDB->get_where('admcustomers',array('cliId'=>$idcli));
-			if($query->num_rows()>0){
-                return $query->result();
-            }
-            else{
-                return false;
-            }
-			
-		}
-	}
-
-	function getnums($id){
-
-		$query= "SELECT id_orden
-	        FROM orden_pedido
-	        WHERE nro_trabajo=$id";
-
-		$query= $this->assetDB->query($sql);
-
-		if($query!=""){
-
-			foreach ($query->result_array() as $row){		
-			$data = $row['id_orden'];
-			}
-		return $data;
-		}
-		else
-			{
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getpedidos(" . json_encode($id) . ")");
+		$filas = $this->filas('/ot/' . (int) $id . '/cliente/empresa/' . man_empresa());
+		if (!$filas) {
 			return 0;
-			}
+		}
+		foreach ($filas as &$f) {
+			unset($f['cliId2']);
+		}
+		return $filas;
 	}
 
-
-	function agregar_usuario($data){
-                   
-        $query = $this->assetDB->insert("sisusers",$data);
-    	return $query;
-    }
-
-
-    function agregar_pedidos($data){          
-        $query = $this->assetDB->insert("orden_pedido",$data);
-    	return $query;
-    }
-        
-
-    function update_guardar($id, $datos){
-        $this->assetDB->where('id_orden', $id);
-        $query = $this->assetDB->update("orden_trabajo",$datos);
-        return $query;
-    }
-
-    
-    function update_ordtrab($id, $datos){
-        $this->assetDB->where('id_orden', $id);
-        $query = $this->assetDB->update("orden_trabajo",$datos);
-        return $query;
-    }
-		
-	// seleccionar el grupo
-	function getgrupo(){
-       $query= $this->assetDB->get_where('sisgroups');
-		if($query->num_rows()>0){
-			 return $query->result();
-        }
-        else{
-            return false;
-        }
-	}
-
-	//insertar pedido 
-	function insert_pedido($data)
-    {
-        $query = $this->assetDB->insert("orden_pedido",$data);
-        return $query;
-    }
-
-    function agregar_tareas($data) {
-        $query = $this->assetDB->insert("tbl_listarea",$data);
-        return $query;
-    }
-
-	function get_pedido($id){
-		$query= "SELECT *
-				 FROM orden_pedido 
-				 WHERE id_orden=$id";
-
-        $result = $this->assetDB->query($query);
-		if($result->num_rows()>0){
-            return $result->result_array();
-        }
-        else{
-            return false;
-        }
-	}
-	
-    //agrega proveedor
-	function agregar_proveedor($data){
-        $query = $this->assetDB->insert("proveedores", $data);
-    	return $query;
-    }
-
-	
-	  
-	function eliminacion($data){
-       	$this->assetDB->where('id_orden', $data);
-		$query =$this->assetDB->delete('orden_trabajo');
-        return $query;
-    }
-
-    function update_cambio($ido,$fecha){
-    	$consulta= "UPDATE orden_trabajo SET estado='T',
-    										fecha_terminada='$fecha'
-                               
-				WHERE id_orden=$ido" ;
-
-		$query= $this->assetDB->query($consulta);
-        
-		return $query;
-    }
-
-	function getArticulos(){
-		$sql= "SELECT *
-			FROM sisusers
-			
-			"; //
-			$query= $this->assetDB->query($sql);
-
-        //$query = $this->assetDB->query("SELECT `artId`, `artBarCode` FROM `articles`");
-        $i=0;
-        foreach ($query->result() as $row)
-        {	
-        	$insumos[$i]['label'] = $row->usrName;
-            $insumos[$i]['value'] = $row->usrId;
-            
-            
-            $i++;
-        }
-        return $insumos;
-    }
-
-    function EliminarTareas($idor,$data){
-        $this->assetDB->where('id_listarea', $idor);
-        $query = $this->assetDB->update("tbl_listarea",$data);
-        return $query;
-    }
-
-    function ModificarUsuarios($idta,$datos){
-        $this->assetDB->where('id_listarea', $idta);
-        $query = $this->assetDB->update("tbl_listarea",$datos);
-        return $query;
-    }
-
-    function TareaRealizadas($id, $datos){
-        $this->assetDB->where('id_listarea', $id);
-        $query = $this->assetDB->update("tbl_listarea",$datos);
-        return $query;
-    }
-
-    function ModificarFechas($idta,$datos){
-        $this->assetDB->where('id_listarea', $idta);
-        $query = $this->assetDB->update("tbl_listarea",$datos);
-        return $query;
-    }
-    
-    function CambioParcials($idor,$datos){
-        $this->assetDB->where('id_orden', $idor);
-        $query = $this->assetDB->update("orden_trabajo",$datos);
-        return $query;
-    }
-
-    function agregar_pedidos_fecha($fecha,$id){
-        $this->assetDB->where('id_orden', $id);
-        $query = $this->assetDB->update("orden_pedido",$fecha);
-        return $query;
-    }
-
-    function update_predictivo($data, $id){
-	    $this->assetDB->where('id_orden', $id);
-	    $query = $this->assetDB->update("orden_trabajo",$data);
-	    return $query;
-	}
-	
-    /**
-     * Cuenta la cantidad de ordenes de trabajo agrupadas por tipo.
-     *
-     * @return Void|Array     Cantidad de ordenes de trabajo.
-     */
-    function kpiCantTipoOrdenTrabajo()
-    {
-		$empresaId = empresa();
-
-        $sql = "SELECT tt.descripcion as descripcion, count(*) as cantidad 
-		        FROM orden_trabajo ot
-                JOIN tbl_tipoordentrabajo tt  on ot.tipo = tt.tipo_orden
-                WHERE ot.id_empresa =".$empresaId."
-                AND (ot.estado  = 'CE' or estado = 'CN')
-                GROUP BY ot.tipo
-                ORDER BY ot.tipo";
-
-                $query = $this->assetDB->query($sql);
-                $res = $query->result();
-
-		//log_message('DEBUG','#Main/index | kpiCantTipoOrdenTrabajo >> data '.json_encode($query));
-
-        if($query->num_rows()!=0)
-        {
-            return $res;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    function getEquipoDisponibilidad() // Ok
-    {
-    	$userdata = $this->session->userdata('user_data');
-    	$empId    = $userdata[0]['id_empresa'];
-
-    	$this->assetDB->select('equipos.id_equipo AS value, equipos.codigo AS label');
-    	$this->assetDB->from('equipos');
-    	$this->assetDB->where('id_empresa', $empId);
-    	$this->assetDB->where('estado !=', 'AN');
-    	$query = $this->assetDB->get();
-
-    	if($query->num_rows()>0)
-    	{
-    		return $query->result();
-    	}
-    	else
-    	{
-    		return false;
-    	}
-    }
-
-	/**
-	 * Devuelve valores de todos los datos de la OT para mostrar en modal.
-	 * @param Integer $idot id de la orden de trabajo
-	 * @return array datos de la OT
-	*/
-    function getOrigenOt($idot){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOrigenOt($idot)");
-    	$this->assetDB->select('orden_trabajo.tipo, orden_trabajo.id_solicitud');
-        $this->assetDB->from('orden_trabajo');
-        $this->assetDB->where('orden_trabajo.id_orden', $idot);
-
-        $query = $this->assetDB->get();
-        if($query->num_rows()!=0){
-            return $query->result();
-        }else{
-            return false;
-        }
-    }
-
-
-
-    //devuelve valores de todos los datos de la OT para mostrar en modal.
-    function getViewDataOt($idOt)
-    {
-    	$this->assetDB->select('orden_trabajo.id_orden, orden_trabajo.nro, orden_trabajo.descripcion AS descripcionFalla, orden_trabajo.fecha_inicio, orden_trabajo.fecha_entrega, 
-    		orden_trabajo.fecha_program, tbl_estado.descripcion AS estado, sisusers.usrName, sisusers.usrLastName, 
-    		orden_trabajo.tipo, orden_trabajo.id_solicitud,
-    		sucursal.id_sucursal, sucursal.descripc,
-    		abmproveedores.provid, abmproveedores.provnombre,
-    		equipos.codigo, equipos.fecha_ingreso, equipos.marca, equipos.ubicacion, equipos.descripcion AS descripcionEquipo');
-        $this->assetDB->from('orden_trabajo');
-        $this->assetDB->join('sisusers', 'sisusers.usrId = orden_trabajo.id_usuario_a');
-        $this->assetDB->join('sucursal', 'sucursal.id_sucursal = orden_trabajo.id_sucursal','left');
-        $this->assetDB->join('abmproveedores', 'abmproveedores.provid = orden_trabajo.id_proveedor','left');
-        $this->assetDB->join('equipos', 'equipos.id_equipo = orden_trabajo.id_equipo');
-        $this->assetDB->join('tbl_estado', 'tbl_estado.estado = orden_trabajo.estado');
-        $this->assetDB->where('orden_trabajo.id_orden', $idOt);
-
-        $query = $this->assetDB->get();
-        if($query->num_rows()!=0)
-        {
-            $datos = $query->result_array();
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    //devuelve valores de todos los datos de la OT para mostrar en modal.
-    function getViewDataSolServicio($idOt, $idSolicitud=null)
-    {
-			$this->assetDB->select('orden_trabajo.id_orden, 
-				orden_trabajo.nro, orden_trabajo.descripcion AS descripcionFalla, 
-				orden_trabajo.fecha_inicio,orden_trabajo.fecha_program, orden_trabajo.fecha_terminada, orden_trabajo.estado, 
-				sisusers.usrName, sisusers.usrLastName, 
-				orden_trabajo.tipo, orden_trabajo.id_solicitud,				
-				sucursal.id_sucursal, sucursal.descripc,
-				admcustomers.cliRazonSocial AS nomCli,
-    			abmproveedores.provid, abmproveedores.provnombre,
-				equipos.codigo, equipos.fecha_ingreso, equipos.ubicacion, equipos.descripcion AS descripcionEquipo,
-				marcasequipos.marcadescrip AS marca,
-				grupo.descripcion AS grupodescrip, grupo.id_grupo');
-        $this->assetDB->from('orden_trabajo');
-        $this->assetDB->join('sisusers', 'orden_trabajo.id_usuario_a = sisusers.usrId', 'left');
-        $this->assetDB->join('sucursal', ' orden_trabajo.id_sucursal = sucursal.id_sucursal ', 'left');
-        $this->assetDB->join('abmproveedores', 'orden_trabajo.id_proveedor = abmproveedores.provid', 'left');
-		$this->assetDB->join('equipos', 'equipos.id_equipo = orden_trabajo.id_equipo');
-		$this->assetDB->join('admcustomers','admcustomers.cliId = equipos.id_customer');
-		$this->assetDB->join('marcasequipos', 'marcasequipos.marcaid = equipos.marca');
-		$this->assetDB->join('grupo', 'grupo.id_grupo = equipos.id_grupo');
-		$this->assetDB->where('orden_trabajo.id_orden', $idOt);
-
-				$query = $this->assetDB->get();
-
-        if($query->num_rows()!=0)
-        {
-            $datos = $query->result_array();
-            //dump_exit($datos);
-            $datos[0]['solServicio'] = $this->getViewDataInfoSolServicio( $datos[0]['id_solicitud']);
-            return $datos;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-    	//
-    	function getViewDataInfoSolServicio($id_solicitud)
-	    {
-	    
-				$this->assetDB->select('sector.descripcion AS sector, 			
-													solicitud_reparacion.solicitante, 
-													solicitud_reparacion.f_sugerido AS fechaSugerida, 
-													solicitud_reparacion.hora_sug AS horarioSugerido, 										
-													solicitud_reparacion.causa AS falla');
-				$this->assetDB->from('solicitud_reparacion');
-				$this->assetDB->join('equipos', 'solicitud_reparacion.id_equipo = equipos.id_equipo');
-				$this->assetDB->join('sector', 'equipos.id_sector = sector.id_sector');
-				$this->assetDB->where('solicitud_reparacion.id_solicitud', $id_solicitud);
-
-				$query = $this->assetDB->get();
-				if($query->num_rows()!=0)
-				{
-						$solServicio = $query->result_array();
-						return $solServicio[0];
-				}
-				else
-				{
-						return null;
-				}
-	    }
-
-
-
-    //devuelve valores de todos los datos de la OT para mostrar en modal.
-    function getViewDataPreventivo($idOt, $idSolicitud=null)
-    {
-			$this->assetDB->select('orden_trabajo.id_orden, 
-												orden_trabajo.nro, 
-												orden_trabajo.descripcion AS descripcionFalla, 
-												orden_trabajo.fecha_inicio, 
-												orden_trabajo.fecha_terminada, 
-												orden_trabajo.fecha_program, 
-												orden_trabajo.estado, 
-												sisusers.usrName, sisusers.usrLastName, 
-												orden_trabajo.tipo, 
-												orden_trabajo.id_solicitud,
-												admcustomers.cliRazonSocial AS nomCli,
-												sucursal.id_sucursal, 
-												sucursal.descripc,
-												equipos.codigo, 
-												equipos.fecha_ingreso, 												 
-												equipos.ubicacion, 
-												equipos.descripcion AS descripcionEquipo,
-												marcasequipos.marcadescrip AS marca');
-        $this->assetDB->from('orden_trabajo');
-        $this->assetDB->join('sisusers', 'orden_trabajo.id_usuario_a  = sisusers.usrId', 'left');
-        $this->assetDB->join('sucursal', 'orden_trabajo.id_sucursal = sucursal.id_sucursal', 'left');
-        $this->assetDB->join('abmproveedores', 'orden_trabajo.id_proveedor = abmproveedores.provid', 'left');
-        $this->assetDB->join('equipos', 'equipos.id_equipo = orden_trabajo.id_equipo');
-		$this->assetDB->join('marcasequipos', 'marcasequipos.marcaid = equipos.marca');
-		$this->assetDB->join('admcustomers','admcustomers.cliId = equipos.id_customer');
-        $this->assetDB->where('orden_trabajo.id_orden', $idOt);
-				$query = $this->assetDB->get();
-        if($query->num_rows()!=0)
-        {
-            $datos = $query->result_array();
-            //dump_exit($datos);
-            $datos[0]['tarea'] = $this->getViewDataTareaPreventivo( $datos[0]['id_solicitud']);
-            return $datos;
-        }
-        else
-        {
-            return false;
-        }
-    }
-    
-	    function getViewDataTareaPreventivo($id_solicitud)
-	    {
-	    	$this->assetDB->select('preventivo.prevId, preventivo.ultimo, preventivo.cantidad AS frecuencia, preventivo.lectura_base, preventivo.critico1 AS alerta, preventivo.prev_duracion, preventivo.prev_canth, preventivo.prev_adjunto,
-	    		tareas.descripcion AS tareadescrip,
-	    		unidad_tiempo.unidaddescrip AS perido,
-	    		componentes.descripcion AS descripComponente');
-	        $this->assetDB->from('preventivo');
-	        $this->assetDB->where('preventivo.prevId', $id_solicitud);
-	        $this->assetDB->join('tareas', 'tareas.id_tarea = preventivo.id_tarea');
-	        $this->assetDB->join('unidad_tiempo', 'unidad_tiempo.id_unidad = preventivo.id_unidad');
-	        $this->assetDB->join('componentes', 'componentes.id_componente = preventivo.id_componente');
-	        $query = $this->assetDB->get();
-	        if($query->num_rows()!=0)
-	        {
-	            $preventivos = $query->result_array();
-	            for ($i=0; $i < sizeof($preventivos) ; $i++) { 
-		            $herramientas = null;
-		            $insumos      = null;
-
-		            $herramientas[$i] = $this->getPreventivoHerramientas( $preventivos[$i]['prevId'] );
-		            $insumos[$i]      = $this->getPreventivoInsumos( $preventivos[$i]['prevId'] );
-	            }
-	            $preventivos[0]['herramientas'] = $herramientas;
-	            $preventivos[0]['insumos']  = $insumos;
-
-	            return $preventivos[0];
-	        }
-	        else
-	        {
-	            return null;
-	        }
-	    }
-
-		    // Trae herramientas ppor id de preventivo para Editar
-		    function getPreventivoHerramientas($id)
-		    {
-		        $this->assetDB->select('tbl_preventivoherramientas.cantidad,
-		                            herramientas.herrcodigo,
-		                            herramientas.herrmarca,
-		                            herramientas.herrdescrip,
-		                            herramientas.herrId');
-		        $this->assetDB->from('tbl_preventivoherramientas');
-		        $this->assetDB->join('herramientas', 'herramientas.herrId = tbl_preventivoherramientas.herrId');   
-		        $this->assetDB->where('tbl_preventivoherramientas.prevId', $id);   
-		             
-		        $query = $this->assetDB->get();
-		        if( $query->num_rows() > 0)
-		        {
-		        	$herramientas = $query->result_array();
-		          	return $herramientas;
-		        }
-		        else {
-		          return 0;
-		        }
-		    }
-
-		    // Trae insumos por id de preventivo para Editar
-		    function getPreventivoInsumos($id)
-		    {    
-		        $this->assetDB->select('tbl_preventivoinsumos.id,
-		                            tbl_preventivoinsumos.cantidad,
-		                            articles.artBarCode,
-		                            articles.artId,
-		                            articles.artDescription,
-		                            articles.id_empresa');                            
-		        $this->assetDB->from('tbl_preventivoinsumos');
-		        $this->assetDB->join('articles', 'articles.artId = tbl_preventivoinsumos.artId');   
-		        $this->assetDB->where('tbl_preventivoinsumos.prevId', $id);        
-		        $query= $this->assetDB->get(); 
-
-		        if( $query->num_rows() > 0)
-		        {
-		          	$insumos = $query->result_array();
-		          	return $insumos;
-		        }
-		        else {
-		          return 0;
-		        }
-		    }
-
-
-
-	//devuelve valores de todos los datos de la OT para mostrar en modal.
-    function getViewDataBacklog($idOt, $idSolicitud)
-    {
-			$this->assetDB->select('orden_trabajo.id_orden, orden_trabajo.nro,
-												orden_trabajo.estado,
-												orden_trabajo.descripcion AS descripcionFalla, 
-												orden_trabajo.fecha_inicio, 
-												orden_trabajo.fecha_program,
-												orden_trabajo.fecha_terminada, 
-												sisusers.usrName, sisusers.usrLastName, 
-												orden_trabajo.tipo, orden_trabajo.id_solicitud,
-												sucursal.id_sucursal, sucursal.descripc,
-												abmproveedores.provid, abmproveedores.provnombre,
-												equipos.codigo, equipos.fecha_ingreso, marcasequipos.marcadescrip AS marca,
-												equipos.ubicacion, equipos.descripcion AS descripcionEquipo');
-        $this->assetDB->from('orden_trabajo');
-        $this->assetDB->join('sisusers', 'orden_trabajo.id_usuario_a = sisusers.usrId', 'left');
-        $this->assetDB->join('sucursal', 'orden_trabajo.id_sucursal =  sucursal.id_sucursal', 'left');
-        $this->assetDB->join('abmproveedores', 'orden_trabajo.id_proveedor = abmproveedores.provid', 'left');
-        $this->assetDB->join('equipos', 'equipos.id_equipo = orden_trabajo.id_equipo');
-      	$this->assetDB->join('marcasequipos', 'marcasequipos.marcaid = equipos.marca');
-        $this->assetDB->where('orden_trabajo.id_orden', $idOt);
-
-        $query = $this->assetDB->get();
-				
-				if($query->num_rows()!=0)
-        {
-            $datos = $query->result_array();
-            $datos[0]['tarea'] = $this->getViewDataTareaBacklog( $datos[0]['id_solicitud']);
-            //dump_exit($datos);
-            return $datos;
-        }
-        else
-        {
-            return false;
-        }
-    }
-
-		function getViewDataTareaBacklog($idBacklog){
-			$this->assetDB->select('tbl_back.fecha,
-												tbl_back.id_tarea,	 
-												tbl_back.back_duracion, 
-												tbl_back.tarea_opcional,
-												tbl_back.idcomponenteequipo,
-												tareas.descripcion AS tareadescrip');
-			$this->assetDB->from('tbl_back');
-			$this->assetDB->join('tareas', 'tbl_back.id_tarea = tareas.id_tarea', 'left');
-			$this->assetDB->where('tbl_back.backId', $idBacklog);
-			$query = $this->assetDB->get();
-			//$dato = $this->assetDB->last_query();
-			//dump($dato, 'backlog info: ');
-				if($query->num_rows()!=0)
-				{
-						$tarea = $query->result_array();
-						$tarea[0]['compEquipo'] = $this->getViewDataComponenteEquipoBacklog( $tarea[0]['idcomponenteequipo']);
-						return $tarea[0];
-				}
-				else
-				{
-						return null;
-				}
-	  }
-	/**
-	* Devuelve los datos de la OT para mostrar en modal.
-	* @param 
-	* @return array datos de la OT
-	*/
-	function getLecturasOrden($id_ot){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getLecturasOrden(id_ot : $id_ot");
-		$this->assetDB->select('orden_trabajo.fecha_inicio,
-							orden_trabajo.fecha_terminada');
-		$this->assetDB->from('orden_trabajo');
-		$this->assetDB->where('orden_trabajo.id_orden', $id_ot);
-		$query = $this->assetDB->get();
-
-		if ($query->num_rows()!=0){
-			return $query->result_array();
-		}else{   
+	/** Un cliente de la empresa. @return array|false objetos */
+	function getcliente($data = null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getcliente(" . json_encode($data) . ")");
+		if ($data == null) {
 			return false;
-		}   
+		}
+		return $this->objetos('/ots/cliente/' . (int) $data['idcliente'] . '/empresa/' . man_empresa());
 	}
 
-		function getViewDataComponenteEquipoBacklog($idComponenteEquipo)
-		{
-			$this->assetDB->select('componenteequipo.codigo AS codigoComponente, 
-				componentes.descripcion AS descripComponente,
-				sistema.descripcion AS descripSistema');
-				$this->assetDB->from('componenteequipo');
-				$this->assetDB->join('componentes', 'componentes.id_componente = componenteequipo.id_componente');
-				$this->assetDB->join('sistema', 'sistema.sistemaid = componenteequipo.sistemaid');
-				$this->assetDB->where('componenteequipo.idcomponenteequipo', $idComponenteEquipo);
+	/** Tipo de origen e id de la solicitud de origen. @return array objetos */
+	function getOrigenOt($idot){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getOrigenOt(" . json_encode($idot) . ")");
+		$filas = $this->objetos('/ot/' . (int) $idot . '/origen/empresa/' . man_empresa());
+		return $filas ? $filas : array();
+	}
 
-				$query = $this->assetDB->get();
-				if($query->num_rows()!=0)
-				{
-						$compEquipo = $query->result_array();
-						return $compEquipo[0];
-				}
-				else
-				{
-						return null;
-				}
+	/** Vista de una OT que viene de una solicitud de servicio, con los datos de la solicitud. @return array */
+	function getViewDataSolServicio($idOt, $idSolicitud = null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getViewDataSolServicio($idOt)");
+		$datos = $this->filas('/ot/' . (int) $idOt . '/vista/solicitud/empresa/' . man_empresa());
+		if (!$datos) {
+			return array();
 		}
+		$sol = $this->filas('/ots/vista/solicitud/' . (int) $datos[0]['id_solicitud'] . '/empresa/' . man_empresa());
+		$datos[0]['solServicio'] = $sol ? $sol[0] : null;
+		return $datos;
+	}
 
-		function getViewDataPredictivo($idOt, $idSolicitud)
-		{
-			$this->assetDB->select('orden_trabajo.id_orden, orden_trabajo.descripcion AS descripcionFalla, 
-												orden_trabajo.fecha_inicio, orden_trabajo.fecha_terminada, 
-												orden_trabajo.fecha_program, 
-												orden_trabajo.tipo, orden_trabajo.id_solicitud, 
-												orden_trabajo.estado,
-												sisusers.usrName, 
-												sisusers.usrLastName, 
-												equipos.codigo, equipos.fecha_ingreso, equipos.ubicacion, 
-												equipos.descripcion AS descripcionEquipo,	
-												marcasequipos.marcadescrip AS marca,		
-												sucursal.id_sucursal, sucursal.descripc, 
-												abmproveedores.provid, abmproveedores.provnombre ');													
-			$this->assetDB->from('orden_trabajo');			
-			$this->assetDB->join('sucursal', 'orden_trabajo.id_sucursal = sucursal.id_sucursal','left');
-			$this->assetDB->join('sisusers', 'orden_trabajo.id_usuario_a = sisusers.usrId', 'left');
-			$this->assetDB->join('abmproveedores', 'orden_trabajo.id_proveedor = abmproveedores.provid', 'left');				
-			$this->assetDB->join('equipos', 'equipos.id_equipo = orden_trabajo.id_equipo');
-			$this->assetDB->join('marcasequipos', 'marcasequipos.marcaid = equipos.marca');				
-			$this->assetDB->where('orden_trabajo.id_orden', $idOt);
-			$query = $this->assetDB->get();	
-		
-			if($query->num_rows()!=0)
-			{
-					$datos = $query->result_array();
-					//dump_exit($datos);
-					$datos[0]['tarea'] = $this->getViewDataTareaPredictivo( $datos[0]['id_solicitud']);
-					return $datos;
-			}
-			else
-			{
-					return false;
-			}
-		}	
-    //
-    function getViewDataTareaPredictivo($id_solicitud)
-    {
-      $this->assetDB->select('tareas.descripcion AS tareadescrip,
-        predictivo.fecha, predictivo.periodo, 
-        predictivo.cantidad AS frecuencia, predictivo.pred_duracion AS duracion,
-        unidad_tiempo.unidaddescrip,
-        predictivo.pred_canth AS cantOperarios, predictivo.horash');
-        $this->assetDB->from('predictivo');
-        $this->assetDB->where('predictivo.predId', $id_solicitud);
-        $this->assetDB->join('tareas', 'tareas.id_tarea = predictivo.tarea_descrip');
-        $this->assetDB->join('unidad_tiempo', 'unidad_tiempo.id_unidad = predictivo.id_unidad');
-        $query = $this->assetDB->get();
-        if($query->num_rows()!=0)
-        {
-            $predictivos = $query->result_array();
-            return $predictivos[0];
-        }
-        else
-        {
-            return null;
-        }
+	/** Vista de una OT de preventivo, con la tarea del preventivo y su detalle. @return array */
+	function getViewDataPreventivo($idOt, $idSolicitud = null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getViewDataPreventivo($idOt)");
+		$datos = $this->filas('/ot/' . (int) $idOt . '/vista/preventivo/empresa/' . man_empresa());
+		if (!$datos) {
+			return array();
 		}
-		   
-		//Define si la OT tiene un proceso lanzado
-		function getCaseIdOT($id){	
-			$this->assetDB->select('orden_trabajo.case_id');
-			$this->assetDB->from('orden_trabajo');			
-			$this->assetDB->where('orden_trabajo.id_orden',$id);
-			$query = $this->assetDB->get();
-      $row = $query->row('case_id');
-      return $row;  
-		}
+		$datos[0]['tarea'] = $this->getViewDataTareaPreventivo($datos[0]['id_solicitud']);
+		return $datos;
+	}
 
-		// develve tipo de solicitud e id q dieron origen a OT
-		function getDatosOrigenOT($id){
-			$this->assetDB->select('orden_trabajo.id_solicitud, orden_trabajo.tipo');
-			$this->assetDB->from('orden_trabajo');
-			$this->assetDB->where('id_orden',$id);
-			$query = $this->assetDB->get();
-			return $query->result_array();
-		}
-		// trae id de SServicio desde backlog
-		function getIdSolReparacion($id_solicitud){
-			
-			//$id_solicitud = 7;
-			$this->assetDB->select('tbl_back.sore_id');
-			$this->assetDB->from('tbl_back');
-			$this->assetDB->where('backId',$id_solicitud);
-			return $this->assetDB->get()->first_row()->sore_id;
-			
-			// $query = $this->assetDB->get();
-			// $row = $query->row('sore_id');
-			// return $row;;			
-		}
-		// trae case_id desde SServicios
-		function getCaseIdenSServicios($id_solicitud){
-			$this->assetDB->select('orden_trabajo.case_id');
-			$this->assetDB->from('orden_trabajo');
-			$this->assetDB->where('id_orden',$id_solicitud);
-			$query = $this->assetDB->get();
-			$row = $query->row('case_id');
-			return $row;	
-			// $this->assetDB->select('solicitud_reparacion.case_id');
-			// $this->assetDB->from('solicitud_reparacion');
-			// $this->assetDB->where('id_solicitud',$id_solicitud);
-			// $query = $this->assetDB->get();
-			// $row = $query->row('case_id');
-			// return $row;		
-		}
-		//Valida si hay o no un proceso lanzado en BPM
-		function validarProcesoEnOT($id){
-			$this->assetDB->select('orden_trabajo.case_id');
-			$this->assetDB->from('orden_trabajo');
-			$this->assetDB->where('id_orden',$id);
-			$result = $query->row();			
-			return $result->case_id;
-		}
-		// guarda case_id en Otrabajo
-		function setCaseidenOT($case_id, $id){
-			$this->assetDB->where('orden_trabajo.id_orden', $id);
-			return $this->assetDB->update('orden_trabajo', array('case_id'=>$case_id));			
-		}
-
-		// devuelve id de SServicio por Case_id
-		function getIdSServicioporCaseId($caseDeBacklog){
-			$this->assetDB->select('solicitud_reparacion.id_solicitud');
-			$this->assetDB->from('solicitud_reparacion');
-			$this->assetDB->where('solicitud_reparacion.case_id', $caseDeBacklog);			
-			$query = $this->assetDB->get();
-			$row = $query->row('id_solicitud');
-      return $row;
-		}
-
-		// cambbia de estado la Tareas(SServ, Prevent, Predic, Back y OT)
-		function cambiarEstado($id_solicitud, $estado, $tipo){		
-			$f_asignacion =  date("Y-m-d H:i:s"); 				
-			
-			if ($tipo == 'correctivo') {
-				$this->assetDB->set('estado', $estado);
-				$this->assetDB->where('id_solicitud', $id_solicitud);
-				$response = $this->assetDB->update('solicitud_reparacion');
-			}
-
-			if ($tipo == 'preventivo') {
-				$this->assetDB->set('estadoprev', $estado);
-				$this->assetDB->where('prevId', $id_solicitud);
-				$response = $this->assetDB->update('preventivo');
-			}
-
-			if ($tipo == 'backlog') {
-				$this->assetDB->set('estado', $estado);
-				$this->assetDB->where('backId', $id_solicitud);
-				$response = $this->assetDB->update('tbl_back');
-			}			
-
-			if ($tipo == 'predictivo') {
-				$this->assetDB->set('estado', $estado);
-				$this->assetDB->where('predId', $id_solicitud);
-				$response = $this->assetDB->update('predictivo');
-			}	
-			
-			if ($tipo == 'OT') {
-				$this->assetDB->set('estado',$estado);
-				$this->assetDB->set('f_asignacion', $f_asignacion);
-				$this->assetDB->where('id_orden',$id_solicitud);
-        		return $this->assetDB->update('orden_trabajo');
-			}
-
-			return $response;
-		}
-
-		// Actualiza tareas en OT
-		function updOT($ot, $datos){
-			$this->assetDB->where('orden_trabajo.id_orden', $ot);
-			return $this->assetDB->update('orden_trabajo', $datos);	
-		} 
-
-		function obtenerOT($ot){
-			$this->assetDB->where('orden_trabajo.id_orden', $ot);
-			return $this->assetDB->get('orden_trabajo')->first_row();	
-		} 
-		// Obtener OT dado un CaseID
-		function ObtenerOTporCaseId($case_id)
-		{
-			$this->assetDB->where('orden_trabajo.case_id', $case_id);
-			$query = $this->assetDB->get('orden_trabajo');
-			return $query->row('id_orden');
-		}
-
-		function guardarPosicion($ot, $lat, $lon){
-			$this->assetDB->where('id_orden', $ot);
-			$this->assetDB->set('latitud', $lat);
-			$this->assetDB->set('longitud', $lon);
-			return $this->assetDB->update('orden_trabajo');
-		}
 	/**
-	 * Elimina una OT por su ID
-	 * @param Integer $id id de la orden de trabajo
-	 * @return Bool true/false segun resultado de la operacion
-	*/
-	public function eliminar($id){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | eliminar(ID ot: $id)");
-		$this->assetDB->where('id_orden', $id);
-		return $this->assetDB->delete('orden_trabajo');
+	 * Tarea del preventivo. Asset arma herramientas e insumos como arreglos indexados por la posición del preventivo
+	 * ($herramientas[0] = lista); se conserva esa forma.
+	 * @return array|null
+	 */
+	function getViewDataTareaPreventivo($id_solicitud){
+		$filas = $this->filas('/ots/vista/preventivo/' . (int) $id_solicitud . '/empresa/' . man_empresa());
+		if (!$filas) {
+			return null;
+		}
+		$h = man_lista(wso2(REST_MAN . '/preventivo/' . (int) $filas[0]['prevId'] . '/herramientas/empresa/' . man_empresa()));
+		$i = man_lista(wso2(REST_MAN . '/preventivo/' . (int) $filas[0]['prevId'] . '/insumos/empresa/' . man_empresa()));
+		$filas[0]['herramientas'] = array(tools_merge_herramientas($h ? $h : array()));
+		$filas[0]['insumos'] = array(tools_merge_articulos($i ? $i : array()));
+		return $filas[0];
 	}
 
+	/** Vista de una OT de backlog, con la tarea y el componente del backlog. @return array */
+	function getViewDataBacklog($idOt, $idSolicitud = null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getViewDataBacklog($idOt)");
+		$datos = $this->filas('/ot/' . (int) $idOt . '/vista/backlog/empresa/' . man_empresa());
+		if (!$datos) {
+			return array();
+		}
+		$tarea = $this->filas('/ots/vista/backlog/' . (int) $datos[0]['id_solicitud'] . '/empresa/' . man_empresa());
+		if ($tarea) {
+			$comp = $this->filas('/ots/vista/componente-equipo/' . (int) $tarea[0]['idcomponenteequipo'] . '/empresa/' . man_empresa());
+			$tarea[0]['compEquipo'] = $comp ? $comp[0] : null;
+		}
+		$datos[0]['tarea'] = $tarea ? $tarea[0] : null;
+		return $datos;
+	}
+
+	/** Vista de una OT de predictivo, con la tarea del predictivo. @return array */
+	function getViewDataPredictivo($idOt, $idSolicitud = null){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getViewDataPredictivo($idOt)");
+		$datos = $this->filas('/ot/' . (int) $idOt . '/vista/predictivo/empresa/' . man_empresa());
+		if (!$datos) {
+			return array();
+		}
+		$tarea = $this->filas('/ots/vista/predictivo/' . (int) $datos[0]['id_solicitud'] . '/empresa/' . man_empresa());
+		$datos[0]['tarea'] = $tarea ? $tarea[0] : null;
+		return $datos;
+	}
+
+	/**
+	 * Listado de OTs con los filtros de la pantalla. $tipo 1 = solo OTs (tipo 1); cualquier otro valor, todas.
+	 * @return array|false
+	 */
 	public function filtrarListado($data, $tipo){
-		log_message('DEBUG',"#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | filtrarListado(Data:".json_encode($data)." Tipo: $tipo)");
-		$empId    = empresa();
-		$this->assetDB->select('orden_trabajo.*, tareas.descripcion as tareaSTD,
-								tbl_tipoordentrabajo.descripcion AS tipoDescrip,
-								user1.usrName AS nombre, user1.usrLastName,
-								sisusers.usrName, 
-								sisusers.usrLastName, equipos.codigo, 
-								0 as grpId,
-								equipos.id_equipo,
-								admcustomers.cliRazonSocial AS nomCli,
-								orden_servicio.id_orden AS ordenservicioId');
-		$this->assetDB->from('orden_trabajo');
-		$this->assetDB->join('tbl_tipoordentrabajo', 'tbl_tipoordentrabajo.tipo_orden = orden_trabajo.tipo');
-		$this->assetDB->join('sisusers', 'sisusers.usrId = orden_trabajo.id_usuario');
-		$this->assetDB->join('sisusers AS user1', 'orden_trabajo.id_usuario_a = user1.usrId', 'left');//usuario asignado?
-		$this->assetDB->join('equipos','equipos.id_equipo = orden_trabajo.id_equipo');
-		$this->assetDB->join('admcustomers','admcustomers.cliId = equipos.id_customer');
-		$this->assetDB->join('tareas', 'tareas.id_tarea = orden_trabajo.id_tarea', 'left');
-		//LEFT JOIN orden_servicio ON orden_trabajo.id_orden = orden_servicio.id_ot
-		$this->assetDB->join('orden_servicio', 'orden_trabajo.id_orden = orden_servicio.id_ot', 'left');
-		$this->assetDB->where('equipos.estado !=','AN');
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | filtrarListado(" . json_encode($data) . ", $tipo)");
+		$q = http_build_query(array(
+			'solo_tipo1' => $tipo == 1 ? '1' : '',
+			'fec_desde'  => isset($data['fec_desde']) ? $data['fec_desde'] : '',
+			'fec_hasta'  => isset($data['fec_hasta']) ? $data['fec_hasta'] : '',
+			'estado'     => isset($data['estadoFilt']) ? $data['estadoFilt'] : '',
+			'equipo'     => isset($data['equipoFilt']) ? $data['equipoFilt'] : '',
+		));
+		return $this->filas('/ots/listado/empresa/' . man_empresa() . '?' . $q);
+	}
 
-		if($tipo == 1){
-			$this->assetDB->where('orden_trabajo.tipo', 1);
-		}
-		//FILTRADO
-		//Entre Fechas
-		if(!empty($data['fec_hasta']) && !empty($data['fec_desde'])){
-			$this->assetDB->where('DATE(orden_trabajo.fecha_program) >=', $data['fec_desde']);
-			$this->assetDB->where('DATE(orden_trabajo.fecha_program) <=', $data['fec_hasta']);
-		}elseif (!empty($data['fec_desde'])) {
-			$this->assetDB->where('DATE(orden_trabajo.fecha_program)',$data['fec_desde']);
-		}
-		//Estado
-        if(!empty($data['estadoFilt'])){
-            $this->assetDB->where('orden_trabajo.estado',$data['estadoFilt']);
-        }
-		//Equipo
-        if(!empty($data['equipoFilt'])){
-            $this->assetDB->where('equipos.id_equipo',$data['equipoFilt']);
-        }
-		$this->assetDB->where('orden_trabajo.id_empresa', $empId);
-		$query = $this->assetDB->get();
-
-		if ($query->num_rows()!=0){
-			return $query->result_array();
-		}else{
+	/**
+	 * Edita la OT con los campos del formulario (asset aceptaba cualquier columna que llegara; acá solo las del
+	 * formulario) y reemplaza herramientas e insumos. La cabecera y el borrado del detalle van en un request_box y
+	 * cada lista nueva en un pedido por lotes (E20).
+	 * @return bool
+	 */
+	function update_edita($id, $data, $herramientas = array(), $insumos = array()){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | update_edita($id, " . json_encode($data) . ")");
+		$emp = man_empresa();
+		$clave = array('id_orden' => (string) $id, 'id_empresa' => $emp);
+		$rsp = requestBox(REST_MAN . '/', array(
+			array('_put_ot_editar' => array(
+				'fecha_program' => man_fecha(isset($data['fecha_program']) ? $data['fecha_program'] : null, true),
+				'fecha_entrega' => man_fecha(isset($data['fecha_entrega']) ? $data['fecha_entrega'] : null, true),
+				'id_tarea'      => man_numero(isset($data['id_tarea']) ? $data['id_tarea'] : null),
+				'descripcion'   => isset($data['descripcion']) ? (string) $data['descripcion'] : '',
+				'id_sucursal'   => man_numero(isset($data['id_sucursal']) ? $data['id_sucursal'] : ''),
+				'id_proveedor'  => man_numero(isset($data['id_proveedor']) ? $data['id_proveedor'] : ''),
+				'id_equipo'     => (string) (isset($data['id_equipo']) ? $data['id_equipo'] : ''),
+				'id_orden'      => (string) $id,
+				'id_empresa'    => $emp,
+			)),
+			array('_put_ot_herramientas_borrar' => $clave),
+			array('_put_ot_insumos_borrar' => $clave),
+		));
+		if (!$rsp['status']) {
 			return false;
 		}
+		$h = array();
+		foreach ($herramientas as $f) {
+			$h[] = array_merge($f, $clave, array('descripcion_libre' => null));
+		}
+		$i = array();
+		foreach ($insumos as $f) {
+			$i[] = array_merge($f, $clave);
+		}
+		return man_lote_detalle('ot', 'herramienta', $h) !== false && man_lote_detalle('ot', 'insumo', $i) !== false;
 	}
-}	
+
+	/**
+	 * Crea la OT con su caso de Bonita, herramientas e insumos (toolsMANAPI POST /tools/man/ot). Asset lo hacía en
+	 * varios pasos desde PHP y, si Bonita fallaba, borraba la OT pero seguía; la API compensa todo lo creado.
+	 * @param array $ot id_tarea, fecha_program, fecha_entrega, descripcion, id_sucursal, id_proveedor, id_equipo
+	 * @param array $herramientas herrId, cantidad, descripcion_libre
+	 * @param array $insumos artId, cantidad
+	 * @return array status, id, caseId, msj
+	 */
+	function lanzarOT($ot, $herramientas, $insumos){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | lanzarOT(" . json_encode($ot) . ")");
+		$ot['id_usuario'] = man_usuario();
+		$ot['id_empresa'] = man_empresa();
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/ot', array(
+			'ot'           => $ot,
+			'herramientas' => $herramientas,
+			'insumos'      => $insumos,
+			'session'      => $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '',
+			'emprId'       => empresa(),
+		));
+		$aux = json_decode($rsp['data'], true);
+		if (!$rsp['status'] || empty($aux['status'])) {
+			log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | lanzarOT() >> ' . $rsp['data']);
+			return array('status' => false, 'msj' => isset($aux['msj']) ? $aux['msj'] : 'ASP_101');
+		}
+		if (!empty($aux['session'])) {
+			$this->session->set_userdata('bpm_token', $aux['session']);
+		}
+		return array('status' => true, 'id' => $aux['id'], 'caseId' => $aux['caseId']);
+	}
+
+	/**
+	 * Asigna la OT a un responsable (toolsMANAPI POST /tools/man/ot/asignar): cierra la tarea actual, le asigna
+	 * "Ejecutar OT" en Bonita al usuario con su correo y graba la OT como asignada. Asset le pasaba a Bonita el
+	 * número de usuario de asset, que no es el de Bonita (T30).
+	 * @return string "1" o el mensaje de error, como asset
+	 */
+	function asignar($idOrden, $usrId, $fechaEntrega, $caseId, $taskId){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | asignar($idOrden, $usrId, $fechaEntrega, $caseId, $taskId)");
+		$nick = $this->filas('/usuario/' . (int) $usrId . '/nick/empresa/' . man_empresa());
+		if (!$nick) {
+			return 'El responsable no es usuario de la empresa';
+		}
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/ot/asignar', array(
+			'task_id'       => (string) $taskId,
+			'case_id'       => (string) $caseId,
+			'usrNick'       => (string) $nick[0]['usrNick'],
+			'usrId'         => (string) (int) $usrId,
+			'fecha_entrega' => (string) $fechaEntrega,
+			'id_orden'      => (string) $idOrden,
+			'id_empresa'    => man_empresa(),
+			'session'       => $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '',
+		));
+		$aux = json_decode($rsp['data'], true);
+		if ($rsp['status'] && !empty($aux['status'])) {
+			return '1';
+		}
+		log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | asignar() >> ' . $rsp['data']);
+		return isset($aux['msj']) ? $aux['msj'] : 'error al insertar';
+	}
+
+	/**
+	* Número de la tarea "Asignar Recursos y Tareas" que la orden tiene pendiente en Bonita, o 0 (la ventana de la orden muestra las
+	* pestañas de asignación y el botón solo si hay). toolsMANAPI POST /tools/man/plan/ot/tarea.
+	*/
+	function tareaAsignarPendiente($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | tareaAsignarPendiente($idOt)");
+		$aux = $this->planApi('plan/ot/tarea', array('id_orden' => (string) (int) $idOt));
+		return (!empty($aux['status']) && isset($aux['tarea'])) ? (int) $aux['tarea'] : 0;
+	}
+
+	/**
+	* EjecutarOT de asset: cierra "Asignar Recursos y Tareas" del caso de la orden, asigna "Ejecutar OT" al responsable y deja la orden
+	* y su origen asignados (toolsMANAPI POST /tools/man/plan/asignar). La tarea de Bonita, el tipo y el origen salen de la orden en la
+	* empresa, no del navegador. No instancia los formularios de subtareas (E34).
+	* @return array status y msj si falla
+	*/
+	function asignarPlan($idOt, $responsable, $idTarea, $tareaOpcional, $lat, $lon){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | asignarPlan($idOt, $responsable, $idTarea)");
+		return $this->planApi('plan/asignar', array(
+			'usrId'          => (string) (int) $responsable,
+			'usrNick'        => (string) userNick(),
+			'id_orden'       => (string) (int) $idOt,
+			'id_tarea'       => (string) (int) $idTarea,
+			'tarea_opcional' => (string) $tareaOpcional,
+			'latitud'        => ($lat === null || $lat === false) ? '' : (string) $lat,
+			'longitud'       => ($lon === null || $lon === false) ? '' : (string) $lon,
+		));
+	}
+
+	/**
+	* Pedido de materiales de la OT en el almacén de tools (E65): el primero de la OT, con sus líneas, o null si no tiene.
+	* @return array|null pema_id, estado, fecha, case_id y detalle (barcode, descripcion, cantidad, resto)
+	*/
+	function pedidoDeOT($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | pedidoDeOT($idOt)");
+		$pedidos = tools_pedidos_ot($idOt);
+		if (empty($pedidos)) {
+			return null;
+		}
+		$p = $pedidos[0];
+		$p['detalle'] = tools_pedido_detalle($p['pema_id']);
+		return $p;
+	}
+
+	/**
+	* Crea y lanza el pedido de materiales de la OT (toolsMANAPI POST /tools/man/plan/ot/pedido, E65): almacén de tools + Bonita + empresa,
+	* con marcha atrás si algo falla. Una OT tiene un solo pedido.
+	* @param array $items lista de array(arti_id, cantidad)
+	* @return array status, pema_id, case_id o msj
+	*/
+	function crearPedidoPlan($idOt, $items){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | crearPedidoPlan($idOt, " . json_encode($items) . ")");
+		$lista = array();
+		foreach ((array) $items as $i) {
+			if (isset($i['arti_id'], $i['cantidad']) && ctype_digit((string) $i['arti_id']) && is_numeric($i['cantidad']) && $i['cantidad'] > 0) {
+				$lista[] = array('arti_id' => (string) (int) $i['arti_id'], 'cantidad' => (string) (0 + $i['cantidad']));
+			}
+		}
+		if (empty($lista)) {
+			return array('status' => false, 'msj' => 'El pedido no tiene artículos');
+		}
+		return $this->planApi('plan/ot/pedido', array(
+			'id_orden' => (string) (int) $idOt,
+			'emprId'   => (string) tools_empr_id(),
+			'usrNick'  => (string) userNick(),
+			'items'    => $lista,
+		));
+	}
+
+	/**
+	* Reemplaza la lista de herramientas de la OT (pestaña Herramientas de Ejecutar OT, E65): del maestro del pañol de tools (herrId) o en texto
+	* libre (herrId 0 y descripcion_libre), como la pantalla de la OT (F3 de asset). Solo la base de MAN.
+	* @param array $lista lista de array(herrId, cantidad, descripcion_libre)
+	* @return bool
+	*/
+	function guardarHerramientasPlan($idOt, $lista){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | guardarHerramientasPlan($idOt, " . json_encode($lista) . ")");
+		$emp = man_empresa();
+		if (!$this->filas('/plan/ot/' . (int) $idOt . '/empresa/' . $emp)) {
+			return false;
+		}
+		$clave = array('id_orden' => (string) (int) $idOt, 'id_empresa' => $emp);
+		$filas = array();
+		foreach ((array) $lista as $h) {
+			$herr  = isset($h['herrId']) ? (int) $h['herrId'] : 0;
+			$libre = isset($h['descripcion_libre']) ? trim((string) $h['descripcion_libre']) : '';
+			if ($herr <= 0 && $libre === '') {
+				continue;
+			}
+			$filas[] = array_merge(array('herrId' => (string) max($herr, 0), 'cantidad' => man_numero(isset($h['cantidad']) ? $h['cantidad'] : 1),
+				'descripcion_libre' => $herr > 0 ? '' : $libre), $clave);
+		}
+		$rsp = requestBox(REST_MAN . '/', array(array('_put_ot_herramientas_borrar' => $clave)));
+		if (!$rsp['status']) {
+			return false;
+		}
+		return man_lote_detalle('ot', 'herramienta', $filas) !== false;
+	}
+
+	/** reasignaOt de asset: cambia el responsable de "Ejecutar OT" (toolsMANAPI POST /tools/man/plan/reasignar). @return array status y msj */
+	function reasignarPlan($idOt, $responsable){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | reasignarPlan($idOt, $responsable)");
+		return $this->planApi('plan/reasignar', array('usrId' => (string) (int) $responsable, 'id_orden' => (string) (int) $idOt));
+	}
+
+	/**
+	* Guarda el responsable elegido en la ventana al cerrarla (updateResponsable de asset). Solo órdenes y usuarios de la empresa (T47).
+	* @return bool
+	*/
+	function updateResponsablePlan($idOt, $responsable){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | updateResponsablePlan($idOt, $responsable)");
+		$e = man_empresa();
+		// La base no informa cuántas filas tocó: se mira antes que la orden y el usuario sean de la empresa
+		if (!$this->filas('/plan/ot/' . (int) $idOt . '/empresa/' . $e) || !$this->filas('/usuario/' . (int) $responsable . '/nick/empresa/' . $e)) {
+			return false;
+		}
+		$rsp = man_escribir('PUT', 'plan/ot/responsable', array('id_usuario_a' => (string) (int) $responsable, 'id_orden' => (string) (int) $idOt,
+			'id_empresa' => $e, 'id_usuario_a2' => (string) (int) $responsable, 'id_empresa2' => $e));
+		return (bool) $rsp['status'];
+	}
+
+	/**
+	* Lanza el caso de Bonita de una OT preventiva o predictiva programada sin lanzar (toolsMANAPI POST /tools/man/plan/lanzar, MIG-8).
+	* @return array status, id_orden, case_id o msj
+	*/
+	function lanzarPlan($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | lanzarPlan($idOt)");
+		return $this->planApi('plan/lanzar', array('id_orden' => (string) (int) $idOt, 'emprId' => (string) empresa()));
+	}
+
+	/**
+	* Anula una OT preventiva o predictiva programada sin lanzar (toolsMANAPI POST /tools/man/plan/anular, MIG-8). No abre ningún caso.
+	* @return array status e id_orden, o status false y msj
+	*/
+	function anularPlan($idOt){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | anularPlan($idOt)");
+		return $this->planApi('plan/anular', array('id_orden' => (string) (int) $idOt, 'usrId' => (string) man_usuario(),
+			'fecha' => date('Y-m-d H:i:s'), 'motivo' => 'Anulada antes de lanzar'));
+	}
+
+	/** Pedido a un recurso de toolsMANAPI del Plan con los datos de la sesión. @return array respuesta ({status, msj, ...}) */
+	private function planApi($recurso, $datos){
+		$datos['id_empresa'] = man_empresa();
+		$datos['session'] = $this->session->has_userdata('bpm_token') ? $this->session->userdata('bpm_token') : '';
+		$rsp = $this->rest->callAPI('POST', HOST . '/tools/man/' . $recurso, $datos);
+		$aux = json_decode($rsp['data'], true);
+		if (!$rsp['status'] || empty($aux['status'])) {
+			log_message('ERROR', '#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | planApi(' . $recurso . ') >> ' . json_encode($rsp['data']));
+			return array('status' => false, 'msj' => isset($aux['msj']) ? $aux['msj'] : 'ASP_101');
+		}
+		return $aux;
+	}
+
+	/** Fechas de inicio y terminación de la OT (ventana de ver informe). @return array|false */
+	function getLecturasOrden($id_ot){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | getLecturasOrden(" . json_encode($id_ot) . ")");
+		return $this->filas('/ot/' . (int) $id_ot . '/fechas/empresa/' . man_empresa());
+	}
+
+	/** Registra un adjunto de la OT. @return string|false id del adjunto */
+	function setAdjunto($adjunto){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | setAdjunto(" . json_encode($adjunto) . ")");
+		$rsp = man_escribir('POST', 'ot/adjunto', array(
+			'ot_adjunto' => (string) $adjunto['ot_adjunto'],
+			'id_orden'   => (string) $adjunto['otId'],
+			'id_empresa' => man_empresa(),
+		));
+		return ($rsp['status'] && is_scalar($rsp['data']) && (int) $rsp['data'] > 0) ? (string) $rsp['data'] : false;
+	}
+
+	/** Borra un adjunto de la OT. @return bool */
+	function eliminarAdjunto($id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | eliminarAdjunto($id)");
+		$rsp = man_escribir('PUT', 'ot/adjunto/borrar', array('id' => (string) $id, 'id_empresa' => man_empresa()));
+		return (bool) $rsp['status'];
+	}
+
+	/** Cambia el estado de la OT. @return bool */
+	function update_predictivo($data, $id){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | update_predictivo(" . json_encode($data) . ", $id)");
+		$rsp = man_escribir('PUT', 'ot/estado', array('estado' => (string) $data['estado'], 'id_orden' => (string) $id, 'id_empresa' => man_empresa()));
+		return (bool) $rsp['status'];
+	}
+
+	/** Termina la OT (T) con la fecha indicada. @return bool */
+	function update_cambio($ido, $fecha){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | update_cambio($ido, $fecha)");
+		$rsp = man_escribir('PUT', 'ot/finalizar', array('fecha' => (string) $fecha, 'id_orden' => (string) $ido, 'id_empresa' => man_empresa()));
+		return (bool) $rsp['status'];
+	}
+
+	/**
+	 * Tareas de la OT con el nombre del usuario. Asset devolvía todas las columnas de sisusers, incluida la
+	 * contraseña cifrada; acá solo usrId, usrName y usrLastName, que es lo que usa la vista (E25).
+	 * @return array|false
+	 */
+	function cargartareas($idglob){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | cargartareas(" . json_encode($idglob) . ")");
+		return $this->filas('/ot/' . (int) $idglob . '/tareas/empresa/' . man_empresa());
+	}
+
+	/** Agrega una tarea a la OT. @return string|false id */
+	function agregar_tareas($data){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | agregar_tareas(" . json_encode($data) . ")");
+		$rsp = man_escribir('POST', 'ot/tarea', array(
+			'id_orden'     => (string) $data['id_orden'],
+			'tareadescrip' => isset($data['tareadescrip']) ? (string) $data['tareadescrip'] : null,
+			'estado'       => isset($data['estado']) ? (string) $data['estado'] : null,
+			'id_empresa'   => man_empresa(),
+		));
+		return ($rsp['status'] && is_scalar($rsp['data']) && (int) $rsp['data'] > 0) ? (string) $rsp['data'] : false;
+	}
+
+	/** Cambia un campo de una tarea de la OT (estado, usuario o fecha). @return bool */
+	function cambiarTarea($idListarea, $campo, $valor){
+		log_message('DEBUG', "#TRAZA | TRAZ-TOOLS-MAN | Otrabajos | cambiarTarea($idListarea, $campo, " . json_encode($valor) . ")");
+		$params = array('estado' => 'estado', 'usuario' => 'id_usuario', 'fecha' => 'fecha');
+		$rsp = man_escribir('PUT', 'ot/tarea/' . $campo, array(
+			$params[$campo] => $valor === null ? null : (string) $valor,
+			'id_listarea'   => (string) $idListarea,
+			'id_empresa'    => man_empresa(),
+		));
+		return (bool) $rsp['status'];
+	}
+
+	/** Filas de un recurso de MANDataService (result_array()), o false si no hay. */
+	private function filas($recurso){
+		$filas = man_lista(wso2(REST_MAN . $recurso));
+		return $filas ? $filas : false;
+	}
+
+	/** Filas como objetos (result()), o false si no hay. */
+	private function objetos($recurso){
+		$filas = man_lista(wso2(REST_MAN . $recurso));
+		return $filas ? json_decode(json_encode($filas)) : false;
+	}
+}
